@@ -1,0 +1,6 @@
+{
+  "name": "Gestor de Treinamentos Internos - QSMS Offshore",
+  "description": "Plataforma de gestão de treinamentos, procedimentos POPs, matriz de conformidade e avaliações de eficácia para operações offshore.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
