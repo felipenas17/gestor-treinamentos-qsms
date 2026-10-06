@@ -189,7 +189,7 @@ export function ProceduresScreen({
                 onChange={(e) => setSelectedRole(e.target.value)}
                 className="px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 max-w-[140px] truncate"
               >
-                {roles.map((r) => (
+                {[...new Set(roles)].map((r) => (
                   <option key={r} value={r}>{r}</option>
                 ))}
               </select>

@@ -15,6 +15,8 @@ import { NewProcedureAiModal } from '@/components/modals/new-procedure-ai-modal'
 import { NewTrainingPlanModal } from '@/components/modals/new-training-plan-modal';
 import { ProcedureDetailsModal } from '@/components/modals/procedure-details-modal';
 import { RegisterTrainingModal } from '@/components/modals/register-training-modal';
+import { EmployeesScreen } from '@/components/screens/employees-screen';
+import { CertificatesScreen } from '@/components/screens/certificates-screen';
 import { ImportDocumentModal } from '@/components/modals/import-document-modal';
 
 import {
@@ -297,6 +299,10 @@ export default function GestorTreinamentosApp() {
               onCreateNewAssessment={() => { setIsNewProcedureModalOpen(true); }}
             />
           )}
+          {currentTab === 'colaboradores' && <EmployeesScreen />}
+          {currentTab === 'certificados' && <CertificatesScreen />}
+          {currentTab === 'colaboradores' && <EmployeesScreen />}
+          {currentTab === 'certificados' && <CertificatesScreen />}
           {currentTab === 'matriz' && (
             <MatrixScreen
               records={records}
@@ -325,7 +331,7 @@ export default function GestorTreinamentosApp() {
       <NewTrainingPlanModal isOpen={isNewPlanModalOpen} onClose={() => setIsNewPlanModalOpen(false)} procedures={procedures} onPlanScheduled={handlePlanScheduled} />
       <ProcedureDetailsModal procedure={selectedProcedureDetails} onClose={() => setSelectedProcedureDetails(null)} />
       <RegisterTrainingModal isOpen={isRegisterTrainingOpen} onClose={() => setIsRegisterTrainingOpen(false)} procedures={procedures} onSave={handleSaveTrainingRecord} />
-      <ImportDocumentModal isOpen={isImportDocOpen} onClose={() => setIsImportDocOpen(false)} onImported={handleProcedureImported} />
+      <ImportDocumentModal isOpen={isImportDocOpen} onClose={() => setIsImportDocOpen(false)} onProcedureImported={handleProcedureImported} />
     </div>
   );
 }

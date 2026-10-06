@@ -30,7 +30,7 @@ export async function fetchTrainingRecords() {
       employees (id, name, role, sector, email, avatar_url),
       procedures (id, code, name, sector)
     `)
-    .order('days_remaining');
+    .order('validity_date');
   if (error) { console.error('fetchTrainingRecords:', error); return null; }
   return data;
 }

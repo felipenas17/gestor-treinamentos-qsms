@@ -11,7 +11,8 @@ import {
   ShieldCheck,
   Anchor,
   Sparkles,
-  Radio
+  Radio,
+  Award,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -53,6 +54,13 @@ export function Sidebar({
       icon: CheckSquare,
       badge: 'UUID Ativo',
       badgeColor: 'text-cyan-400 bg-cyan-950/60 border-cyan-800/40',
+    },
+    {
+      id: 'certificados',
+      label: 'Certificados',
+      icon: Award,
+      badge: '',
+      description: 'Internos e Normativos',
     },
     {
       id: 'matriz',
