@@ -1,41 +1,34 @@
-import { NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from "@google/genai";
+import { NextRequest, NextResponse } from "next/server";
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) return NextResponse.json({ error: "GEMINI_API_KEY não configurada" }, { status: 500 });
 
-    // Extração a partir de arquivo
+    const ai = new GoogleGenAI({ apiKey });
+    const prompt = `Analise este documento e extraia em JSON puro (sem markdown):
+{"code":"POP-001","name":"nome","description":"escopo","hours":"8","validityMonths":"12","criticality":"Alta"}
+Se não encontrar, use string vazia. Responda APENAS com o JSON.`;
+
     if (body.fileData) {
-      const prompt = `Analise este documento de procedimento operacional e extraia as seguintes informações em JSON puro (sem markdown):
-{
-  "code": "código do POP ex: POP-001 ou IT-002",
-  "name": "título/nome do procedimento",
-  "description": "objetivo e escopo em até 3 frases",
-  "hours": "carga horária em número (só o número)",
-  "validityMonths": "validade em meses (6, 12, 24, 36 ou 60)",
-  "criticality": "Alta, Média ou Baixa"
-}
-Se não encontrar um campo, use string vazia. Responda APENAS com o JSON.`;
-
-      const result = await model.generateContent([
-        { inlineData: { mimeType: body.mimeType, data: body.fileData } },
-        prompt
-      ]);
-      const text = result.response.text().trim().replace(/```json|```/g, '');
-      const data = JSON.parse(text);
-      return NextResponse.json(data);
+      const result = await ai.models.generateContent({
+        model: "gemini-2.0-flash",
+        contents: [{ role: "user", parts: [
+          { inlineData: { mimeType: body.mimeType || "application/octet-stream", data: body.fileData } },
+          { text: prompt }
+        ]}],
+      });
+      const text = result.text?.trim().replace(/```json|```/g, "").trim() ?? "";
+      return NextResponse.json(JSON.parse(text));
     }
 
-    // Geração a partir de descrição textual (fluxo original)
-    const { description } = body;
-    const result = await model.generateContent(
-      `Gere um procedimento operacional padrão completo em português para: ${description}. Retorne JSON com: code, name, description, hours, validityMonths, criticality.`
-    );
-    const text = result.response.text().trim().replace(/```json|```/g, '');
+    const result = await ai.models.generateContent({
+      model: "gemini-2.0-flash",
+      contents: [{ role: "user", parts: [{ text: `Gere POP em português para: ${body.description}. JSON puro: code, name, description, hours, validityMonths, criticality.` }] }],
+    });
+    const text = result.text?.trim().replace(/```json|```/g, "").trim() ?? "";
     return NextResponse.json(JSON.parse(text));
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 });
