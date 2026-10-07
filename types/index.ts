@@ -14,7 +14,7 @@ export type Sector =
   | 'RH'
   | 'Segurança Patrimonial';
 
-export type ComplianceStatus = 'Certificado' | 'Reciclar' | 'Vencido';
+export type ComplianceStatus = 'Certificado' | 'Reciclar' | 'Vencido' | 'Pendente';
 export type ProcedureStatus = 'Ativo' | 'Em Revisão' | 'Arquivado';
 
 export interface Procedure {
@@ -42,6 +42,8 @@ export interface Employee {
   admissionDate: string;
   cpfMasked: string;
   email: string;
+  phone?: string;
+  status?: 'Ativo' | 'Embarcado' | 'Desembarcado' | 'Afastado';
 }
 
 export interface TrainingRecord {

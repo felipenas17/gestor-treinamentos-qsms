@@ -108,6 +108,102 @@ export async function generateAssessmentLink(assessmentId: string, employeeId?: 
   return data?.token_uuid;
 }
 
+// ─── Employees ──────────────────────────────────────────────────────────────
+
+export async function fetchEmployees() {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from('employees')
+    .select('*')
+    .order('name');
+  if (error) { console.error('fetchEmployees:', error); return null; }
+  return data;
+}
+
+export async function upsertEmployee(payload: {
+  id?: string;
+  name: string;
+  role: string;
+  sector: string;
+  email: string;
+  phone?: string;
+  cpf_masked?: string;
+  admission_date?: string;
+  status?: string;
+}) {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from('employees')
+    .upsert({
+      ...payload,
+      admission_date: payload.admission_date || new Date().toISOString().split('T')[0],
+      status: payload.status || 'Ativo',
+    }, { onConflict: 'id' })
+    .select()
+    .single();
+  if (error) { console.error('upsertEmployee:', error); return null; }
+  return data;
+}
+
+export async function deleteEmployee(id: string) {
+  if (!supabase) return false;
+  const { error } = await supabase.from('employees').delete().eq('id', id);
+  if (error) { console.error('deleteEmployee:', error); return false; }
+  return true;
+}
+
+// ─── Auto-Matriz: gera registros pendentes ao cadastrar colaborador ─────────
+
+export async function autoGenerateMatrixForEmployee(employeeId: string, sector: string) {
+  if (!supabase) return { count: 0 };
+
+  // 1. Busca todos os procedimentos obrigatórios para o setor
+  const { data: matrix, error: matrixError } = await supabase
+    .from('sector_procedure_matrix')
+    .select('procedure_id')
+    .eq('sector', sector);
+
+  if (matrixError || !matrix || matrix.length === 0) {
+    console.warn('autoGenerateMatrixForEmployee: sem procedimentos para setor', sector, matrixError);
+    return { count: 0 };
+  }
+
+  // 2. Verifica quais treinamentos o colaborador já tem (evita duplicatas)
+  const procedureIds = matrix.map((m: any) => m.procedure_id);
+  const { data: existing } = await supabase
+    .from('trainings')
+    .select('procedure_id')
+    .eq('employee_id', employeeId)
+    .in('procedure_id', procedureIds);
+
+  const existingIds = new Set((existing || []).map((t: any) => t.procedure_id));
+  const missing = procedureIds.filter((id: string) => !existingIds.has(id));
+
+  if (missing.length === 0) return { count: 0 };
+
+  // 3. Insere registros pendentes para os procedimentos que faltam
+  const records = missing.map((procedure_id: string) => ({
+    employee_id: employeeId,
+    procedure_id,
+    status: 'Pendente',
+    completion_date: null,
+    validity_date: null,
+    compliance_rate: 0,
+  }));
+
+  const { data: inserted, error: insertError } = await supabase
+    .from('trainings')
+    .insert(records)
+    .select('id');
+
+  if (insertError) {
+    console.error('autoGenerateMatrixForEmployee insert error:', insertError);
+    return { count: 0 };
+  }
+
+  return { count: inserted?.length ?? 0 };
+}
+
 export async function saveProcedure(data: {
   code: string; name: string; description: string;
   hours: string; validityMonths: string;
