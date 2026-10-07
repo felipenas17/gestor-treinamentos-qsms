@@ -107,3 +107,28 @@ export async function generateAssessmentLink(assessmentId: string, employeeId?: 
   if (error) { console.error('generateAssessmentLink:', error); return null; }
   return data?.token_uuid;
 }
+
+export async function saveProcedure(data: {
+  code: string; name: string; description: string;
+  hours: string; validityMonths: string;
+  criticality: string; sectors: string[];
+}) {
+  if (!supabase) return { error: 'not configured' };
+  const { data: proc, error } = await supabase
+    .from('procedures')
+    .insert({
+      code: data.code, name: data.name,
+      description: data.description,
+      hours: parseInt(data.hours) || 0,
+      validity_months: parseInt(data.validityMonths),
+      criticality: data.criticality,
+      status: 'active'
+    })
+    .select('id').single();
+  if (error || !proc) return { error };
+  if (data.sectors.length > 0) {
+    await supabase.from('sector_procedure_matrix')
+      .insert(data.sectors.map(sector => ({ sector, procedure_id: proc.id })));
+  }
+  return { id: proc.id };
+}

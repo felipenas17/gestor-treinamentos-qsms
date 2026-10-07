@@ -1,4 +1,7 @@
 'use client';
+'use client';
+import { NewProcedureModal } from '@/components/modals/new-procedure-modal';
+import { saveProcedure } from '@/lib/supabase';
 
 import React, { useState, useMemo } from 'react';
 import { 
@@ -32,6 +35,11 @@ export function ProceduresScreen({
   onSelectProcedure,
   onImportDocument,
 }: ProceduresScreenProps) {
+  const [showNewProc, setShowNewProc] = useState(false);
+
+  const handleProcSaved = async (data: any) => {
+    await saveProcedure(data);
+  };
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSector, setSelectedSector] = useState<string>('Todos');
   const [selectedRole, setSelectedRole] = useState<string>('Todos');
@@ -412,6 +420,12 @@ export function ProceduresScreen({
             );
           })}
         </div>
+      )}
+      {showNewProc && (
+        <NewProcedureModal
+          onSaved={handleProcSaved}
+          onClose={() => setShowNewProc(false)}
+        />
       )}
     </div>
   );

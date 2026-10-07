@@ -140,7 +140,7 @@ export function EmployeesScreen() {
         <div className="bg-white border border-slate-200 rounded-xl flex flex-col items-center justify-center py-16 gap-3">
           <Users className="w-10 h-10 text-slate-300"/>
           <p className="text-slate-500 text-sm font-medium">Nenhum colaborador cadastrado</p>
-          <p className="text-slate-400 text-xs">Clique em "Novo colaborador" para começar</p>
+          <p className="text-slate-400 text-xs">Clique em &quot;Novo colaborador&quot; para começar</p>
           <button onClick={() => { setEditing(null); setShowModal(true); }}
             className="mt-2 flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700">
             <Plus className="w-4 h-4"/>Cadastrar primeiro colaborador
