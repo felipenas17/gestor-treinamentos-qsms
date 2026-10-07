@@ -1,88 +1,43 @@
-import { GoogleGenAI, Type } from "@google/genai";
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from 'next/server';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
-export async function POST(req: NextRequest) {
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+
+export async function POST(req: Request) {
   try {
-    const { title, sector, associatedRole, keyHazards } = await req.json();
+    const body = await req.json();
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
-    if (!title) {
-      return NextResponse.json({ error: 'Título do procedimento é obrigatório' }, { status: 400 });
+    // Extração a partir de arquivo
+    if (body.fileData) {
+      const prompt = `Analise este documento de procedimento operacional e extraia as seguintes informações em JSON puro (sem markdown):
+{
+  "code": "código do POP ex: POP-001 ou IT-002",
+  "name": "título/nome do procedimento",
+  "description": "objetivo e escopo em até 3 frases",
+  "hours": "carga horária em número (só o número)",
+  "validityMonths": "validade em meses (6, 12, 24, 36 ou 60)",
+  "criticality": "Alta, Média ou Baixa"
+}
+Se não encontrar um campo, use string vazia. Responda APENAS com o JSON.`;
+
+      const result = await model.generateContent([
+        { inlineData: { mimeType: body.mimeType, data: body.fileData } },
+        prompt
+      ]);
+      const text = result.response.text().trim().replace(/```json|```/g, '');
+      const data = JSON.parse(text);
+      return NextResponse.json(data);
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      const randomCode = `POP-${sector ? sector.slice(0, 2).toUpperCase() : 'OP'}-${Math.floor(100 + Math.random() * 900)}`;
-      return NextResponse.json({
-        procedure: {
-          code: randomCode,
-          name: title,
-          sector: sector || 'Operações Offshore',
-          associatedRole: associatedRole || 'Operador Especialista',
-          application: `Aplicação operacional com foco em: ${keyHazards || 'Controle de riscos críticos'}.`,
-          complianceRate: 100,
-          lastRevision: new Date().toLocaleDateString('pt-BR'),
-          status: 'Ativo',
-          questionsCount: 10,
-          criticality: 'Alta',
-          description: `Procedimento Padrão para mitigar riscos de ${keyHazards || 'falhas operacionais'} conforme NR-37.`,
-          validityMonths: 12
-        }
-      });
-    }
-
-    const ai = new GoogleGenAI({ apiKey });
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash',
-      contents: `Gere um procedimento operacional padrão (POP) completo para Tiger Rentank do Brasil (offshore QSMS):
-Título: ${title}
-Setor: ${sector || 'Operações Offshore'}
-Função associada: ${associatedRole || 'Operador'}
-Riscos principais: ${keyHazards || 'Riscos operacionais offshore'}
-
-Responda APENAS com JSON válido no formato especificado.`,
-      config: {
-        systemInstruction: `Você é um Engenheiro Sênior de QSMS offshore. Gere POPs técnicos, precisos e alinhados com NR-37, ISO 45001 e práticas Petrobras/PRIO/MODEC. Responda em português brasileiro.`,
-        temperature: 0.5,
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            procedure: {
-              type: Type.OBJECT,
-              properties: {
-                code: { type: Type.STRING },
-                name: { type: Type.STRING },
-                sector: { type: Type.STRING },
-                associatedRole: { type: Type.STRING },
-                application: { type: Type.STRING },
-                complianceRate: { type: Type.NUMBER },
-                lastRevision: { type: Type.STRING },
-                status: { type: Type.STRING },
-                questionsCount: { type: Type.INTEGER },
-                criticality: { type: Type.STRING },
-                description: { type: Type.STRING },
-                validityMonths: { type: Type.INTEGER },
-              },
-              required: ['code', 'name', 'sector', 'associatedRole', 'application', 'criticality', 'description', 'validityMonths'],
-            },
-          },
-          required: ['procedure'],
-        },
-      },
-    });
-
-    const parsed = JSON.parse(response.text || '{}');
-    if (!parsed.procedure) throw new Error('Resposta inválida da IA');
-
-    parsed.procedure.complianceRate = 100;
-    parsed.procedure.status = 'Ativo';
-    parsed.procedure.questionsCount = parsed.procedure.questionsCount || 10;
-    parsed.procedure.lastRevision = new Date().toLocaleDateString('pt-BR');
-
-    return NextResponse.json(parsed);
-  } catch (error) {
-    console.error('Erro ao gerar procedimento:', error);
-    return NextResponse.json({ error: 'Falha ao gerar procedimento.' }, { status: 500 });
+    // Geração a partir de descrição textual (fluxo original)
+    const { description } = body;
+    const result = await model.generateContent(
+      `Gere um procedimento operacional padrão completo em português para: ${description}. Retorne JSON com: code, name, description, hours, validityMonths, criticality.`
+    );
+    const text = result.response.text().trim().replace(/```json|```/g, '');
+    return NextResponse.json(JSON.parse(text));
+  } catch (e) {
+    return NextResponse.json({ error: String(e) }, { status: 500 });
   }
 }

@@ -1,17 +1,13 @@
 'use client';
-import React, { useState } from 'react';
-import { X, FileText, Check } from 'lucide-react';
+import React, { useState, useRef, useCallback } from 'react';
+import { X, FileText, Check, Upload, Loader2, Sparkles } from 'lucide-react';
 
 const SETORES = ['Operacional','Brascabo','Operacional RDO','Transbordo MC','CS','QSMS','Suprimentos'];
 
 export interface ProcedureFormData {
-  code: string;
-  name: string;
-  description: string;
-  hours: string;
-  validityMonths: string;
-  criticality: 'Alta' | 'Média' | 'Baixa';
-  sectors: string[];
+  code: string; name: string; description: string;
+  hours: string; validityMonths: string;
+  criticality: 'Alta' | 'Média' | 'Baixa'; sectors: string[];
 }
 
 interface NewProcedureModalProps {
@@ -24,6 +20,10 @@ export function NewProcedureModal({ onSaved, onClose }: NewProcedureModalProps) 
     code: '', name: '', description: '', hours: '',
     validityMonths: '12', criticality: 'Média', sectors: []
   });
+  const [dragging, setDragging] = useState(false);
+  const [extracting, setExtracting] = useState(false);
+  const [extractedFile, setExtractedFile] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const set = (k: keyof ProcedureFormData, v: string | string[]) =>
     setF(p => ({ ...p, [k]: v }));
@@ -33,6 +33,46 @@ export function NewProcedureModal({ onSaved, onClose }: NewProcedureModalProps) 
       ...p,
       sectors: p.sectors.includes(s) ? p.sectors.filter(x => x !== s) : [...p.sectors, s]
     }));
+
+  const extractFromFile = useCallback(async (file: File) => {
+    setExtracting(true);
+    setExtractedFile(file.name);
+    try {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = async () => {
+        const base64 = (reader.result as string).split(',')[1];
+        const mimeType = file.type || 'application/octet-stream';
+        const res = await fetch('/api/gemini/generate-procedure', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fileData: base64, mimeType, fileName: file.name })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setF(p => ({
+            ...p,
+            code: data.code || p.code,
+            name: data.name || p.name,
+            description: data.description || p.description,
+            hours: data.hours || p.hours,
+            validityMonths: data.validityMonths || p.validityMonths,
+            criticality: data.criticality || p.criticality,
+          }));
+        }
+        setExtracting(false);
+      };
+    } catch {
+      setExtracting(false);
+    }
+  }, []);
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (file) extractFromFile(file);
+  };
 
   const save = () => {
     if (!f.name || !f.code) return;
@@ -53,6 +93,42 @@ export function NewProcedureModal({ onSaved, onClose }: NewProcedureModalProps) 
         </div>
 
         <div className="p-5 space-y-4">
+          {/* Drop zone */}
+          <div
+            onDragOver={e => { e.preventDefault(); setDragging(true); }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={handleDrop}
+            onClick={() => fileRef.current?.click()}
+            className={`relative border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition-colors ${
+              dragging ? 'border-blue-400 bg-blue-50' : 'border-slate-200 hover:border-blue-300 hover:bg-slate-50'
+            }`}
+          >
+            <input ref={fileRef} type="file" className="hidden"
+              accept=".pdf,.doc,.docx,.txt"
+              onChange={e => e.target.files?.[0] && extractFromFile(e.target.files[0])}/>
+            {extracting ? (
+              <div className="flex flex-col items-center gap-2 py-1">
+                <Loader2 className="w-6 h-6 text-blue-500 animate-spin"/>
+                <p className="text-sm text-blue-600 font-medium">Analisando {extractedFile}...</p>
+                <p className="text-xs text-slate-400">O Gemini está extraindo os dados do procedimento</p>
+              </div>
+            ) : extractedFile ? (
+              <div className="flex flex-col items-center gap-2 py-1">
+                <div className="w-7 h-7 rounded-full bg-emerald-100 flex items-center justify-center">
+                  <Sparkles className="w-4 h-4 text-emerald-600"/>
+                </div>
+                <p className="text-sm text-emerald-700 font-medium">Dados extraídos de <span className="font-mono">{extractedFile}</span></p>
+                <p className="text-xs text-slate-400">Clique para trocar o arquivo</p>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-2 py-1">
+                <Upload className="w-6 h-6 text-slate-300"/>
+                <p className="text-sm font-medium text-slate-600">Arraste o PDF ou DOCX do procedimento</p>
+                <p className="text-xs text-slate-400">O Gemini preenche os campos automaticamente · ou preencha manualmente abaixo</p>
+              </div>
+            )}
+          </div>
+
           {/* Code + Hours */}
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1">
@@ -79,7 +155,7 @@ export function NewProcedureModal({ onSaved, onClose }: NewProcedureModalProps) 
 
           {/* Description */}
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-600">Descrição</label>
+            <label className="text-xs font-medium text-slate-600">Descrição / Escopo</label>
             <textarea value={f.description} onChange={e => set('description', e.target.value)}
               rows={3} placeholder="Descreva o objetivo e escopo do procedimento..."
               className="px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"/>
@@ -124,9 +200,7 @@ export function NewProcedureModal({ onSaved, onClose }: NewProcedureModalProps) 
                 return (
                   <button key={s} onClick={() => toggleSector(s)}
                     className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm text-left transition-colors ${
-                      selected
-                        ? 'bg-blue-50 border-blue-300 text-blue-700'
-                        : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                      selected ? 'bg-blue-50 border-blue-300 text-blue-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
                     }`}>
                     <div className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 ${
                       selected ? 'bg-blue-600' : 'border border-slate-300'
@@ -152,8 +226,8 @@ export function NewProcedureModal({ onSaved, onClose }: NewProcedureModalProps) 
             className="px-4 py-2 text-sm border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50">
             Cancelar
           </button>
-          <button onClick={save}
-            className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">
+          <button onClick={save} disabled={!f.name || !f.code}
+            className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:opacity-40 disabled:cursor-not-allowed">
             Salvar procedimento
           </button>
         </div>
