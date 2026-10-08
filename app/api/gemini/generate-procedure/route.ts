@@ -5,13 +5,13 @@ const EMPTY = { code: "", name: "", description: "", hours: "", validityMonths: 
 
 function extractJson(text: string) {
   try { return JSON.parse(text); } catch { /* not pure JSON */ }
-  const biggest = text.match(/\{[\s\S]*\}/);
-  if (biggest) { try { return JSON.parse(biggest[0]); } catch { /* ignore */ } }
+  const m = text.match(/\{[\s\S]*\}/);
+  if (m) { try { return JSON.parse(m[0]); } catch { /* ignore */ } }
   return null;
 }
 
 const PROMPT = `Você é um extrator de dados de procedimentos operacionais (POPs/PGTs/Normas).
-Analise o texto abaixo e extraia as informações em JSON puro (sem markdown, sem explicações).
+Analise o documento abaixo e extraia as informações em JSON puro (sem markdown, sem explicações).
 
 {
   "code": "código exato como aparece no cabeçalho (ex: PG-TR-SMS-002, POP-EST-001, IT-SEG-015 — mantenha o formato original)",
@@ -22,15 +22,6 @@ Analise o texto abaixo e extraia as informações em JSON puro (sem markdown, se
   "criticality": "criticidade de segurança — escolha entre: Alta, Média ou Baixa — se não encontrar use Alta"
 }`;
 
-async function extractTextFromPDF(base64: string): Promise<string> {
-  const buffer = Buffer.from(base64, "base64");
-  // pdf-parse@1.1.1 is CJS — declared in serverExternalPackages so Next.js doesn't bundle it
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const pdfParse = require("pdf-parse") as (buf: Buffer) => Promise<{ text: string }>;
-  const data = await pdfParse(buffer);
-  return data.text || "";
-}
-
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -38,50 +29,12 @@ export async function POST(req: NextRequest) {
     if (!apiKey) return NextResponse.json({ error: "GEMINI_API_KEY não configurada" }, { status: 500 });
 
     const ai = new GoogleGenAI({ apiKey });
-    let contentText = "";
 
     if (body.fileData) {
-      const isPdf = (body.mimeType || "").includes("pdf") ||
-                    (body.fileName || "").toLowerCase().endsWith(".pdf");
+      const mimeType = (body.mimeType && body.mimeType !== "application/octet-stream")
+        ? body.mimeType : "application/pdf";
 
-      if (isPdf) {
-        // Extract text from PDF server-side, then send text to Gemini
-        try {
-          const extracted = await extractTextFromPDF(body.fileData);
-          if (extracted.trim().length > 100) {
-            // Limit to first 8000 chars to stay within token limits
-            contentText = extracted.substring(0, 8000);
-          }
-        } catch (pdfErr) {
-          console.warn("[generate-procedure] pdf-parse failed, falling back to inline:", pdfErr);
-        }
-      }
-
-      if (contentText) {
-        // Use extracted text
-        const result = await ai.models.generateContent({
-          model: "gemini-2.0-flash",
-          contents: [{
-            role: "user",
-            parts: [{ text: `${PROMPT}\n\n--- TEXTO DO DOCUMENTO ---\n${contentText}` }],
-          }],
-        });
-        const rawText = result.text ?? "";
-        const cleaned = rawText.trim()
-          .replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/\s*```$/i, "").trim();
-        const parsed = extractJson(cleaned);
-        if (parsed) {
-          return NextResponse.json(sanitise(parsed));
-        }
-        console.error("[generate-procedure] JSON não encontrado (text mode). Gemini:", rawText.substring(0, 300));
-        return NextResponse.json(EMPTY);
-      }
-
-      // Fallback: send inline to Gemini (for docx/txt or if pdf-parse returned nothing)
-      const mimeType = body.mimeType && body.mimeType !== "application/octet-stream"
-        ? body.mimeType
-        : "application/pdf";
-
+      // Send file directly to Gemini as inlineData — suporta PDF nativamente
       const result = await ai.models.generateContent({
         model: "gemini-2.0-flash",
         contents: [{
@@ -92,16 +45,17 @@ export async function POST(req: NextRequest) {
           ],
         }],
       });
+
       const rawText = result.text ?? "";
       const cleaned = rawText.trim()
         .replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/\s*```$/i, "").trim();
       const parsed = extractJson(cleaned);
       if (parsed) return NextResponse.json(sanitise(parsed));
-      console.error("[generate-procedure] JSON não encontrado (inline mode). Gemini:", rawText.substring(0, 300));
+      console.error("[generate-procedure] JSON não encontrado. Gemini:", rawText.substring(0, 300));
       return NextResponse.json(EMPTY);
     }
 
-    // Text-only fallback (no file uploaded, just description text)
+    // Fallback sem arquivo — usa descrição textual
     const descText = body.description || body.title || "procedimento operacional";
     const result = await ai.models.generateContent({
       model: "gemini-2.0-flash",
@@ -130,7 +84,6 @@ function sanitise(parsed: Record<string, unknown>) {
     hours: String(parsed.hours ?? "").replace(/\D/g, "").trim(),
     validityMonths: String(parsed.validityMonths ?? "12").trim(),
     criticality: (["Alta", "Média", "Baixa"].includes(parsed.criticality as string)
-      ? parsed.criticality
-      : "Alta") as string,
+      ? parsed.criticality : "Alta") as string,
   };
 }

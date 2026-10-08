@@ -1,7 +1,6 @@
 import type { NextConfig } from 'next';
 const nextConfig: NextConfig = {
   typescript: { ignoreBuildErrors: false },
-  serverExternalPackages: ['pdf-parse'],
   webpack: (config) => {
     config.watchOptions = { ignored: ['**/supabase/**'] };
     return config;
