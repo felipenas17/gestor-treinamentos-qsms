@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useRef, useCallback } from 'react';
-import { X, FileText, Check, Upload, Loader2, Sparkles } from 'lucide-react';
+import { X, FileText, Check, Upload, Loader2, Sparkles, Paperclip } from 'lucide-react';
 
 const SETORES = ['Operacional','Brascabo','Operacional RDO','Transbordo MC','CS','QSMS','Suprimentos','Terceiros'];
 
@@ -23,7 +23,8 @@ export function NewProcedureModal({ onSaved, onClose }: NewProcedureModalProps) 
   });
   const [dragging, setDragging] = useState(false);
   const [extracting, setExtracting] = useState(false);
-  const [extractedFile, setExtractedFile] = useState<string | null>(null);
+  const [attachedFile, setAttachedFile] = useState<string | null>(null);   // sempre que um arquivo é selecionado
+  const [extractionOk, setExtractionOk] = useState(false);                 // true só quando Gemini retornou dados
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -39,7 +40,8 @@ export function NewProcedureModal({ onSaved, onClose }: NewProcedureModalProps) 
   const extractFromFile = useCallback(async (file: File) => {
     setSelectedFile(file);
     setExtracting(true);
-    setExtractedFile(file.name);
+    setAttachedFile(file.name);
+    setExtractionOk(false);
 
     const doExtract = () => new Promise<void>((resolve) => {
       const reader = new FileReader();
@@ -66,19 +68,16 @@ export function NewProcedureModal({ onSaved, onClose }: NewProcedureModalProps) 
                 validityMonths: data.validityMonths || p.validityMonths,
                 criticality: data.criticality || p.criticality,
               }));
-            } else {
-              setExtractedFile(null);
+              setExtractionOk(true);
             }
-          } else {
-            setExtractedFile(null);
           }
         } catch {
-          setExtractedFile(null);
+          // arquivo anexado mas extração falhou — mantém attachedFile visível
         } finally {
           resolve();
         }
       };
-      reader.onerror = () => { setExtractedFile(null); resolve(); };
+      reader.onerror = () => { resolve(); };
     });
 
     try {
@@ -130,16 +129,24 @@ export function NewProcedureModal({ onSaved, onClose }: NewProcedureModalProps) 
             {extracting ? (
               <div className="flex flex-col items-center gap-2 py-1">
                 <Loader2 className="w-6 h-6 text-blue-500 animate-spin"/>
-                <p className="text-sm text-blue-600 font-medium">Analisando {extractedFile}...</p>
+                <p className="text-sm text-blue-600 font-medium">Analisando {attachedFile}...</p>
                 <p className="text-xs text-slate-400">O Gemini está extraindo os dados do procedimento</p>
               </div>
-            ) : extractedFile ? (
+            ) : attachedFile && extractionOk ? (
               <div className="flex flex-col items-center gap-2 py-1">
                 <div className="w-7 h-7 rounded-full bg-emerald-100 flex items-center justify-center">
                   <Sparkles className="w-4 h-4 text-emerald-600"/>
                 </div>
-                <p className="text-sm text-emerald-700 font-medium">Dados extraídos de <span className="font-mono text-xs">{extractedFile}</span></p>
+                <p className="text-sm text-emerald-700 font-medium">Dados extraídos de <span className="font-mono text-xs">{attachedFile}</span></p>
                 <p className="text-xs text-slate-400">Clique para trocar o arquivo</p>
+              </div>
+            ) : attachedFile ? (
+              <div className="flex flex-col items-center gap-2 py-1">
+                <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center">
+                  <Paperclip className="w-4 h-4 text-slate-500"/>
+                </div>
+                <p className="text-sm text-slate-700 font-medium"><span className="font-mono text-xs">{attachedFile}</span> anexado</p>
+                <p className="text-xs text-slate-400">Preencha os campos manualmente · clique para trocar o arquivo</p>
               </div>
             ) : (
               <div className="flex flex-col items-center gap-2 py-1">
