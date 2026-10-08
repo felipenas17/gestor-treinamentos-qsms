@@ -31,6 +31,8 @@ export interface Procedure {
   criticality: 'Alta' | 'Média' | 'Baixa';
   description?: string;
   validityMonths: number;
+  fileUrl?: string;
+  sectors?: string[];
 }
 
 export interface Employee {

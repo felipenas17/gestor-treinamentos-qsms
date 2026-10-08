@@ -15,7 +15,7 @@ export async function fetchProcedures() {
   if (!supabase) return null;
   const { data, error } = await supabase
     .from('procedures')
-    .select('*')
+    .select('*, sector_procedure_matrix(sector)')
     .order('code');
   if (error) { console.error('fetchProcedures:', error); return null; }
   return data;
@@ -240,7 +240,7 @@ export async function saveProcedure(data: {
       validity_months: parseInt(data.validityMonths),
       criticality: data.criticality,
       file_url: fileUrl,
-      status: 'active'
+      status: 'Ativo'
     })
     .select('id').single();
   if (error || !proc) return { error };

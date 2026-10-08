@@ -88,22 +88,28 @@ export default function GestorTreinamentosApp() {
         if (dbMetrics) setMetrics(dbMetrics);
         if (dbSector && dbSector.length > 0) setSectorData(dbSector);
 
-        if (dbProcedures && dbProcedures.length > 0) {
-          setProcedures(dbProcedures.map((p: any) => ({
-            id: p.id,
-            code: p.code,
-            name: p.name,
-            sector: p.sector,
-            associatedRole: p.associated_role,
-            application: p.application,
-            complianceRate: p.compliance_rate,
-            lastRevision: new Date(p.last_revision).toLocaleDateString('pt-BR'),
-            status: p.status,
-            questionsCount: p.questions_count,
-            criticality: p.criticality,
-            description: p.content_summary,
-            validityMonths: p.validity_months,
-          })));
+        if (dbProcedures) {
+          const mapped = dbProcedures.map((p: any) => {
+            const sectors: string[] = (p.sector_procedure_matrix || []).map((s: any) => s.sector);
+            return {
+              id: p.id,
+              code: p.code,
+              name: p.name,
+              sector: (sectors[0] || 'Geral') as any,
+              sectors,
+              associatedRole: sectors.join(', ') || '—',
+              application: p.description || '—',
+              complianceRate: 0,
+              lastRevision: p.created_at ? new Date(p.created_at).toLocaleDateString('pt-BR') : '—',
+              status: (p.status === 'active' ? 'Ativo' : (p.status || 'Ativo')) as any,
+              questionsCount: 0,
+              criticality: p.criticality || 'Média',
+              description: p.description,
+              validityMonths: p.validity_months || 12,
+              fileUrl: p.file_url || undefined,
+            };
+          });
+          setProcedures(mapped);
         }
 
         if (dbRecords && dbRecords.length > 0) {
