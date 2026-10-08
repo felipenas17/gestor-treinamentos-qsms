@@ -242,6 +242,7 @@ export function ProceduresScreen({
               <thead className="bg-slate-50 text-slate-600 uppercase tracking-wider font-semibold border-b border-slate-200">
                 <tr>
                   <th className="py-3 px-4">Código</th>
+                  <th className="py-3 px-4 text-center">Rev.</th>
                   <th className="py-3 px-4">Nome do Procedimento</th>
                   <th className="py-3 px-4">Setores</th>
                   <th className="py-3 px-4 text-center">Criticidade</th>
@@ -259,6 +260,11 @@ export function ProceduresScreen({
                     <td className="py-3 px-4">
                       <span className="font-mono font-bold text-blue-700 group-hover:underline">
                         {proc.code}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 text-center">
+                      <span className="font-mono text-[11px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
+                        {proc.revision ?? 'R00'}
                       </span>
                     </td>
                     <td className="py-3 px-4 font-semibold text-slate-900 max-w-[220px] truncate">

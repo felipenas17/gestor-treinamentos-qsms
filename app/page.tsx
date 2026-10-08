@@ -94,6 +94,7 @@ export default function GestorTreinamentosApp() {
             return {
               id: p.id,
               code: p.code,
+              revision: p.revision || 'R00',
               name: p.name,
               sector: (sectors[0] || 'Geral') as any,
               sectors,

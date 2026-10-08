@@ -20,6 +20,7 @@ export type ProcedureStatus = 'Ativo' | 'Em Revisão' | 'Arquivado';
 export interface Procedure {
   id: string;
   code: string;
+  revision?: string;
   name: string;
   sector: Sector;
   associatedRole: string;

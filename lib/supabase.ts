@@ -205,7 +205,7 @@ export async function autoGenerateMatrixForEmployee(employeeId: string, sector: 
 }
 
 export async function saveProcedure(data: {
-  code: string; name: string; description: string;
+  code: string; revision?: string; name: string; description: string;
   hours: string; validityMonths: string;
   criticality: string; sectors: string[];
   file?: File;
@@ -234,7 +234,9 @@ export async function saveProcedure(data: {
   const { data: proc, error } = await supabase
     .from('procedures')
     .insert({
-      code: data.code, name: data.name,
+      code: data.code,
+      revision: data.revision || 'R00',
+      name: data.name,
       description: data.description,
       hours: parseInt(data.hours) || 0,
       validity_months: parseInt(data.validityMonths),

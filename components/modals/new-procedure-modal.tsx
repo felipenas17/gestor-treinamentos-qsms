@@ -5,7 +5,7 @@ import { X, FileText, Check, Upload, Loader2, Sparkles, Paperclip } from 'lucide
 const SETORES = ['Operacional','Brascabo','Operacional RDO','Transbordo MC','CS','QSMS','Suprimentos','Terceiros'];
 
 export interface ProcedureFormData {
-  code: string; name: string; description: string;
+  code: string; revision: string; name: string; description: string;
   hours: string; validityMonths: string;
   criticality: 'Alta' | 'Média' | 'Baixa'; sectors: string[];
   file?: File;
@@ -18,7 +18,7 @@ interface NewProcedureModalProps {
 
 export function NewProcedureModal({ onSaved, onClose }: NewProcedureModalProps) {
   const [f, setF] = useState<ProcedureFormData>({
-    code: '', name: '', description: '', hours: '',
+    code: '', revision: 'R00', name: '', description: '', hours: '',
     validityMonths: '12', criticality: 'Média', sectors: []
   });
   const [dragging, setDragging] = useState(false);
@@ -157,12 +157,18 @@ export function NewProcedureModal({ onSaved, onClose }: NewProcedureModalProps) 
             )}
           </div>
 
-          {/* Code + Hours */}
-          <div className="grid grid-cols-2 gap-3">
+          {/* Code + Revision + Hours */}
+          <div className="grid grid-cols-3 gap-3">
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-slate-600">Código</label>
               <input value={f.code} onChange={e => set('code', e.target.value)}
                 placeholder="POP-001"
+                className="h-9 px-3 border border-slate-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-400"/>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-slate-600">Revisão</label>
+              <input value={f.revision} onChange={e => set('revision', e.target.value)}
+                placeholder="R00"
                 className="h-9 px-3 border border-slate-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-400"/>
             </div>
             <div className="flex flex-col gap-1">
