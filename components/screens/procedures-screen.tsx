@@ -131,18 +131,7 @@ export function ProceduresScreen({
         </div>
       </div>
 
-      {/* Info Banner (Blue) */}
-      <div className="p-4 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 flex items-start gap-3 shadow-sm">
-        <Info className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
-        <div className="text-xs space-y-0.5">
-          <p className="font-semibold text-blue-950">
-            Repositório oficial que centraliza todos os setores.
-          </p>
-          <p className="text-blue-800">
-            Cada documento gera banco de questões automaticamente via IA para avaliação de eficácia no retorno de embarque.
-          </p>
-        </div>
-      </div>
+      {/* Info Banner — oculto até modal estar ativo */}
 
       {/* Filters Row */}
       <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-sm space-y-3">

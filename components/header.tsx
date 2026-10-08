@@ -68,37 +68,12 @@ export function Header({
         </h1>
       </div>
 
-      {/* Zone 2: Informational / System markers */}
-      <div className="hidden lg:flex items-center gap-4 text-xs text-slate-500">
-        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-100 border border-slate-200">
-          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-          <span className="font-medium text-slate-700">Auditoria ANP: Em Dia</span>
-        </div>
-        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-100 border border-slate-200">
-          <span className="w-2 h-2 rounded-full bg-blue-600" />
-          <span className="font-medium text-slate-700">Base: Bacia de Santos</span>
-        </div>
-      </div>
+      {/* Zone 2: Informational / System markers — oculto até modal estar ativo */}
+      <div className="hidden" />
 
       {/* Zone 3: Primary and Secondary Actions */}
       <div className="flex items-center gap-2.5 shrink-0">
-        <button
-          onClick={onOpenImagesModal}
-          title="Ver links diretos das imagens HTML"
-          className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100 hover:text-slate-900 transition-colors whitespace-nowrap"
-        >
-          <ImageIcon className="w-3.5 h-3.5 text-purple-600" />
-          <span>Links Imagens</span>
-        </button>
-
-        <button
-          onClick={onOpenSchemaModal}
-          title="Ver estrutura SQL e RLS do Supabase"
-          className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100 hover:text-slate-900 transition-colors whitespace-nowrap"
-        >
-          <Database className="w-3.5 h-3.5 text-emerald-600" />
-          <span>Esquema SQL</span>
-        </button>
+        {/* Botões Links Imagens e Esquema SQL — ocultos até modal estar ativo */}
 
         {onQuickAction && quickActionLabel && (
           <button
