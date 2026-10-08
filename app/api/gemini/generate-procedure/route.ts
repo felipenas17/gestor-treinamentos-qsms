@@ -24,9 +24,11 @@ Analise o texto abaixo e extraia as informações em JSON puro (sem markdown, se
 
 async function extractTextFromPDF(base64: string): Promise<string> {
   const buffer = Buffer.from(base64, "base64");
-  // Dynamic import to avoid build-time issues
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const pdfParse = require("pdf-parse");
+  // pdf-parse is declared in serverExternalPackages — loads as native CJS/ESM
+  const mod = await import("pdf-parse");
+  // v2 exports the function as default OR as the module itself
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const pdfParse: (buf: Buffer) => Promise<{ text: string }> = (mod as any).default ?? mod;
   const data = await pdfParse(buffer);
   return data.text || "";
 }
