@@ -208,8 +208,29 @@ export async function saveProcedure(data: {
   code: string; name: string; description: string;
   hours: string; validityMonths: string;
   criticality: string; sectors: string[];
+  file?: File;
 }) {
   if (!supabase) return { error: 'not configured' };
+
+  // Upload do PDF para o Storage antes de inserir o registro
+  let fileUrl: string | null = null;
+  if (data.file) {
+    const ext = data.file.name.split('.').pop() || 'pdf';
+    const safeName = data.code.replace(/[^a-zA-Z0-9-]/g, '_');
+    const path = `procedures/${safeName}.${ext}`;
+    const { error: uploadError } = await supabase.storage
+      .from('procedure-docs')
+      .upload(path, data.file, { upsert: true, contentType: data.file.type || 'application/pdf' });
+    if (!uploadError) {
+      const { data: urlData } = supabase.storage
+        .from('procedure-docs')
+        .getPublicUrl(path);
+      fileUrl = urlData.publicUrl;
+    } else {
+      console.warn('saveProcedure: upload falhou, procedimento será salvo sem arquivo', uploadError);
+    }
+  }
+
   const { data: proc, error } = await supabase
     .from('procedures')
     .insert({
@@ -218,6 +239,7 @@ export async function saveProcedure(data: {
       hours: parseInt(data.hours) || 0,
       validity_months: parseInt(data.validityMonths),
       criticality: data.criticality,
+      file_url: fileUrl,
       status: 'active'
     })
     .select('id').single();

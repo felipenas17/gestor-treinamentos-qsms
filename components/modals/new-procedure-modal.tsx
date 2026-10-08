@@ -8,6 +8,7 @@ export interface ProcedureFormData {
   code: string; name: string; description: string;
   hours: string; validityMonths: string;
   criticality: 'Alta' | 'Média' | 'Baixa'; sectors: string[];
+  file?: File;
 }
 
 interface NewProcedureModalProps {
@@ -24,6 +25,7 @@ export function NewProcedureModal({ onSaved, onClose }: NewProcedureModalProps) 
   const [extracting, setExtracting] = useState(false);
   const [extractedFile, setExtractedFile] = useState<string | null>(null);
   const [extractError, setExtractError] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const set = (k: keyof ProcedureFormData, v: string | string[]) =>
@@ -36,6 +38,7 @@ export function NewProcedureModal({ onSaved, onClose }: NewProcedureModalProps) 
     }));
 
   const extractFromFile = useCallback(async (file: File) => {
+    setSelectedFile(file);
     setExtracting(true);
     setExtractedFile(file.name);
     setExtractError(false);
@@ -96,7 +99,7 @@ export function NewProcedureModal({ onSaved, onClose }: NewProcedureModalProps) 
 
   const save = () => {
     if (!f.name || !f.code) return;
-    onSaved(f);
+    onSaved({ ...f, file: selectedFile ?? undefined });
     onClose();
   };
 
