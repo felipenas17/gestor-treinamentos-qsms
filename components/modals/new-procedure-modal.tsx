@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useRef, useCallback } from 'react';
-import { X, FileText, Check, Upload, Loader2, Sparkles } from 'lucide-react';
+import { X, FileText, Check, Upload, Loader2, Sparkles, AlertTriangle } from 'lucide-react';
 
 const SETORES = ['Operacional','Brascabo','Operacional RDO','Transbordo MC','CS','QSMS','Suprimentos'];
 
@@ -23,6 +23,7 @@ export function NewProcedureModal({ onSaved, onClose }: NewProcedureModalProps) 
   const [dragging, setDragging] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const [extractedFile, setExtractedFile] = useState<string | null>(null);
+  const [extractError, setExtractError] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const set = (k: keyof ProcedureFormData, v: string | string[]) =>
@@ -37,32 +38,51 @@ export function NewProcedureModal({ onSaved, onClose }: NewProcedureModalProps) 
   const extractFromFile = useCallback(async (file: File) => {
     setExtracting(true);
     setExtractedFile(file.name);
-    try {
+    setExtractError(false);
+
+    const doExtract = () => new Promise<void>((resolve) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
       reader.onload = async () => {
-        const base64 = (reader.result as string).split(',')[1];
-        const mimeType = file.type || 'application/octet-stream';
-        const res = await fetch('/api/gemini/generate-procedure', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fileData: base64, mimeType, fileName: file.name })
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setF(p => ({
-            ...p,
-            code: data.code || p.code,
-            name: data.name || p.name,
-            description: data.description || p.description,
-            hours: data.hours || p.hours,
-            validityMonths: data.validityMonths || p.validityMonths,
-            criticality: data.criticality || p.criticality,
-          }));
+        try {
+          const base64 = (reader.result as string).split(',')[1];
+          const mimeType = file.type || 'application/pdf';
+          const res = await fetch('/api/gemini/generate-procedure', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fileData: base64, mimeType, fileName: file.name })
+          });
+          if (res.ok) {
+            const data = await res.json();
+            const hasContent = data.code || data.name || data.description;
+            if (hasContent) {
+              setF(p => ({
+                ...p,
+                code: data.code || p.code,
+                name: data.name || p.name,
+                description: data.description || p.description,
+                hours: data.hours || p.hours,
+                validityMonths: data.validityMonths || p.validityMonths,
+                criticality: data.criticality || p.criticality,
+              }));
+            } else {
+              setExtractError(true);
+            }
+          } else {
+            setExtractError(true);
+          }
+        } catch {
+          setExtractError(true);
+        } finally {
+          resolve();
         }
-        setExtracting(false);
       };
-    } catch {
+      reader.onerror = () => { setExtractError(true); resolve(); };
+    });
+
+    try {
+      await doExtract();
+    } finally {
       setExtracting(false);
     }
   }, []);
@@ -71,7 +91,7 @@ export function NewProcedureModal({ onSaved, onClose }: NewProcedureModalProps) 
     e.preventDefault();
     setDragging(false);
     const file = e.dataTransfer.files[0];
-    if (file) extractFromFile(file);
+    if (file) { setExtractError(false); extractFromFile(file); }
   };
 
   const save = () => {
@@ -105,20 +125,28 @@ export function NewProcedureModal({ onSaved, onClose }: NewProcedureModalProps) 
           >
             <input ref={fileRef} type="file" className="hidden"
               accept=".pdf,.doc,.docx,.txt"
-              onChange={e => e.target.files?.[0] && extractFromFile(e.target.files[0])}/>
+              onChange={e => { if (e.target.files?.[0]) { setExtractError(false); extractFromFile(e.target.files[0]); } }}/>
             {extracting ? (
               <div className="flex flex-col items-center gap-2 py-1">
                 <Loader2 className="w-6 h-6 text-blue-500 animate-spin"/>
                 <p className="text-sm text-blue-600 font-medium">Analisando {extractedFile}...</p>
                 <p className="text-xs text-slate-400">O Gemini está extraindo os dados do procedimento</p>
               </div>
-            ) : extractedFile ? (
+            ) : extractedFile && !extractError ? (
               <div className="flex flex-col items-center gap-2 py-1">
                 <div className="w-7 h-7 rounded-full bg-emerald-100 flex items-center justify-center">
                   <Sparkles className="w-4 h-4 text-emerald-600"/>
                 </div>
-                <p className="text-sm text-emerald-700 font-medium">Dados extraídos de <span className="font-mono">{extractedFile}</span></p>
+                <p className="text-sm text-emerald-700 font-medium">Dados extraídos de <span className="font-mono text-xs">{extractedFile}</span></p>
                 <p className="text-xs text-slate-400">Clique para trocar o arquivo</p>
+              </div>
+            ) : extractedFile && extractError ? (
+              <div className="flex flex-col items-center gap-2 py-1">
+                <div className="w-7 h-7 rounded-full bg-amber-100 flex items-center justify-center">
+                  <AlertTriangle className="w-4 h-4 text-amber-600"/>
+                </div>
+                <p className="text-sm text-amber-700 font-medium">Não foi possível extrair dados do PDF</p>
+                <p className="text-xs text-slate-400">Preencha os campos manualmente · clique para tentar outro arquivo</p>
               </div>
             ) : (
               <div className="flex flex-col items-center gap-2 py-1">
