@@ -14,6 +14,7 @@ import { AssessmentTakerModal } from '@/components/modals/assessment-taker-modal
 import { NewProcedureAiModal } from '@/components/modals/new-procedure-ai-modal';
 import { NewTrainingPlanModal } from '@/components/modals/new-training-plan-modal';
 import { ProcedureDetailsModal } from '@/components/modals/procedure-details-modal';
+import { ProcedureExamModal } from '@/components/modals/procedure-exam-modal';
 import { RegisterTrainingModal } from '@/components/modals/register-training-modal';
 import { EmployeesScreen } from '@/components/screens/employees-screen';
 import { CertificatesScreen } from '@/components/screens/certificates-screen';
@@ -62,6 +63,7 @@ export default function GestorTreinamentosApp() {
   const [isRegisterTrainingOpen, setIsRegisterTrainingOpen] = useState(false);
   const [isImportDocOpen, setIsImportDocOpen] = useState(false);
   const [selectedProcedureDetails, setSelectedProcedureDetails] = useState<Procedure | null>(null);
+  const [selectedExamProcedure, setSelectedExamProcedure] = useState<Procedure | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [toastType, setToastType] = useState<'success' | 'error'>('success');
 
@@ -72,6 +74,35 @@ export default function GestorTreinamentosApp() {
   }, []);
 
   // ─── Carrega dados reais do Supabase (se configurado) ────────────────────
+  const mapProcedures = useCallback((raw: any[]) => {
+    return raw.map((p: any) => {
+      const sectors: string[] = (p.sector_procedure_matrix || []).map((s: any) => s.sector);
+      return {
+        id: p.id,
+        code: p.code,
+        revision: p.revision || 'R00',
+        name: p.name,
+        sector: (sectors[0] || 'Geral') as any,
+        sectors,
+        associatedRole: sectors.join(', ') || '—',
+        application: p.description || '—',
+        complianceRate: 0,
+        lastRevision: p.created_at ? new Date(p.created_at).toLocaleDateString('pt-BR') : '—',
+        status: (p.status === 'active' ? 'Ativo' : (p.status || 'Ativo')) as any,
+        questionsCount: 0,
+        criticality: p.criticality || 'Média',
+        description: p.description,
+        validityMonths: p.validity_months || 12,
+        fileUrl: p.file_url || undefined,
+      };
+    });
+  }, []);
+
+  const loadProceduresFromDB = useCallback(async () => {
+    const dbProcedures = await fetchProcedures();
+    if (dbProcedures) setProcedures(mapProcedures(dbProcedures));
+  }, [mapProcedures]);
+
   useEffect(() => {
     if (!isSupabaseConfigured) return;
 
@@ -89,28 +120,7 @@ export default function GestorTreinamentosApp() {
         if (dbSector && dbSector.length > 0) setSectorData(dbSector);
 
         if (dbProcedures) {
-          const mapped = dbProcedures.map((p: any) => {
-            const sectors: string[] = (p.sector_procedure_matrix || []).map((s: any) => s.sector);
-            return {
-              id: p.id,
-              code: p.code,
-              revision: p.revision || 'R00',
-              name: p.name,
-              sector: (sectors[0] || 'Geral') as any,
-              sectors,
-              associatedRole: sectors.join(', ') || '—',
-              application: p.description || '—',
-              complianceRate: 0,
-              lastRevision: p.created_at ? new Date(p.created_at).toLocaleDateString('pt-BR') : '—',
-              status: (p.status === 'active' ? 'Ativo' : (p.status || 'Ativo')) as any,
-              questionsCount: 0,
-              criticality: p.criticality || 'Média',
-              description: p.description,
-              validityMonths: p.validity_months || 12,
-              fileUrl: p.file_url || undefined,
-            };
-          });
-          setProcedures(mapped);
+          setProcedures(mapProcedures(dbProcedures));
         }
 
         if (dbRecords && dbRecords.length > 0) {
@@ -293,6 +303,8 @@ export default function GestorTreinamentosApp() {
               onOpenNewProcedureAiModal={() => setIsNewProcedureModalOpen(true)}
               onSelectProcedure={(p) => setSelectedProcedureDetails(p)}
               onImportDocument={() => setIsImportDocOpen(true)}
+              onManageExam={(p) => setSelectedExamProcedure(p)}
+              onProcedureCreated={loadProceduresFromDB}
             />
           )}
           {currentTab === 'provas' && (
@@ -335,6 +347,11 @@ export default function GestorTreinamentosApp() {
       <NewProcedureAiModal isOpen={isNewProcedureModalOpen} onClose={() => setIsNewProcedureModalOpen(false)} onProcedureCreated={handleProcedureCreated} />
       <NewTrainingPlanModal isOpen={isNewPlanModalOpen} onClose={() => setIsNewPlanModalOpen(false)} procedures={procedures} onPlanScheduled={handlePlanScheduled} />
       <ProcedureDetailsModal procedure={selectedProcedureDetails} onClose={() => setSelectedProcedureDetails(null)} />
+      <ProcedureExamModal
+        procedure={selectedExamProcedure}
+        onClose={() => setSelectedExamProcedure(null)}
+        onGoToAssessments={() => setCurrentTab('provas')}
+      />
       <RegisterTrainingModal isOpen={isRegisterTrainingOpen} onClose={() => setIsRegisterTrainingOpen(false)} procedures={procedures} onSaveRecord={handleSaveTrainingRecord} />
       {/* <ImportDocumentModal isOpen={isImportDocOpen} onClose={() => setIsImportDocOpen(false)} onProcedureImported={handleProcedureImported} /> */}
     </div>

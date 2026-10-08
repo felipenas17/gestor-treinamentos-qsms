@@ -204,6 +204,30 @@ export async function autoGenerateMatrixForEmployee(employeeId: string, sector: 
   return { count: inserted?.length ?? 0 };
 }
 
+export async function fetchAssessmentByProcedureCode(procedureCode: string) {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from('assessments')
+    .select('*, assessment_questions(*)')
+    .eq('procedure_code', procedureCode)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) { console.error('fetchAssessmentByProcedureCode:', error); return null; }
+  return data;
+}
+
+export async function fetchRespondentsByAssessment(assessmentId: string) {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from('assessment_links')
+    .select('*, employees(name, role, sector, avatar_url)')
+    .eq('assessment_id', assessmentId)
+    .order('created_at', { ascending: false });
+  if (error) { console.error('fetchRespondentsByAssessment:', error); return []; }
+  return data || [];
+}
+
 export async function saveProcedure(data: {
   code: string; revision?: string; name: string; description: string;
   hours: string; validityMonths: string;

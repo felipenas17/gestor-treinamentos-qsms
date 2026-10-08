@@ -20,6 +20,8 @@ interface ProceduresScreenProps {
   onOpenNewProcedureAiModal: () => void;
   onSelectProcedure: (procedure: Procedure) => void;
   onImportDocument: () => void;
+  onManageExam?: (procedure: Procedure) => void;
+  onProcedureCreated?: () => void;
 }
 
 export function ProceduresScreen({
@@ -27,11 +29,14 @@ export function ProceduresScreen({
   onOpenNewProcedureAiModal,
   onSelectProcedure,
   onImportDocument,
+  onManageExam,
+  onProcedureCreated,
 }: ProceduresScreenProps) {
   const [showNewProc, setShowNewProc] = useState(false);
 
   const handleProcSaved = async (data: any) => {
     await saveProcedure(data);
+    onProcedureCreated?.();
   };
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSector, setSelectedSector] = useState<string>('Todos');
@@ -300,11 +305,15 @@ export function ProceduresScreen({
                           </a>
                         : <span className="text-slate-300">—</span>}
                     </td>
-                    <td className="py-3 px-4 text-center">
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-blue-50 text-blue-700 font-semibold font-mono text-[11px] border border-blue-200">
+                    <td className="py-3 px-4 text-center" onClick={e => e.stopPropagation()}>
+                      <button
+                        onClick={() => onManageExam?.(proc)}
+                        title="Gestão de Avaliação"
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-blue-50 text-blue-700 font-semibold font-mono text-[11px] border border-blue-200 hover:bg-blue-100 hover:border-blue-400 transition-colors cursor-pointer"
+                      >
                         <HelpCircle className="w-3.5 h-3.5"/>
                         {proc.questionsCount}
-                      </span>
+                      </button>
                     </td>
                   </tr>
                 ))}
