@@ -48,10 +48,10 @@ export default function GestorTreinamentosApp() {
   const [metrics, setMetrics] = useState(INITIAL_METRICS);
   const [sectorData, setSectorData] = useState(SECTOR_CHART_DATA);
   const [projectionData, setProjectionData] = useState(PROJECTION_CHART_DATA);
-  const [procedures, setProcedures] = useState<Procedure[]>(INITIAL_PROCEDURES);
-  const [records, setRecords] = useState<TrainingRecord[]>(INITIAL_TRAINING_RECORDS);
-  const [assessment, setAssessment] = useState<Assessment>(INITIAL_ASSESSMENT);
-  const [respondents, setRespondents] = useState<RespondentStatus[]>(INITIAL_RESPONDENTS);
+  const [procedures, setProcedures] = useState<Procedure[]>([]);
+  const [records, setRecords] = useState<TrainingRecord[]>([]);
+  const [assessment, setAssessment] = useState<Assessment>(INITIAL_ASSESSMENT); // mantido só para o modal de avaliação
+  const [respondents, setRespondents] = useState<RespondentStatus[]>([]);
 
   // Modal states
   const [isImagesModalOpen, setIsImagesModalOpen] = useState(false);
@@ -305,8 +305,6 @@ export default function GestorTreinamentosApp() {
               onCreateNewAssessment={() => { setIsNewProcedureModalOpen(true); }}
             />
           )}
-          {currentTab === 'colaboradores' && <EmployeesScreen />}
-          {currentTab === 'certificados' && <CertificatesScreen />}
           {currentTab === 'colaboradores' && <EmployeesScreen />}
           {currentTab === 'certificados' && <CertificatesScreen />}
           {currentTab === 'matriz' && (

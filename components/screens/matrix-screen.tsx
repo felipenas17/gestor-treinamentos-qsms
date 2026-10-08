@@ -238,6 +238,21 @@ export function MatrixScreen({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 text-slate-700">
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={9} className="py-16 text-center">
+                    <div className="flex flex-col items-center gap-2">
+                      <Users className="w-6 h-6 text-slate-300"/>
+                      <p className="text-sm font-semibold text-slate-500">Nenhum registro encontrado</p>
+                      <p className="text-xs text-slate-400">
+                        {records.length === 0
+                          ? 'Cadastre os procedimentos e colaboradores para gerar a matriz automaticamente.'
+                          : 'Nenhum registro corresponde aos filtros aplicados.'}
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+              )}
               {filtered.map((rec) => {
                 const isOverdue = rec.daysRemaining < 0;
                 return (
