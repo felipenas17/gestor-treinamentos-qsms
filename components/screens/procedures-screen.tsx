@@ -113,14 +113,7 @@ export function ProceduresScreen({
         </div>
 
         <div className="flex items-center gap-2.5">
-          <button
-            onClick={onImportDocument}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors shadow-sm"
-          >
-            <Upload className="w-4 h-4 text-slate-500" />
-            <span>Importar Documentos (PDF/Doc)</span>
-          </button>
-
+          {/* Botão Importar Documentos — modal não ativo */}
           <button
             onClick={() => setShowNewProc(true)}
             className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 rounded-lg shadow-sm transition-colors"

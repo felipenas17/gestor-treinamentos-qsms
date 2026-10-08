@@ -17,7 +17,7 @@ import { ProcedureDetailsModal } from '@/components/modals/procedure-details-mod
 import { RegisterTrainingModal } from '@/components/modals/register-training-modal';
 import { EmployeesScreen } from '@/components/screens/employees-screen';
 import { CertificatesScreen } from '@/components/screens/certificates-screen';
-import { ImportDocumentModal } from '@/components/modals/import-document-modal';
+// import { ImportDocumentModal } from '@/components/modals/import-document-modal'; // modal não ativo
 
 import {
   INITIAL_METRICS,
@@ -331,7 +331,7 @@ export default function GestorTreinamentosApp() {
       <NewTrainingPlanModal isOpen={isNewPlanModalOpen} onClose={() => setIsNewPlanModalOpen(false)} procedures={procedures} onPlanScheduled={handlePlanScheduled} />
       <ProcedureDetailsModal procedure={selectedProcedureDetails} onClose={() => setSelectedProcedureDetails(null)} />
       <RegisterTrainingModal isOpen={isRegisterTrainingOpen} onClose={() => setIsRegisterTrainingOpen(false)} procedures={procedures} onSaveRecord={handleSaveTrainingRecord} />
-      <ImportDocumentModal isOpen={isImportDocOpen} onClose={() => setIsImportDocOpen(false)} onProcedureImported={handleProcedureImported} />
+      {/* <ImportDocumentModal isOpen={isImportDocOpen} onClose={() => setIsImportDocOpen(false)} onProcedureImported={handleProcedureImported} /> */}
     </div>
   );
 }
