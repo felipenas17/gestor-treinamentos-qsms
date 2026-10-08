@@ -1,8 +1,8 @@
 'use client';
 import React, { useState, useRef, useCallback } from 'react';
-import { X, FileText, Check, Upload, Loader2, Sparkles, AlertTriangle } from 'lucide-react';
+import { X, FileText, Check, Upload, Loader2, Sparkles } from 'lucide-react';
 
-const SETORES = ['Operacional','Brascabo','Operacional RDO','Transbordo MC','CS','QSMS','Suprimentos'];
+const SETORES = ['Operacional','Brascabo','Operacional RDO','Transbordo MC','CS','QSMS','Suprimentos','Terceiros'];
 
 export interface ProcedureFormData {
   code: string; name: string; description: string;
@@ -24,7 +24,6 @@ export function NewProcedureModal({ onSaved, onClose }: NewProcedureModalProps) 
   const [dragging, setDragging] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const [extractedFile, setExtractedFile] = useState<string | null>(null);
-  const [extractError, setExtractError] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -41,7 +40,6 @@ export function NewProcedureModal({ onSaved, onClose }: NewProcedureModalProps) 
     setSelectedFile(file);
     setExtracting(true);
     setExtractedFile(file.name);
-    setExtractError(false);
 
     const doExtract = () => new Promise<void>((resolve) => {
       const reader = new FileReader();
@@ -69,18 +67,18 @@ export function NewProcedureModal({ onSaved, onClose }: NewProcedureModalProps) 
                 criticality: data.criticality || p.criticality,
               }));
             } else {
-              setExtractError(true);
+              setExtractedFile(null);
             }
           } else {
-            setExtractError(true);
+            setExtractedFile(null);
           }
         } catch {
-          setExtractError(true);
+          setExtractedFile(null);
         } finally {
           resolve();
         }
       };
-      reader.onerror = () => { setExtractError(true); resolve(); };
+      reader.onerror = () => { setExtractedFile(null); resolve(); };
     });
 
     try {
@@ -94,7 +92,7 @@ export function NewProcedureModal({ onSaved, onClose }: NewProcedureModalProps) 
     e.preventDefault();
     setDragging(false);
     const file = e.dataTransfer.files[0];
-    if (file) { setExtractError(false); extractFromFile(file); }
+    if (file) { extractFromFile(file); }
   };
 
   const save = () => {
@@ -128,28 +126,20 @@ export function NewProcedureModal({ onSaved, onClose }: NewProcedureModalProps) 
           >
             <input ref={fileRef} type="file" className="hidden"
               accept=".pdf,.doc,.docx,.txt"
-              onChange={e => { if (e.target.files?.[0]) { setExtractError(false); extractFromFile(e.target.files[0]); } }}/>
+              onChange={e => { if (e.target.files?.[0]) { extractFromFile(e.target.files[0]); } }}/>
             {extracting ? (
               <div className="flex flex-col items-center gap-2 py-1">
                 <Loader2 className="w-6 h-6 text-blue-500 animate-spin"/>
                 <p className="text-sm text-blue-600 font-medium">Analisando {extractedFile}...</p>
                 <p className="text-xs text-slate-400">O Gemini está extraindo os dados do procedimento</p>
               </div>
-            ) : extractedFile && !extractError ? (
+            ) : extractedFile ? (
               <div className="flex flex-col items-center gap-2 py-1">
                 <div className="w-7 h-7 rounded-full bg-emerald-100 flex items-center justify-center">
                   <Sparkles className="w-4 h-4 text-emerald-600"/>
                 </div>
                 <p className="text-sm text-emerald-700 font-medium">Dados extraídos de <span className="font-mono text-xs">{extractedFile}</span></p>
                 <p className="text-xs text-slate-400">Clique para trocar o arquivo</p>
-              </div>
-            ) : extractedFile && extractError ? (
-              <div className="flex flex-col items-center gap-2 py-1">
-                <div className="w-7 h-7 rounded-full bg-amber-100 flex items-center justify-center">
-                  <AlertTriangle className="w-4 h-4 text-amber-600"/>
-                </div>
-                <p className="text-sm text-amber-700 font-medium">Não foi possível extrair dados do PDF</p>
-                <p className="text-xs text-slate-400">Preencha os campos manualmente · clique para tentar outro arquivo</p>
               </div>
             ) : (
               <div className="flex flex-col items-center gap-2 py-1">
@@ -224,7 +214,14 @@ export function NewProcedureModal({ onSaved, onClose }: NewProcedureModalProps) 
 
           {/* Sectors */}
           <div className="flex flex-col gap-2">
-            <label className="text-xs font-medium text-slate-600">Setores que utilizam este procedimento</label>
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-medium text-slate-600">Setores que utilizam este procedimento</label>
+              <button type="button" onClick={() =>
+                setF(p => ({ ...p, sectors: p.sectors.length === SETORES.length ? [] : [...SETORES] }))
+              } className="text-xs text-blue-600 hover:underline">
+                {f.sectors.length === SETORES.length ? 'Desmarcar todos' : 'Selecionar todos'}
+              </button>
+            </div>
             <div className="grid grid-cols-2 gap-2">
               {SETORES.map(s => {
                 const selected = f.sectors.includes(s);
