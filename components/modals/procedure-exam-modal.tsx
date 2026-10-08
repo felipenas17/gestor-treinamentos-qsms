@@ -42,19 +42,30 @@ export function ProcedureExamModal({
 
   useEffect(() => {
     if (!procedure) return;
-    setLoading(true);
-    setExam(null);
-    setRespondents([]);
-    fetchAssessmentByProcedureCode(procedure.code)
-      .then(async (examData) => {
+
+    let cancelled = false;
+
+    const load = async () => {
+      setLoading(true);
+      setExam(null);
+      setRespondents([]);
+      try {
+        const examData = await fetchAssessmentByProcedureCode(procedure.code);
+        if (cancelled) return;
         setExam(examData);
         if (examData?.id) {
           const resp = await fetchRespondentsByAssessment(examData.id);
-          setRespondents(resp);
+          if (!cancelled) setRespondents(resp ?? []);
         }
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false));
+      } catch (err) {
+        console.error(err);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    void load();
+    return () => { cancelled = true; };
   }, [procedure]);
 
   if (!procedure) return null;

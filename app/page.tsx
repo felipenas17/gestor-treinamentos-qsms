@@ -151,7 +151,7 @@ export default function GestorTreinamentosApp() {
     };
 
     loadAll();
-  }, [showToast]);
+  }, [showToast, mapProcedures]);
 
   // ─── Handlers ────────────────────────────────────────────────────────────
   const handleScheduleExam = (rec: TrainingRecord) => {
