@@ -157,7 +157,7 @@ export function EmployeesScreen() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { loadEmployees(); }, [loadEmployees]);
+  useEffect(() => { loadEmployees(); }, [loadEmployees]); // eslint-disable-line react-hooks/set-state-in-effect
 
   const filtered = employees.filter(e =>
     (e.name.toLowerCase().includes(search.toLowerCase()) ||
