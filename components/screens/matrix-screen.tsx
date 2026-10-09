@@ -50,6 +50,13 @@ export function MatrixScreen({
     return ['Todos', ...list];
   }, [records]);
 
+  // KPI counts derived from real data
+  const total = records.length;
+  const ativas = records.filter((r) => r.status === 'Certificado').length;
+  const vencendo = records.filter((r) => r.status === 'Reciclar').length;
+  const vencidas = records.filter((r) => r.status === 'Vencido').length;
+  const ativasPercent = total > 0 ? ((ativas / total) * 100).toFixed(1) : '0.0';
+
   // Filtered list
   const filtered = useMemo(() => {
     return records.filter((rec) => {
@@ -121,7 +128,7 @@ export function MatrixScreen({
             Total Certificações
           </span>
           <p className="text-2xl font-extrabold text-slate-900 font-mono tabular-nums mt-1">
-            478
+            {total}
           </p>
           <span className="text-[11px] text-slate-500 font-medium">Histórico acumulado</span>
         </div>
@@ -131,9 +138,9 @@ export function MatrixScreen({
             Certificações Ativas
           </span>
           <p className="text-2xl font-extrabold text-blue-600 font-mono tabular-nums mt-1">
-            428
+            {ativas}
           </p>
-          <span className="text-[11px] text-blue-700 font-medium">89.5% da meta anual</span>
+          <span className="text-[11px] text-blue-700 font-medium">{ativasPercent}% do total</span>
         </div>
 
         <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-sm">
@@ -141,7 +148,7 @@ export function MatrixScreen({
             Vencendo (60 dias)
           </span>
           <p className="text-2xl font-extrabold text-amber-600 font-mono tabular-nums mt-1">
-            38
+            {vencendo}
           </p>
           <span className="text-[11px] text-amber-700 font-medium">Reciclagens agendadas</span>
         </div>
@@ -151,7 +158,7 @@ export function MatrixScreen({
             Vencidas
           </span>
           <p className="text-2xl font-extrabold text-red-600 font-mono tabular-nums mt-1">
-            12
+            {vencidas}
           </p>
           <span className="text-[11px] text-red-700 font-medium">Bloqueio operacional</span>
         </div>

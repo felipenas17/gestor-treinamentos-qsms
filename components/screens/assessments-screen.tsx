@@ -144,7 +144,9 @@ export function AssessmentsScreen({
           <p className="text-2xl font-extrabold text-emerald-600 font-mono tabular-nums mt-1">
             {assessment.approvalRate}%
           </p>
-          <span className="text-[11px] text-emerald-700 font-medium">Acima do alvo de 85%</span>
+          <span className="text-[11px] text-emerald-700 font-medium">
+            {(assessment.approvalRate ?? 0) >= 85 ? 'Acima do alvo de 85%' : 'Abaixo do alvo de 85%'}
+          </span>
         </div>
 
         <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-sm">
@@ -172,7 +174,7 @@ export function AssessmentsScreen({
             Certificados Emitidos
           </span>
           <p className="text-2xl font-extrabold text-indigo-600 font-mono tabular-nums mt-1">
-            318
+            {respondents.filter((r) => r.status === 'Entregue').length}
           </p>
           <span className="text-[11px] text-indigo-700 font-medium">Validados no Supabase</span>
         </div>
@@ -196,7 +198,7 @@ export function AssessmentsScreen({
                 {assessment.title}
               </h3>
               <p className="text-xs text-slate-500 mt-1">
-                10 questões · 80% mínimo · 20 min · 2 tentativas
+                {assessment.questions.length} questões · {assessment.minScorePercent ?? 80}% mínimo · {assessment.durationMinutes ?? 20} min · {assessment.maxAttempts ?? 2} tentativas
               </p>
             </div>
 
@@ -266,7 +268,7 @@ export function AssessmentsScreen({
               { id: 'provas', label: 'Provas Ativas', count: '1' },
               { id: 'respostas', label: 'Respostas & Dados do Colaborador', count: `${respondents.length}` },
               { id: 'banco', label: 'Banco de Questões', count: `${assessment.questions.length}` },
-              { id: 'figuras', label: 'Ver Figuras', count: '4' },
+              { id: 'figuras', label: 'Ver Figuras', count: '0' },
             ].map((chip) => (
               <button
                 key={chip.id}
@@ -293,7 +295,7 @@ export function AssessmentsScreen({
           <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700 space-y-2">
             {activeChip === 'provas' && (
               <div>
-                <p className="font-semibold text-slate-900">Prova Ativa: POP-OP-014 Operações a Empregadeiras</p>
+                <p className="font-semibold text-slate-900">Prova Ativa: {assessment.code} {assessment.title}</p>
                 <p className="text-slate-600 mt-1">
                   Avaliação habilitada no link anônimo via token UUID: <code className="text-blue-700 font-mono">{assessment.tokenUuid}</code>.
                   Nenhum dado sensível como CPF é trafegado no navegador.
