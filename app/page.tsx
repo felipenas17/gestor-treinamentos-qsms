@@ -334,7 +334,7 @@ export default function GestorTreinamentosApp() {
         procedureTitle: proc.name,
         questionsCount: qs.length,
         minScorePercent: 80,
-        durationMinutes: 20,
+        durationMinutes: Math.max(20, Math.round(qs.length * 2)),
         maxAttempts: 2,
         tokenUuid: newId,
         status: 'Rascunho',

@@ -10,15 +10,17 @@ function extractJSON(raw: string): string {
 }
 
 const SYSTEM_INSTRUCTION = `Você é um Engenheiro Sênior Especialista em QSMS (Qualidade, Segurança, Meio Ambiente e Saúde) em operações offshore de óleo e gás (Petrobras, PRIO, MODEC, Clariant, NR-37).
-Gere EXATAMENTE 10 questões de múltipla escolha técnicas, rigorosas e realistas para avaliação de eficácia de treinamento.
+Gere entre 10 e 20 questões de múltipla escolha técnicas, rigorosas e realistas para avaliação de eficácia de treinamento.
+Adapte a quantidade ao conteúdo: procedimentos curtos → 10 questões; procedimentos longos com muitas definições, etapas e responsabilidades → até 20 questões.
 IMPORTANTE: As questões DEVEM ser baseadas EXCLUSIVAMENTE no conteúdo, definições, conceitos e procedimentos descritos no POP/procedimento fornecido.
 Não gere questões genéricas sobre LOTO, SWA ou PT a menos que o próprio procedimento trate desses temas.
 Cada questão: 4 alternativas, 1 correta, justificativa técnica referenciando o procedimento ou norma regulamentadora citada no próprio POP.
-OBRIGATÓRIO: Varie a posição da resposta correta — distribua o correctOptionIndex entre 0, 1, 2 e 3. NÃO coloque a resposta correta sempre na posição 0 (alternativa A). Misture as posições ao longo das 10 questões.
+OBRIGATÓRIO: Varie a posição da resposta correta — distribua o correctOptionIndex entre 0, 1, 2 e 3. NÃO coloque a resposta correta sempre na posição 0 (alternativa A). Misture as posições ao longo de todas as questões.
 Responda SOMENTE com JSON válido, sem texto adicional, sem blocos markdown.`;
 
 function buildPrompt(promptText: string, procedureCode: string, procedureName: string): string {
-  return `Com base no seguinte POP/procedimento, gere EXATAMENTE 10 questões de eficácia de treinamento:
+  return `Com base no seguinte POP/procedimento, gere entre 10 e 20 questões de eficácia de treinamento.
+Adapte a quantidade ao conteúdo: procedimentos curtos → 10 questões; procedimentos com muitas definições, etapas e responsabilidades → até 20 questões.
 
 === CONTEÚDO DO PROCEDIMENTO ===
 ${promptText}
@@ -26,7 +28,7 @@ ${promptText}
 
 As questões devem testar se o colaborador compreendeu os conceitos, definições, etapas e responsabilidades descritos NESTE procedimento específico.
 
-REGRA CRÍTICA: Distribua o correctOptionIndex de forma variada. Exemplo de distribuição aceitável: q1→2, q2→0, q3→3, q4→1, q5→2, q6→0, q7→3, q8→1, q9→2, q10→0. NUNCA use 0 em todas as questões.
+REGRA CRÍTICA: Distribua o correctOptionIndex de forma variada entre 0, 1, 2 e 3. Exemplo aceitável: q1→2, q2→0, q3→3, q4→1, q5→2, q6→0, q7→3, q8→1, q9→2, q10→0, q11→3, q12→1. NUNCA use 0 em todas as questões.
 
 Responda APENAS com este JSON (sem mais nada):
 {
