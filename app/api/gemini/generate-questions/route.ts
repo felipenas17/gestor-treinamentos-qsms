@@ -15,7 +15,7 @@ Adapte a quantidade ao conteúdo: procedimentos curtos → 10 questões; procedi
 IMPORTANTE: As questões DEVEM ser baseadas EXCLUSIVAMENTE no conteúdo, definições, conceitos e procedimentos descritos no POP/procedimento fornecido.
 Não gere questões genéricas sobre LOTO, SWA ou PT a menos que o próprio procedimento trate desses temas.
 Cada questão: 4 alternativas, 1 correta, justificativa técnica referenciando o procedimento ou norma regulamentadora citada no próprio POP.
-OBRIGATÓRIO: Varie a posição da resposta correta — distribua o correctOptionIndex entre 0, 1, 2 e 3. NÃO coloque a resposta correta sempre na posição 0 (alternativa A). Misture as posições ao longo de todas as questões.
+OBRIGATÓRIO: Embaralhe ALEATORIAMENTE a posição da resposta correta. Use os índices 0, 1, 2 e 3 de forma não-previsível — PROIBIDO padrões como A-B-C-D-A-B-C-D ou A-A-B-B. A sequência deve parecer aleatória: ex. q1→3, q2→1, q3→0, q4→2, q5→3, q6→0, q7→2, q8→1, q9→3, q10→2.
 Responda SOMENTE com JSON válido, sem texto adicional, sem blocos markdown.`;
 
 function buildPrompt(promptText: string, procedureCode: string, procedureName: string): string {
@@ -28,7 +28,7 @@ ${promptText}
 
 As questões devem testar se o colaborador compreendeu os conceitos, definições, etapas e responsabilidades descritos NESTE procedimento específico.
 
-REGRA CRÍTICA: Distribua o correctOptionIndex de forma variada entre 0, 1, 2 e 3. Exemplo aceitável: q1→2, q2→0, q3→3, q4→1, q5→2, q6→0, q7→3, q8→1, q9→2, q10→0, q11→3, q12→1. NUNCA use 0 em todas as questões.
+REGRA CRÍTICA: Embaralhe ALEATORIAMENTE o correctOptionIndex — PROIBIDO qualquer padrão sequencial (ex: 0-1-2-3-0-1-2-3 ou 2-0-3-1-2-0-3-1 repetindo). A distribuição deve parecer genuinamente aleatória. Ex válido: 3,1,0,2,3,0,2,1,3,2,0,1. NUNCA repita a mesma posição em questões consecutivas.
 
 Responda APENAS com este JSON (sem mais nada):
 {
@@ -42,6 +42,25 @@ Responda APENAS com este JSON (sem mais nada):
     }
   ]
 }`;
+}
+
+/** Fisher-Yates shuffle de um array de posições para distribuição não-previsível */
+function makeShuffledPositions(count: number): number[] {
+  // Preenche com distribuição balanceada (cada posição aparece proporcionalmente)
+  const base: number[] = Array.from({ length: count }, (_, i) => i % 4);
+  // Fisher-Yates: garante que não há padrão sequencial
+  for (let i = base.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [base[i], base[j]] = [base[j], base[i]];
+  }
+  // Garante que posições consecutivas nunca sejam iguais (troca se necessário)
+  for (let i = 1; i < base.length; i++) {
+    if (base[i] === base[i - 1]) {
+      const swap = (i + 1) % base.length;
+      [base[i], base[swap]] = [base[swap], base[i]];
+    }
+  }
+  return base;
 }
 
 /** Move a resposta correta para uma posição aleatória entre 0-3 */
@@ -61,8 +80,8 @@ function shuffleCorrectAnswer(q: {
 function mockQuestions(promptText: string, procedureCode: string, procedureName: string) {
   const ts = Date.now();
   const name = procedureName || procedureCode || "Geral";
-  // Posições distribuídas: A=0, B=1, C=2, D=3, A=0, B=1, C=2, D=3, A=0, B=1
-  const positions = [0, 1, 2, 3, 0, 1, 2, 3, 0, 1];
+  // Posições embaralhadas via Fisher-Yates — sem padrão repetitivo
+  const positions = makeShuffledPositions(10);
   return [
     {
       id: `q-mock-${ts}-1`,
@@ -276,7 +295,14 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    return NextResponse.json({ questions: parsed.questions, source: "gemini" });
+    // Força shuffle nas respostas do Gemini — garante aleatoriedade mesmo que o modelo ignore a instrução
+    const geminiPositions = makeShuffledPositions(parsed.questions.length);
+    const shuffledQuestions = (parsed.questions as any[]).map((q, i) =>
+      typeof q?.correctOptionIndex === "number"
+        ? shuffleCorrectAnswer(q, geminiPositions[i])
+        : q
+    );
+    return NextResponse.json({ questions: shuffledQuestions, source: "gemini" });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[generate-questions] Erro inesperado:", msg);
