@@ -223,7 +223,12 @@ export default function ExamPage() {
           signature: signatureData,
         }),
       });
-      const data: SubmitResult = await res.json();
+      const json = await res.json();
+      if (!res.ok) {
+        alert(json?.error || 'Erro ao enviar avaliação. Tente novamente.');
+        return;
+      }
+      const data: SubmitResult = json;
       setResult(data);
       setStep('result');
     } catch {

@@ -21,33 +21,62 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
   }
 
-  // ── Mock mode when Supabase is not configured ────────────────────────────────
+  // ── Mock mode quando Supabase não configurado ─────────────────────────────
   if (!supabase) {
     const totalQuestions = Object.keys(answers).length || 10;
     const correctCount = Math.round(totalQuestions * 0.85);
     const score = Math.round((correctCount / totalQuestions) * 100);
+    const minScore = 80;
     return NextResponse.json({
-      passed: score >= 80,
+      passed: score >= minScore,
       score,
-      minScore: 80,
+      minScore,
       correctCount,
       totalQuestions,
       source: 'mock',
     });
   }
 
-  // ── Fetch full assessment with correct answers ────────────────────────────────
+  // ── Resolve assessment via assessment_links.token_uuid (fluxo normal) ────
+  let assessmentId: string = token;
+  let linkId: string | null = null;
+
+  const { data: link } = await supabase
+    .from('assessment_links')
+    .select('id, assessment_id, expires_at, is_active, max_uses, uses_count')
+    .eq('token_uuid', token)
+    .maybeSingle();
+
+  if (link) {
+    // Validações do link
+    if (!link.is_active) {
+      return NextResponse.json({ error: 'Link desativado' }, { status: 403 });
+    }
+    if (new Date(link.expires_at) < new Date()) {
+      return NextResponse.json({ error: 'Link expirado' }, { status: 403 });
+    }
+    if (link.uses_count >= link.max_uses) {
+      return NextResponse.json({ error: 'Limite de usos atingido' }, { status: 403 });
+    }
+    assessmentId = link.assessment_id;
+    linkId = link.id;
+  }
+  // Se não achou pelo token_uuid, trata token como id direto da avaliação (compatibilidade)
+
+  // ── Busca avaliação com questões e respostas corretas ─────────────────────
   const { data, error } = await supabase
     .from('assessments')
     .select('*, assessment_questions(*)')
-    .eq('id', token)
+    .eq('id', assessmentId)
     .eq('status', 'Ativa')
     .maybeSingle();
 
   if (error || !data) {
-    return NextResponse.json({ error: 'Assessment not found' }, { status: 404 });
+    console.error('[submit] assessment not found:', { assessmentId, error });
+    return NextResponse.json({ error: 'Avaliação não encontrada' }, { status: 404 });
   }
 
+  // ── Calcula score ─────────────────────────────────────────────────────────
   const questions: any[] = data.assessment_questions || [];
   const totalQuestions = questions.length;
   let correctCount = 0;
@@ -63,10 +92,17 @@ export async function POST(req: NextRequest) {
   const score = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0;
   const passed = score >= minScore;
 
-  // ── Get or create an assessment_link for this assessment ─────────────────────
-  let linkId: string | null = null;
-  try {
-    // Look for an existing active link for this assessment
+  // ── Incrementa uses_count no link ─────────────────────────────────────────
+  if (linkId) {
+    const { error: usesErr } = await supabase
+      .from('assessment_links')
+      .update({ uses_count: (link?.uses_count ?? 0) + 1 })
+      .eq('id', linkId);
+    if (usesErr) console.error('[submit] uses_count update:', usesErr);
+  }
+
+  // ── Garante um link_id para inserir em responses ──────────────────────────
+  if (!linkId) {
     const { data: existingLink } = await supabase
       .from('assessment_links')
       .select('id')
@@ -79,7 +115,6 @@ export async function POST(req: NextRequest) {
     if (existingLink) {
       linkId = existingLink.id;
     } else {
-      // Create a link on the fly
       const { data: newLink } = await supabase
         .from('assessment_links')
         .insert({
@@ -91,26 +126,23 @@ export async function POST(req: NextRequest) {
         .single();
       linkId = newLink?.id ?? null;
     }
-  } catch (linkErr) {
-    console.error('[submit] assessment_link error:', linkErr);
   }
 
-  // ── Insert response record ────────────────────────────────────────────────────
+  // ── Insere resposta ───────────────────────────────────────────────────────
   if (linkId) {
-    try {
-      await supabase.from('responses').insert({
+    const { error: respErr } = await supabase
+      .from('responses')
+      .insert({
         link_id: linkId,
         score_percent: score,
         status: passed ? 'Entregue' : 'Reprovado',
         answers,
         completed_at: new Date().toISOString(),
       });
-    } catch (insertErr) {
-      console.error('[submit] responses insert error:', insertErr);
-    }
+    if (respErr) console.error('[submit] responses insert:', respErr);
   }
 
-  // ── Update trainings if passed ────────────────────────────────────────────────
+  // ── Atualiza trainings se aprovado ────────────────────────────────────────
   if (passed && data.procedure_code) {
     try {
       const { data: proc } = await supabase
@@ -137,7 +169,7 @@ export async function POST(req: NextRequest) {
           .eq('procedure_id', proc.id);
       }
     } catch (updateErr) {
-      console.error('[submit] trainings update error:', updateErr);
+      console.error('[submit] trainings update:', updateErr);
     }
   }
 
