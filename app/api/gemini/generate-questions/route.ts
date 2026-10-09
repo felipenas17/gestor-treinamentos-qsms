@@ -14,6 +14,7 @@ Gere EXATAMENTE 10 questões de múltipla escolha técnicas, rigorosas e realist
 IMPORTANTE: As questões DEVEM ser baseadas EXCLUSIVAMENTE no conteúdo, definições, conceitos e procedimentos descritos no POP/procedimento fornecido.
 Não gere questões genéricas sobre LOTO, SWA ou PT a menos que o próprio procedimento trate desses temas.
 Cada questão: 4 alternativas, 1 correta, justificativa técnica referenciando o procedimento ou norma regulamentadora citada no próprio POP.
+OBRIGATÓRIO: Varie a posição da resposta correta — distribua o correctOptionIndex entre 0, 1, 2 e 3. NÃO coloque a resposta correta sempre na posição 0 (alternativa A). Misture as posições ao longo das 10 questões.
 Responda SOMENTE com JSON válido, sem texto adicional, sem blocos markdown.`;
 
 function buildPrompt(promptText: string, procedureCode: string, procedureName: string): string {
@@ -25,23 +26,41 @@ ${promptText}
 
 As questões devem testar se o colaborador compreendeu os conceitos, definições, etapas e responsabilidades descritos NESTE procedimento específico.
 
+REGRA CRÍTICA: Distribua o correctOptionIndex de forma variada. Exemplo de distribuição aceitável: q1→2, q2→0, q3→3, q4→1, q5→2, q6→0, q7→3, q8→1, q9→2, q10→0. NUNCA use 0 em todas as questões.
+
 Responda APENAS com este JSON (sem mais nada):
 {
   "questions": [
     {
       "id": "q-1",
       "question": "Pergunta técnica baseada no procedimento?",
-      "options": ["Alternativa A", "Alternativa B", "Alternativa C", "Alternativa D"],
-      "correctOptionIndex": 0,
+      "options": ["Distrator A", "Distrator B", "Resposta correta", "Distrator D"],
+      "correctOptionIndex": 2,
       "explanation": "Justificativa referenciando o procedimento ou norma."
     }
   ]
 }`;
 }
 
+/** Move a resposta correta para uma posição aleatória entre 0-3 */
+function shuffleCorrectAnswer(q: {
+  id: string; question: string; options: string[];
+  correctOptionIndex: number; explanation: string;
+}, targetIndex: number) {
+  const opts = [...q.options];
+  const correct = opts[q.correctOptionIndex];
+  // Remove do lugar atual
+  opts.splice(q.correctOptionIndex, 1);
+  // Insere na posição alvo
+  opts.splice(targetIndex, 0, correct);
+  return { ...q, options: opts, correctOptionIndex: targetIndex };
+}
+
 function mockQuestions(promptText: string, procedureCode: string, procedureName: string) {
   const ts = Date.now();
   const name = procedureName || procedureCode || "Geral";
+  // Posições distribuídas: A=0, B=1, C=2, D=3, A=0, B=1, C=2, D=3, A=0, B=1
+  const positions = [0, 1, 2, 3, 0, 1, 2, 3, 0, 1];
   return [
     {
       id: `q-mock-${ts}-1`,
@@ -163,7 +182,7 @@ function mockQuestions(promptText: string, procedureCode: string, procedureName:
       correctOptionIndex: 0,
       explanation: "O procedimento segue a metodologia PDCA: identificação (aspecto/perigo) → avaliação (impacto/risco) → controles → monitoramento, alinhado com ISO 14001 e ISO 45001.",
     },
-  ];
+  ].map((q, i) => shuffleCorrectAnswer(q, positions[i]));
 }
 
 export async function POST(req: NextRequest) {
