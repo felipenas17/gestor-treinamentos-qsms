@@ -1,6 +1,6 @@
 'use client';
 import { NewProcedureModal } from '@/components/modals/new-procedure-modal';
-import { saveProcedure } from '@/lib/supabase';
+import { saveProcedure, saveAssessmentDraft } from '@/lib/supabase';
 
 import React, { useState, useMemo } from 'react';
 import {
@@ -35,7 +35,37 @@ export function ProceduresScreen({
   const [showNewProc, setShowNewProc] = useState(false);
 
   const handleProcSaved = async (data: any) => {
-    await saveProcedure(data);
+    const result = await saveProcedure(data);
+    if (!result.error) {
+      // Gera avaliação automaticamente em background (sem bloquear o fluxo)
+      (async () => {
+        try {
+          const res = await fetch('/api/gemini/generate-questions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              promptText: `${data.name}. ${data.description || ''}`.trim(),
+              procedureCode: data.code,
+            }),
+          });
+          const qData = await res.json();
+          if (qData.questions?.length > 0) {
+            await saveAssessmentDraft({
+              procedure_code: data.code,
+              title: data.name,
+              questions: qData.questions.map((q: any) => ({
+                question: q.question,
+                options: q.options,
+                correct_index: q.correctOptionIndex ?? 0,
+                explanation: q.explanation || '',
+              })),
+            });
+          }
+        } catch (err) {
+          console.warn('Auto-assessment generation failed:', err);
+        }
+      })();
+    }
     onProcedureCreated?.();
   };
   const [searchTerm, setSearchTerm] = useState('');

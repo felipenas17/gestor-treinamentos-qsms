@@ -289,3 +289,60 @@ export async function saveProcedure(data: {
   }
   return { id: proc.id };
 }
+
+// ─── Assessments (banco completo) ───────────────────────────────────────────
+
+export async function fetchAllAssessments() {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from('assessments')
+    .select('*, assessment_questions(*)')
+    .order('created_at', { ascending: false });
+  if (error) { console.error('fetchAllAssessments:', error); return null; }
+  return data;
+}
+
+export async function saveAssessmentDraft(payload: {
+  procedure_code: string;
+  title: string;
+  questions: Array<{
+    question: string;
+    options: string[];
+    correct_index: number;
+    explanation: string;
+  }>;
+}) {
+  if (!supabase) return null;
+  const { data: asmnt, error } = await supabase
+    .from('assessments')
+    .insert({
+      procedure_code: payload.procedure_code,
+      title: payload.title,
+      status: 'Rascunho',
+      min_score_percent: 80,
+      duration_minutes: 20,
+      max_attempts: 2,
+    })
+    .select('id')
+    .single();
+  if (error || !asmnt) { console.error('saveAssessmentDraft:', error); return null; }
+  if (payload.questions.length > 0) {
+    const qRecords = payload.questions.map((q) => ({
+      assessment_id: asmnt.id,
+      question: q.question,
+      options: q.options,
+      correct_index: q.correct_index,
+      explanation: q.explanation,
+    }));
+    const { error: qErr } = await supabase.from('assessment_questions').insert(qRecords);
+    if (qErr) console.error('saveAssessmentDraft questions:', qErr);
+  }
+  return asmnt.id as string;
+}
+
+export async function updateAssessmentStatus(id: string, status: 'Ativa' | 'Rascunho' | 'Encerrada') {
+  if (!supabase) return false;
+  const { error } = await supabase.from('assessments').update({ status }).eq('id', id);
+  if (error) { console.error('updateAssessmentStatus:', error); return false; }
+  return true;
+}
