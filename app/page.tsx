@@ -228,10 +228,15 @@ export default function GestorTreinamentosApp() {
     if (!supabase || !isSupabaseConfigured) return;
 
     const channel = supabase
-      .channel('trainings-live')
+      .channel('live-updates')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'trainings' },
+        () => { reloadLiveData(); }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'responses' },
         () => { reloadLiveData(); }
       )
       .subscribe();

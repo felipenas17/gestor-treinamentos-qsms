@@ -142,8 +142,8 @@ export async function POST(req: NextRequest) {
     if (respErr) console.error('[submit] responses insert:', respErr);
   }
 
-  // ── Atualiza trainings se aprovado ────────────────────────────────────────
-  if (passed && data.procedure_code) {
+  // ── Atualiza trainings (aprovado → Certificado, reprovado → compliance_rate) ──
+  if (data.procedure_code) {
     try {
       const { data: proc } = await supabase
         .from('procedures')
@@ -154,19 +154,29 @@ export async function POST(req: NextRequest) {
       if (proc) {
         const today = new Date();
         const completionDate = today.toISOString().split('T')[0];
-        const validityDate = new Date(today);
-        validityDate.setMonth(validityDate.getMonth() + (proc.validity_months || 12));
-        const validityDateStr = validityDate.toISOString().split('T')[0];
 
-        await supabase
-          .from('trainings')
-          .update({
-            status: 'Certificado',
-            completion_date: completionDate,
-            validity_date: validityDateStr,
-            compliance_rate: 100,
-          })
-          .eq('procedure_id', proc.id);
+        if (passed) {
+          const validityDate = new Date(today);
+          validityDate.setMonth(validityDate.getMonth() + (proc.validity_months || 12));
+          await supabase
+            .from('trainings')
+            .update({
+              status: 'Certificado',
+              completion_date: completionDate,
+              validity_date: validityDate.toISOString().split('T')[0],
+              compliance_rate: 100,
+            })
+            .eq('procedure_id', proc.id);
+        } else {
+          // Reprovado: registra tentativa e score para disparar Realtime no dashboard
+          await supabase
+            .from('trainings')
+            .update({
+              compliance_rate: score,
+              completion_date: completionDate,
+            })
+            .eq('procedure_id', proc.id);
+        }
       }
     } catch (updateErr) {
       console.error('[submit] trainings update:', updateErr);
