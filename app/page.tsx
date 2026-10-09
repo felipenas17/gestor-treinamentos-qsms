@@ -271,8 +271,18 @@ export default function GestorTreinamentosApp() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          promptText: `${proc.name}. ${proc.description || proc.application || ''}`.trim(),
+          promptText: [
+            `Procedimento: ${proc.name}`,
+            `Código: ${proc.code}`,
+            proc.revision ? `Revisão: ${proc.revision}` : '',
+            proc.criticality ? `Criticidade: ${proc.criticality}` : '',
+            proc.sectors?.length ? `Setores: ${proc.sectors.join(', ')}` : '',
+            (proc.description || proc.application)
+              ? `Descrição/Conteúdo: ${proc.description || proc.application}`
+              : '',
+          ].filter(Boolean).join('\n'),
           procedureCode: proc.code,
+          procedureName: proc.name,
         }),
       });
       const qData = await res.json();
