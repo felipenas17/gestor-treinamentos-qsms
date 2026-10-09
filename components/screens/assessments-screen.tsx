@@ -25,7 +25,7 @@ import {
 import { Assessment, RespondentStatus, AssessmentQuestion } from '@/types';
 
 interface AssessmentsScreenProps {
-  assessment: Assessment;
+  assessment: Assessment | null;
   respondents: RespondentStatus[];
   onOpenAssessmentTaker: (assessment: Assessment) => void;
   onSendReminder: (respondent: RespondentStatus) => void;
@@ -65,7 +65,7 @@ export function AssessmentsScreen({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           promptText: aiQuestionPrompt,
-          procedureCode: assessment.procedureCode,
+          procedureCode: assessment?.procedureCode ?? '',
         }),
       });
       const data = await res.json();
@@ -94,6 +94,22 @@ export function AssessmentsScreen({
         return 'bg-slate-50 text-slate-700 border-slate-200';
     }
   };
+
+  if (!assessment) {
+    return (
+      <div className="p-6 flex flex-col items-center justify-center min-h-[400px] gap-4">
+        <FileQuestion className="w-12 h-12 text-slate-300" />
+        <p className="text-slate-500 font-semibold text-sm">Nenhuma avaliação ativa no momento</p>
+        <p className="text-slate-400 text-xs">Crie uma nova avaliação para iniciar o processo de certificação.</p>
+        <button
+          onClick={onCreateNewAssessment}
+          className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm transition-colors"
+        >
+          + Criar Nova Avaliação
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">

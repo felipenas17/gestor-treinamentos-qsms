@@ -24,10 +24,6 @@ import {
   INITIAL_METRICS,
   SECTOR_CHART_DATA,
   PROJECTION_CHART_DATA,
-  INITIAL_PROCEDURES,
-  INITIAL_TRAINING_RECORDS,
-  INITIAL_ASSESSMENT,
-  INITIAL_RESPONDENTS,
 } from '@/lib/mock-data';
 
 import {
@@ -36,6 +32,7 @@ import {
   fetchProcedures,
   fetchTrainingRecords,
   fetchSectorChartData,
+  fetchLatestAssessment,
 } from '@/lib/supabase';
 
 import { Procedure, TrainingRecord, Assessment, RespondentStatus } from '@/types';
@@ -51,7 +48,7 @@ export default function GestorTreinamentosApp() {
   const [projectionData, setProjectionData] = useState(PROJECTION_CHART_DATA);
   const [procedures, setProcedures] = useState<Procedure[]>([]);
   const [records, setRecords] = useState<TrainingRecord[]>([]);
-  const [assessment, setAssessment] = useState<Assessment>(INITIAL_ASSESSMENT); // mantido só para o modal de avaliação
+  const [assessment, setAssessment] = useState<Assessment | null>(null);
   const [respondents, setRespondents] = useState<RespondentStatus[]>([]);
 
   // Modal states
@@ -109,11 +106,12 @@ export default function GestorTreinamentosApp() {
     const loadAll = async () => {
       setIsLoading(true);
       try {
-        const [dbMetrics, dbProcedures, dbRecords, dbSector] = await Promise.all([
+        const [dbMetrics, dbProcedures, dbRecords, dbSector, dbAssessment] = await Promise.all([
           fetchDashboardMetrics(),
           fetchProcedures(),
           fetchTrainingRecords(),
           fetchSectorChartData(),
+          fetchLatestAssessment(),
         ]);
 
         if (dbMetrics) setMetrics(dbMetrics);
@@ -141,6 +139,32 @@ export default function GestorTreinamentosApp() {
             instructor: r.instructor,
             certificateHash: r.certificate_hash,
           })));
+        }
+        if (dbAssessment) {
+          const qs = (dbAssessment.assessment_questions || []).map((q: any) => ({
+            id: q.id,
+            question: q.question,
+            options: Array.isArray(q.options) ? q.options : [],
+            correctOptionIndex: q.correct_index ?? 0,
+            explanation: q.explanation || '',
+          }));
+          setAssessment({
+            id: dbAssessment.id,
+            code: `AVAL-${dbAssessment.procedure_code || dbAssessment.id.slice(0, 6).toUpperCase()}`,
+            title: dbAssessment.title,
+            procedureCode: dbAssessment.procedure_code || '',
+            procedureTitle: dbAssessment.title,
+            questionsCount: qs.length,
+            minScorePercent: dbAssessment.min_score_percent ?? 80,
+            durationMinutes: dbAssessment.duration_minutes ?? 20,
+            maxAttempts: dbAssessment.max_attempts ?? 2,
+            tokenUuid: dbAssessment.id,
+            status: dbAssessment.status as Assessment['status'],
+            questions: qs,
+            approvalRate: 0,
+            totalSubmissions: 0,
+            avgDurationMinutes: 0,
+          });
         }
       } catch (err) {
         console.error('Erro ao carregar dados do Supabase:', err);
@@ -212,7 +236,7 @@ export default function GestorTreinamentosApp() {
         ...prev,
       ]);
     } else {
-      showToast(`Nota ${score}% — abaixo do mínimo de ${assessment.minScorePercent}%. Reteste disponível.`, 'error');
+      showToast(`Nota ${score}% — abaixo do mínimo de ${assessment?.minScorePercent ?? 80}%. Reteste disponível.`, 'error');
     }
   };
 
@@ -343,7 +367,7 @@ export default function GestorTreinamentosApp() {
       {/* Modals */}
       <ImageLinksModal isOpen={isImagesModalOpen} onClose={() => setIsImagesModalOpen(false)} />
       <SupabaseSchemaModal isOpen={isSchemaModalOpen} onClose={() => setIsSchemaModalOpen(false)} />
-      <AssessmentTakerModal isOpen={isAssessmentTakerOpen} onClose={() => setIsAssessmentTakerOpen(false)} assessment={assessment} onComplete={handleAssessmentCompleted} />
+      {assessment && <AssessmentTakerModal isOpen={isAssessmentTakerOpen} onClose={() => setIsAssessmentTakerOpen(false)} assessment={assessment} onComplete={handleAssessmentCompleted} />}
       <NewProcedureAiModal isOpen={isNewProcedureModalOpen} onClose={() => setIsNewProcedureModalOpen(false)} onProcedureCreated={handleProcedureCreated} />
       <NewTrainingPlanModal isOpen={isNewPlanModalOpen} onClose={() => setIsNewPlanModalOpen(false)} procedures={procedures} onPlanScheduled={handlePlanScheduled} />
       <ProcedureDetailsModal procedure={selectedProcedureDetails} onClose={() => setSelectedProcedureDetails(null)} />

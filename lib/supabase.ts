@@ -217,6 +217,19 @@ export async function fetchAssessmentByProcedureCode(procedureCode: string) {
   return data;
 }
 
+export async function fetchLatestAssessment() {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from('assessments')
+    .select('*, assessment_questions(*)')
+    .eq('status', 'Ativa')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) { console.error('fetchLatestAssessment:', error); return null; }
+  return data;
+}
+
 export async function fetchRespondentsByAssessment(assessmentId: string) {
   if (!supabase) return [];
   const { data, error } = await supabase
