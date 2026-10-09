@@ -34,6 +34,7 @@ import {
   fetchSectorChartData,
   fetchAllAssessments,
   updateAssessmentStatus,
+  saveAssessmentDraft,
 } from '@/lib/supabase';
 
 import { Procedure, TrainingRecord, Assessment, RespondentStatus } from '@/types';
@@ -264,6 +265,64 @@ export default function GestorTreinamentosApp() {
     }
   };
 
+  const handleGenerateAssessmentForProcedure = async (proc: Procedure) => {
+    try {
+      const res = await fetch('/api/gemini/generate-questions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          promptText: `${proc.name}. ${proc.description || proc.application || ''}`.trim(),
+          procedureCode: proc.code,
+        }),
+      });
+      const qData = await res.json();
+      if (!qData.questions?.length) {
+        showToast('IA não retornou questões. Tente novamente.', 'error');
+        return;
+      }
+      const newId = await saveAssessmentDraft({
+        procedure_code: proc.code,
+        title: proc.name,
+        questions: qData.questions.map((q: any) => ({
+          question: q.question,
+          options: q.options,
+          correct_index: q.correctOptionIndex ?? 0,
+          explanation: q.explanation || '',
+        })),
+      });
+      if (!newId) { showToast('Erro ao salvar avaliação.', 'error'); return; }
+      const qs = qData.questions.map((q: any, i: number) => ({
+        id: `q-${newId}-${i}`,
+        question: q.question,
+        options: q.options,
+        correctOptionIndex: q.correctOptionIndex ?? 0,
+        explanation: q.explanation || '',
+      }));
+      const newAssessment: Assessment = {
+        id: newId,
+        code: `AVAL-${proc.code}`,
+        title: proc.name,
+        procedureCode: proc.code,
+        procedureTitle: proc.name,
+        questionsCount: qs.length,
+        minScorePercent: 80,
+        durationMinutes: 20,
+        maxAttempts: 2,
+        tokenUuid: newId,
+        status: 'Rascunho',
+        questions: qs,
+        approvalRate: 0,
+        totalSubmissions: 0,
+        avgDurationMinutes: 0,
+      };
+      setAssessments((prev) => [newAssessment, ...prev]);
+      showToast(`Avaliação de "${proc.code}" gerada! Revise e aprove.`);
+    } catch (err) {
+      console.error('handleGenerateAssessmentForProcedure:', err);
+      showToast('Erro ao gerar avaliação via IA.', 'error');
+    }
+  };
+
   const handleExportData = (format: 'csv' | 'json' | 'print') => {
     if (format === 'csv') {
       const headers = 'Colaborador,Cargo,Setor,Procedimento,DataConclusao,Validade,DiasRestantes,Conformidade,Status\n';
@@ -357,14 +416,15 @@ export default function GestorTreinamentosApp() {
           )}
           {currentTab === 'provas' && (
             <AssessmentsScreen
+              procedures={procedures}
               assessments={assessments}
-              onCreateNewAssessment={() => setIsNewProcedureModalOpen(true)}
               onApproveAssessment={handleApproveAssessment}
               onArchiveAssessment={handleArchiveAssessment}
               onOpenAssessmentTaker={(a) => {
                 setSelectedAssessmentForTaker(a);
                 setIsAssessmentTakerOpen(true);
               }}
+              onGenerateAssessment={handleGenerateAssessmentForProcedure}
             />
           )}
           {currentTab === 'colaboradores' && <EmployeesScreen />}
