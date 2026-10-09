@@ -1,36 +1,26 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { 
-  Users, 
-  FileCheck2, 
-  Download, 
-  PlusCircle, 
-  Search, 
-  Filter, 
-  CheckCircle2, 
-  Clock, 
+import {
+  Users,
+  UserPlus,
+  Search,
+  CheckCircle2,
+  Clock,
   AlertTriangle,
-  Award,
-  Bell,
-  Calendar,
-  Send,
-  Printer
 } from 'lucide-react';
 import { TrainingRecord, ComplianceStatus, Sector } from '@/types';
 
 interface MatrixScreenProps {
   records: TrainingRecord[];
-  onRegisterTraining: () => void;
-  onExportData: (format: 'csv' | 'json' | 'print') => void;
+  onRegisterEmployee: () => void;
   onScheduleExam: (record: TrainingRecord) => void;
   onNotifyEmployee: (record: TrainingRecord) => void;
 }
 
 export function MatrixScreen({
   records,
-  onRegisterTraining,
-  onExportData,
+  onRegisterEmployee,
   onScheduleExam,
   onNotifyEmployee,
 }: MatrixScreenProps) {
@@ -51,10 +41,11 @@ export function MatrixScreen({
   }, [records]);
 
   // KPI counts derived from real data
-  const total = records.length;
+  const totalColaboradores = new Set(records.map((r) => r.employeeId)).size;
   const ativas = records.filter((r) => r.status === 'Certificado').length;
   const vencendo = records.filter((r) => r.status === 'Reciclar').length;
   const vencidas = records.filter((r) => r.status === 'Vencido').length;
+  const total = records.length;
   const ativasPercent = total > 0 ? ((ativas / total) * 100).toFixed(1) : '0.0';
 
   // Filtered list
@@ -101,22 +92,12 @@ export function MatrixScreen({
         </div>
 
         <div className="flex items-center gap-2.5">
-          <div className="relative">
-            <button
-              onClick={() => onExportData('csv')}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors shadow-sm"
-            >
-              <Download className="w-4 h-4 text-slate-500" />
-              <span>Exportar Dados</span>
-            </button>
-          </div>
-
           <button
-            onClick={onRegisterTraining}
+            onClick={onRegisterEmployee}
             className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 rounded-lg shadow-sm transition-colors"
           >
-            <PlusCircle className="w-4 h-4" />
-            <span>Registrar Treinamento</span>
+            <UserPlus className="w-4 h-4" />
+            <span>Registrar Colaborador</span>
           </button>
         </div>
       </div>
@@ -125,12 +106,12 @@ export function MatrixScreen({
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-sm">
           <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">
-            Total Certificações
+            Total Colaboradores
           </span>
           <p className="text-2xl font-extrabold text-slate-900 font-mono tabular-nums mt-1">
-            {total}
+            {totalColaboradores}
           </p>
-          <span className="text-[11px] text-slate-500 font-medium">Histórico acumulado</span>
+          <span className="text-[11px] text-slate-500 font-medium">Cadastrados na matriz</span>
         </div>
 
         <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-sm">

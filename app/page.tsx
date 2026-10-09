@@ -461,8 +461,7 @@ export default function GestorTreinamentosApp() {
           {currentTab === 'matriz' && (
             <MatrixScreen
               records={records}
-              onRegisterTraining={() => setIsRegisterTrainingOpen(true)}
-              onExportData={handleExportData}
+              onRegisterEmployee={() => setCurrentTab('colaboradores')}
               onScheduleExam={handleScheduleExam}
               onNotifyEmployee={handleNotifyEmployee}
             />
