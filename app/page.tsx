@@ -32,7 +32,8 @@ import {
   fetchProcedures,
   fetchTrainingRecords,
   fetchSectorChartData,
-  fetchLatestAssessment,
+  fetchAllAssessments,
+  updateAssessmentStatus,
 } from '@/lib/supabase';
 
 import { Procedure, TrainingRecord, Assessment, RespondentStatus } from '@/types';
@@ -48,7 +49,8 @@ export default function GestorTreinamentosApp() {
   const [projectionData, setProjectionData] = useState(PROJECTION_CHART_DATA);
   const [procedures, setProcedures] = useState<Procedure[]>([]);
   const [records, setRecords] = useState<TrainingRecord[]>([]);
-  const [assessment, setAssessment] = useState<Assessment | null>(null);
+  const [assessments, setAssessments] = useState<Assessment[]>([]);
+  const [selectedAssessmentForTaker, setSelectedAssessmentForTaker] = useState<Assessment | null>(null);
   const [respondents, setRespondents] = useState<RespondentStatus[]>([]);
 
   // Modal states
@@ -106,12 +108,12 @@ export default function GestorTreinamentosApp() {
     const loadAll = async () => {
       setIsLoading(true);
       try {
-        const [dbMetrics, dbProcedures, dbRecords, dbSector, dbAssessment] = await Promise.all([
+        const [dbMetrics, dbProcedures, dbRecords, dbSector, dbAssessmentList] = await Promise.all([
           fetchDashboardMetrics(),
           fetchProcedures(),
           fetchTrainingRecords(),
           fetchSectorChartData(),
-          fetchLatestAssessment(),
+          fetchAllAssessments(),
         ]);
 
         if (dbMetrics) setMetrics(dbMetrics);
@@ -140,31 +142,33 @@ export default function GestorTreinamentosApp() {
             certificateHash: r.certificate_hash,
           })));
         }
-        if (dbAssessment) {
-          const qs = (dbAssessment.assessment_questions || []).map((q: any) => ({
-            id: q.id,
-            question: q.question,
-            options: Array.isArray(q.options) ? q.options : [],
-            correctOptionIndex: q.correct_index ?? 0,
-            explanation: q.explanation || '',
+        if (dbAssessmentList && dbAssessmentList.length > 0) {
+          setAssessments(dbAssessmentList.map((a: any) => {
+            const qs = (a.assessment_questions || []).map((q: any) => ({
+              id: q.id,
+              question: q.question,
+              options: Array.isArray(q.options) ? q.options : [],
+              correctOptionIndex: q.correct_index ?? 0,
+              explanation: q.explanation || '',
+            }));
+            return {
+              id: a.id,
+              code: `AVAL-${a.procedure_code || a.id.slice(0, 6).toUpperCase()}`,
+              title: a.title,
+              procedureCode: a.procedure_code || '',
+              procedureTitle: a.title,
+              questionsCount: qs.length,
+              minScorePercent: a.min_score_percent ?? 80,
+              durationMinutes: a.duration_minutes ?? 20,
+              maxAttempts: a.max_attempts ?? 2,
+              tokenUuid: a.id,
+              status: a.status as Assessment['status'],
+              questions: qs,
+              approvalRate: 0,
+              totalSubmissions: 0,
+              avgDurationMinutes: 0,
+            };
           }));
-          setAssessment({
-            id: dbAssessment.id,
-            code: `AVAL-${dbAssessment.procedure_code || dbAssessment.id.slice(0, 6).toUpperCase()}`,
-            title: dbAssessment.title,
-            procedureCode: dbAssessment.procedure_code || '',
-            procedureTitle: dbAssessment.title,
-            questionsCount: qs.length,
-            minScorePercent: dbAssessment.min_score_percent ?? 80,
-            durationMinutes: dbAssessment.duration_minutes ?? 20,
-            maxAttempts: dbAssessment.max_attempts ?? 2,
-            tokenUuid: dbAssessment.id,
-            status: dbAssessment.status as Assessment['status'],
-            questions: qs,
-            approvalRate: 0,
-            totalSubmissions: 0,
-            avgDurationMinutes: 0,
-          });
         }
       } catch (err) {
         console.error('Erro ao carregar dados do Supabase:', err);
@@ -236,7 +240,27 @@ export default function GestorTreinamentosApp() {
         ...prev,
       ]);
     } else {
-      showToast(`Nota ${score}% — abaixo do mínimo de ${assessment?.minScorePercent ?? 80}%. Reteste disponível.`, 'error');
+      showToast(`Nota ${score}% — abaixo do mínimo de ${selectedAssessmentForTaker?.minScorePercent ?? 80}%. Reteste disponível.`, 'error');
+    }
+  };
+
+  const handleApproveAssessment = async (id: string) => {
+    const ok = await updateAssessmentStatus(id, 'Ativa');
+    if (ok) {
+      setAssessments((prev) => prev.map((a) => a.id === id ? { ...a, status: 'Ativa' } : a));
+      showToast('Avaliação aprovada e ativada com sucesso!');
+    } else {
+      showToast('Erro ao aprovar avaliação.', 'error');
+    }
+  };
+
+  const handleArchiveAssessment = async (id: string) => {
+    const ok = await updateAssessmentStatus(id, 'Encerrada');
+    if (ok) {
+      setAssessments((prev) => prev.map((a) => a.id === id ? { ...a, status: 'Encerrada' } : a));
+      showToast('Avaliação encerrada e arquivada.');
+    } else {
+      showToast('Erro ao arquivar avaliação.', 'error');
     }
   };
 
@@ -333,13 +357,14 @@ export default function GestorTreinamentosApp() {
           )}
           {currentTab === 'provas' && (
             <AssessmentsScreen
-              assessment={assessment}
-              respondents={respondents}
-              onOpenAssessmentTaker={() => setIsAssessmentTakerOpen(true)}
-              onSendReminder={(resp) => showToast(`Lembrete enviado para ${resp.name}.`)}
-              onApproveAssessment={() => showToast('Avaliação aprovada pela coordenação de QSMS.')}
-              onEditAssessment={() => showToast('Modo de edição habilitado.')}
-              onCreateNewAssessment={() => { setIsNewProcedureModalOpen(true); }}
+              assessments={assessments}
+              onCreateNewAssessment={() => setIsNewProcedureModalOpen(true)}
+              onApproveAssessment={handleApproveAssessment}
+              onArchiveAssessment={handleArchiveAssessment}
+              onOpenAssessmentTaker={(a) => {
+                setSelectedAssessmentForTaker(a);
+                setIsAssessmentTakerOpen(true);
+              }}
             />
           )}
           {currentTab === 'colaboradores' && <EmployeesScreen />}
@@ -367,7 +392,7 @@ export default function GestorTreinamentosApp() {
       {/* Modals */}
       <ImageLinksModal isOpen={isImagesModalOpen} onClose={() => setIsImagesModalOpen(false)} />
       <SupabaseSchemaModal isOpen={isSchemaModalOpen} onClose={() => setIsSchemaModalOpen(false)} />
-      {assessment && <AssessmentTakerModal isOpen={isAssessmentTakerOpen} onClose={() => setIsAssessmentTakerOpen(false)} assessment={assessment} onComplete={handleAssessmentCompleted} />}
+      {selectedAssessmentForTaker && <AssessmentTakerModal isOpen={isAssessmentTakerOpen} onClose={() => { setIsAssessmentTakerOpen(false); setSelectedAssessmentForTaker(null); }} assessment={selectedAssessmentForTaker} onComplete={handleAssessmentCompleted} />}
       <NewProcedureAiModal isOpen={isNewProcedureModalOpen} onClose={() => setIsNewProcedureModalOpen(false)} onProcedureCreated={handleProcedureCreated} />
       <NewTrainingPlanModal isOpen={isNewPlanModalOpen} onClose={() => setIsNewPlanModalOpen(false)} procedures={procedures} onPlanScheduled={handlePlanScheduled} />
       <ProcedureDetailsModal procedure={selectedProcedureDetails} onClose={() => setSelectedProcedureDetails(null)} />
