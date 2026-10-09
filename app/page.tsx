@@ -28,6 +28,7 @@ import {
 } from '@/lib/mock-data';
 
 import {
+  supabase,
   isSupabaseConfigured,
   fetchDashboardMetrics,
   fetchProcedures,
@@ -184,6 +185,59 @@ export default function GestorTreinamentosApp() {
 
     loadAll();
   }, [showToast, mapProcedures]);
+
+  // ─── Realtime: atualiza trainings/metrics quando qualquer linha mudar ────
+  const reloadLiveData = useCallback(async () => {
+    try {
+      const [dbRecords, dbMetrics, dbSector] = await Promise.all([
+        fetchTrainingRecords(),
+        fetchDashboardMetrics(),
+        fetchSectorChartData(),
+      ]);
+      if (dbMetrics) setMetrics(dbMetrics);
+      if (dbSector && dbSector.length > 0) setSectorData(dbSector);
+      if (dbRecords) {
+        setRecords(dbRecords.map((r: any) => ({
+          id: r.id,
+          employeeId: r.employee_id,
+          employeeName: r.employees?.name || '—',
+          employeeRole: r.employees?.role || '—',
+          employeeAvatar: r.employees?.avatar_url || '/images/avatar_engineer.svg',
+          sector: r.employees?.sector || '—',
+          procedureCode: r.procedures?.code || '—',
+          procedureName: r.procedures?.name || '—',
+          completionDate: r.completion_date
+            ? new Date(r.completion_date).toLocaleDateString('pt-BR')
+            : '—',
+          validityDate: r.validity_date
+            ? new Date(r.validity_date).toLocaleDateString('pt-BR')
+            : '—',
+          daysRemaining: r.days_remaining,
+          complianceRate: r.compliance_rate,
+          status: r.status,
+          instructor: r.instructor,
+          certificateHash: r.certificate_hash,
+        })));
+      }
+    } catch (err) {
+      console.error('[realtime] reload failed:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!supabase || !isSupabaseConfigured) return;
+
+    const channel = supabase
+      .channel('trainings-live')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'trainings' },
+        () => { reloadLiveData(); }
+      )
+      .subscribe();
+
+    return () => { supabase!.removeChannel(channel); };
+  }, [reloadLiveData]);
 
   // ─── Handlers ────────────────────────────────────────────────────────────
   const handleScheduleExam = (rec: TrainingRecord) => {
