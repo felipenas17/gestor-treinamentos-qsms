@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
   const { data, error } = await supabase
     .from('assessments')
     .select('*, assessment_questions(*)')
-    .eq('token_uuid', token)
+    .eq('id', token)
     .eq('status', 'Ativa')
     .maybeSingle();
 
@@ -63,19 +63,51 @@ export async function POST(req: NextRequest) {
   const score = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0;
   const passed = score >= minScore;
 
-  // ── Insert response record ────────────────────────────────────────────────────
+  // ── Get or create an assessment_link for this assessment ─────────────────────
+  let linkId: string | null = null;
   try {
-    await supabase.from('responses').insert({
-      assessment_id: data.id,
-      employee_name: employeeName,
-      score_percent: score,
-      status: passed ? 'Entregue' : 'Reprovado',
-      answers,
-      completed_at: new Date().toISOString(),
-      signature_data: signature,
-    });
-  } catch (insertErr) {
-    console.error('[submit] responses insert error:', insertErr);
+    // Look for an existing active link for this assessment
+    const { data: existingLink } = await supabase
+      .from('assessment_links')
+      .select('id')
+      .eq('assessment_id', data.id)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existingLink) {
+      linkId = existingLink.id;
+    } else {
+      // Create a link on the fly
+      const { data: newLink } = await supabase
+        .from('assessment_links')
+        .insert({
+          assessment_id: data.id,
+          expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+          max_uses: 999,
+        })
+        .select('id')
+        .single();
+      linkId = newLink?.id ?? null;
+    }
+  } catch (linkErr) {
+    console.error('[submit] assessment_link error:', linkErr);
+  }
+
+  // ── Insert response record ────────────────────────────────────────────────────
+  if (linkId) {
+    try {
+      await supabase.from('responses').insert({
+        link_id: linkId,
+        score_percent: score,
+        status: passed ? 'Entregue' : 'Reprovado',
+        answers,
+        completed_at: new Date().toISOString(),
+      });
+    } catch (insertErr) {
+      console.error('[submit] responses insert error:', insertErr);
+    }
   }
 
   // ── Update trainings if passed ────────────────────────────────────────────────

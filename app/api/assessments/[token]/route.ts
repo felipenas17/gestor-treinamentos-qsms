@@ -14,7 +14,7 @@ export async function GET(
   const { data, error } = await supabase
     .from('assessments')
     .select('*, assessment_questions(*)')
-    .eq('token_uuid', token)
+    .eq('id', token)
     .eq('status', 'Ativa')
     .maybeSingle();
 
