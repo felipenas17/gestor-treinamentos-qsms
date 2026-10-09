@@ -16,6 +16,7 @@ import { NewTrainingPlanModal } from '@/components/modals/new-training-plan-moda
 import { ProcedureDetailsModal } from '@/components/modals/procedure-details-modal';
 import { ProcedureExamModal } from '@/components/modals/procedure-exam-modal';
 import { RegisterTrainingModal } from '@/components/modals/register-training-modal';
+import { NotifyModal } from '@/components/modals/notify-modal';
 import { EmployeesScreen } from '@/components/screens/employees-screen';
 import { CertificatesScreen } from '@/components/screens/certificates-screen';
 // import { ImportDocumentModal } from '@/components/modals/import-document-modal'; // modal não ativo
@@ -62,6 +63,7 @@ export default function GestorTreinamentosApp() {
   const [isNewProcedureModalOpen, setIsNewProcedureModalOpen] = useState(false);
   const [isAssessmentTakerOpen, setIsAssessmentTakerOpen] = useState(false);
   const [isRegisterTrainingOpen, setIsRegisterTrainingOpen] = useState(false);
+  const [notifyRecord, setNotifyRecord] = useState<TrainingRecord | null>(null);
   const [isImportDocOpen, setIsImportDocOpen] = useState(false);
   const [selectedProcedureDetails, setSelectedProcedureDetails] = useState<Procedure | null>(null);
   const [selectedExamProcedure, setSelectedExamProcedure] = useState<Procedure | null>(null);
@@ -190,7 +192,7 @@ export default function GestorTreinamentosApp() {
   };
 
   const handleNotifyEmployee = (rec: TrainingRecord) => {
-    showToast(`Notificação enviada para ${rec.employeeName} por e-mail.`);
+    setNotifyRecord(rec);
   };
 
   const handleImportCert = (rec: TrainingRecord) => {
@@ -491,6 +493,7 @@ export default function GestorTreinamentosApp() {
         onGoToAssessments={() => setCurrentTab('provas')}
       />
       <RegisterTrainingModal isOpen={isRegisterTrainingOpen} onClose={() => setIsRegisterTrainingOpen(false)} procedures={procedures} onSaveRecord={handleSaveTrainingRecord} />
+      <NotifyModal isOpen={notifyRecord !== null} onClose={() => setNotifyRecord(null)} record={notifyRecord} assessments={assessments} />
       {/* <ImportDocumentModal isOpen={isImportDocOpen} onClose={() => setIsImportDocOpen(false)} onProcedureImported={handleProcedureImported} /> */}
     </div>
   );
