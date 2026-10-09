@@ -9,6 +9,7 @@ import {
   ExternalLink,
   AlertTriangle,
   Link,
+  RefreshCw,
 } from 'lucide-react';
 import { TrainingRecord, Assessment } from '@/types';
 
@@ -28,6 +29,8 @@ const STATUS_COLORS: Record<string, string> = {
 
 export function NotifyModal({ isOpen, onClose, record, assessments }: NotifyModalProps) {
   const [copied, setCopied] = useState(false);
+  const [generatedToken, setGeneratedToken] = useState<string | null>(null);
+  const [generating, setGenerating] = useState(false);
 
   if (!isOpen || !record) return null;
 
@@ -36,7 +39,29 @@ export function NotifyModal({ isOpen, onClose, record, assessments }: NotifyModa
   );
 
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
-  const examLink = activeAssessment ? `${origin}/avaliar/${activeAssessment.tokenUuid}` : '';
+  const token = generatedToken ?? activeAssessment?.tokenUuid ?? null;
+  const examLink = token ? `${origin}/avaliar/${token}` : '';
+
+  const handleGenerateLink = async () => {
+    if (!activeAssessment) return;
+    setGenerating(true);
+    try {
+      const res = await fetch('/api/assessments/generate-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assessmentId: activeAssessment.id }),
+      });
+      const json = await res.json();
+      if (json.tokenUuid) {
+        setGeneratedToken(json.tokenUuid);
+        setCopied(false);
+      }
+    } catch (err) {
+      console.error('generate-link:', err);
+    } finally {
+      setGenerating(false);
+    }
+  };
 
   const handleCopy = async () => {
     if (!examLink) return;
@@ -128,52 +153,66 @@ export function NotifyModal({ isOpen, onClose, record, assessments }: NotifyModa
           <div className="px-5 py-4 space-y-4">
             {activeAssessment ? (
               <>
-                {/* Exam link */}
-                <div className="space-y-2">
-                  <div className="flex items-center gap-1.5 text-[10px] text-slate-500 uppercase tracking-wider font-medium">
-                    <Link className="w-3 h-3" />
-                    Link da Prova
+                {/* Gerar novo link */}
+                <button
+                  onClick={handleGenerateLink}
+                  disabled={generating}
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold bg-blue-700 hover:bg-blue-600 disabled:opacity-60 text-white border border-blue-600 hover:border-blue-500 transition-colors"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${generating ? 'animate-spin' : ''}`} />
+                  {generating ? 'Gerando...' : generatedToken ? 'Gerar Novo Link' : 'Gerar Link da Prova'}
+                </button>
+
+                {/* Exam link — só aparece após gerar */}
+                {examLink && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-1.5 text-[10px] text-slate-500 uppercase tracking-wider font-medium">
+                      <Link className="w-3 h-3" />
+                      Link da Prova {generatedToken && <span className="text-emerald-400 normal-case font-normal">• válido 7 dias · 2 usos</span>}
+                    </div>
+                    <div className="flex items-center gap-2 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5">
+                      <ExternalLink className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                      <span className="flex-1 text-[11px] text-slate-300 font-mono truncate">{examLink}</span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5">
-                    <ExternalLink className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                    <span className="flex-1 text-[11px] text-slate-300 font-mono truncate">{examLink}</span>
-                  </div>
-                </div>
+                )}
 
                 {/* Action buttons */}
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleCopy}
-                    className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 border ${
-                      copied
-                        ? 'bg-emerald-900/60 border-emerald-700 text-emerald-300'
-                        : 'bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700 hover:border-slate-600'
-                    }`}
-                  >
-                    {copied ? (
-                      <>
-                        <Check className="w-3.5 h-3.5" />
-                        Copiado!
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-3.5 h-3.5" />
-                        Copiar Link
-                      </>
-                    )}
-                  </button>
+                {examLink && (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleCopy}
+                      className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 border ${
+                        copied
+                          ? 'bg-emerald-900/60 border-emerald-700 text-emerald-300'
+                          : 'bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700 hover:border-slate-600'
+                      }`}
+                    >
+                      {copied ? (
+                        <>
+                          <Check className="w-3.5 h-3.5" />
+                          Copiado!
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5" />
+                          Copiar Link
+                        </>
+                      )}
+                    </button>
 
-                  <button
-                    onClick={handleWhatsApp}
-                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold bg-emerald-700 hover:bg-emerald-600 text-white border border-emerald-600 hover:border-emerald-500 transition-colors"
-                  >
-                    <MessageCircle className="w-3.5 h-3.5" />
-                    WhatsApp
-                  </button>
-                </div>
+                    <button
+                      onClick={handleWhatsApp}
+                      className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold bg-emerald-700 hover:bg-emerald-600 text-white border border-emerald-600 hover:border-emerald-500 transition-colors"
+                    >
+                      <MessageCircle className="w-3.5 h-3.5" />
+                      WhatsApp
+                    </button>
+                  </div>
+                )}
 
                 <p className="text-[10px] text-slate-500 text-center">
-                  A mensagem do WhatsApp inclui o nome do colaborador, o procedimento e o link — válido por 7 dias.
+                  Cada link gerado é único, expira em 7 dias e tem limite de 2 usos.
                 </p>
               </>
             ) : (
