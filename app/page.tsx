@@ -446,6 +446,7 @@ export default function GestorTreinamentosApp() {
             <AssessmentsScreen
               procedures={procedures}
               assessments={assessments}
+              records={records}
               onApproveAssessment={handleApproveAssessment}
               onArchiveAssessment={handleArchiveAssessment}
               onDeleteAssessment={handleDeleteAssessment}

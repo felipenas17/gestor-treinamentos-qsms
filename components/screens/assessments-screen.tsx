@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   CheckCircle2,
   ChevronDown,
@@ -15,14 +15,16 @@ import {
   Copy,
   Check,
   Trash2,
-  RefreshCw,
+  CalendarClock,
+  Users,
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
-import { Assessment, Procedure } from '@/types';
+import { Assessment, Procedure, TrainingRecord } from '@/types';
 
 interface AssessmentsScreenProps {
   procedures: Procedure[];
   assessments: Assessment[];
+  records: TrainingRecord[];
   onApproveAssessment: (id: string) => void;
   onArchiveAssessment: (id: string) => void;
   onDeleteAssessment: (id: string) => void;
@@ -33,6 +35,7 @@ interface AssessmentsScreenProps {
 export function AssessmentsScreen({
   procedures,
   assessments,
+  records,
   onApproveAssessment,
   onArchiveAssessment,
   onDeleteAssessment,
@@ -42,6 +45,25 @@ export function AssessmentsScreen({
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [generatingFor, setGeneratingFor] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [expandedDate, setExpandedDate] = useState<string | null>(null);
+
+  // Agrupar registros da matriz por data de validade, ordenados pela urgência
+  const expirationGroups = useMemo(() => {
+    const map = new Map<string, TrainingRecord[]>();
+    records.forEach(r => {
+      const existing = map.get(r.validityDate) || [];
+      existing.push(r);
+      map.set(r.validityDate, existing);
+    });
+    return Array.from(map.entries())
+      .map(([date, recs]) => ({
+        date,
+        records: recs,
+        minDays: Math.min(...recs.map(r => r.daysRemaining)),
+      }))
+      .sort((a, b) => a.minDays - b.minDays)
+      .slice(0, 12);
+  }, [records]);
 
   const total = procedures.length;
   const comAvaliacao = assessments.filter((a) => a.status !== 'Encerrada').length;
@@ -54,6 +76,13 @@ export function AssessmentsScreen({
   // Encerrada assessments are invisible — the card shows "Gerar via IA" again
   const getAssessmentForProc = (code: string) =>
     assessments.find((a) => a.procedureCode === code && a.status !== 'Encerrada') ?? null;
+
+  const dateBadgeStyle = (days: number) => {
+    if (days < 0) return { bar: 'bg-red-600', badge: 'bg-red-50 border-red-200 text-red-700', dot: 'bg-red-500', label: `${Math.abs(days)}d vencido` };
+    if (days <= 30) return { bar: 'bg-red-400', badge: 'bg-red-50 border-red-200 text-red-700', dot: 'bg-red-400', label: `${days}d restantes` };
+    if (days <= 60) return { bar: 'bg-amber-400', badge: 'bg-amber-50 border-amber-200 text-amber-700', dot: 'bg-amber-400', label: `${days}d restantes` };
+    return { bar: 'bg-blue-400', badge: 'bg-blue-50 border-blue-200 text-blue-700', dot: 'bg-blue-400', label: `${days}d restantes` };
+  };
 
   const statusBadge = (status: Assessment['status']) => {
     switch (status) {
@@ -130,6 +159,87 @@ export function AssessmentsScreen({
           <span className="text-[11px] text-blue-700 font-medium">Rascunho ou ativa</span>
         </div>
       </div>
+
+      {/* Painel de Vencimentos por Data */}
+      {expirationGroups.length > 0 && (
+        <div className="rounded-xl bg-white border border-slate-200 shadow-sm overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-200 bg-slate-50">
+            <CalendarClock className="w-4 h-4 text-blue-600" />
+            <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Calendário de Vencimentos</span>
+            <span className="ml-auto text-[11px] text-slate-400 font-medium">Por data de validade da matriz</span>
+          </div>
+          <div className="divide-y divide-slate-100">
+            {expirationGroups.map(({ date, records: recs, minDays }) => {
+              const style = dateBadgeStyle(minDays);
+              const isOpen = expandedDate === date;
+              const vencido = minDays < 0;
+              return (
+                <div key={date}>
+                  <button
+                    onClick={() => setExpandedDate(isOpen ? null : date)}
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50/80 transition-colors text-left"
+                  >
+                    {/* Urgency dot */}
+                    <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${style.dot}`} />
+
+                    {/* Date */}
+                    <span className="text-xs font-mono font-semibold text-slate-700 w-24 shrink-0">
+                      {date}
+                    </span>
+
+                    {/* Days badge */}
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${style.badge}`}>
+                      {vencido ? `⚠ ${Math.abs(minDays)}d vencido` : `${minDays}d restantes`}
+                    </span>
+
+                    {/* Employee count */}
+                    <span className="flex items-center gap-1 text-[11px] text-slate-500 font-medium">
+                      <Users className="w-3 h-3" />
+                      {recs.length} certificação{recs.length !== 1 ? 'ões' : ''}
+                    </span>
+
+                    {/* Procedure codes preview */}
+                    <span className="flex-1 text-[10px] text-slate-400 truncate hidden sm:block">
+                      {[...new Set(recs.map(r => r.procedureCode))].slice(0, 3).join(' · ')}
+                      {[...new Set(recs.map(r => r.procedureCode))].length > 3 && ' ...'}
+                    </span>
+
+                    {isOpen
+                      ? <ChevronUp className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      : <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />}
+                  </button>
+
+                  {/* Expanded: list of employee-procedure pairs */}
+                  {isOpen && (
+                    <div className="px-4 pb-3 bg-slate-50/60 space-y-1.5">
+                      {recs.map(r => {
+                        const s = dateBadgeStyle(r.daysRemaining);
+                        return (
+                          <div key={r.id} className="flex items-center gap-2.5 py-1.5 border-b border-slate-100 last:border-0">
+                            <img
+                              src={r.employeeAvatar}
+                              alt={r.employeeName}
+                              className="w-6 h-6 rounded-full border border-slate-200 shrink-0 object-cover"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-semibold text-slate-800 truncate">{r.employeeName}</p>
+                              <p className="text-[10px] text-slate-500 truncate">{r.employeeRole} · {r.sector}</p>
+                            </div>
+                            <span className="font-mono text-[10px] font-bold text-blue-700 shrink-0">{r.procedureCode}</span>
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full border shrink-0 ${s.badge}`}>
+                              {r.status}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Procedure → Assessment cards */}
       <div className="space-y-3">
