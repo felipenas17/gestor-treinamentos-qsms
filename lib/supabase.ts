@@ -346,3 +346,11 @@ export async function updateAssessmentStatus(id: string, status: 'Ativa' | 'Rasc
   if (error) { console.error('updateAssessmentStatus:', error); return false; }
   return true;
 }
+
+export async function deleteAssessment(id: string) {
+  if (!supabase) return false;
+  // Questions are deleted via ON DELETE CASCADE on assessment_id FK
+  const { error } = await supabase.from('assessments').delete().eq('id', id);
+  if (error) { console.error('deleteAssessment:', error); return false; }
+  return true;
+}

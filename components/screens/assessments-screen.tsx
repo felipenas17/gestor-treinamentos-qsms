@@ -14,6 +14,8 @@ import {
   QrCode,
   Copy,
   Check,
+  Trash2,
+  RefreshCw,
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Assessment, Procedure } from '@/types';
@@ -23,6 +25,7 @@ interface AssessmentsScreenProps {
   assessments: Assessment[];
   onApproveAssessment: (id: string) => void;
   onArchiveAssessment: (id: string) => void;
+  onDeleteAssessment: (id: string) => void;
   onOpenAssessmentTaker: (assessment: Assessment) => void;
   onGenerateAssessment: (proc: Procedure) => Promise<void>;
 }
@@ -32,6 +35,7 @@ export function AssessmentsScreen({
   assessments,
   onApproveAssessment,
   onArchiveAssessment,
+  onDeleteAssessment,
   onOpenAssessmentTaker,
   onGenerateAssessment,
 }: AssessmentsScreenProps) {
@@ -42,12 +46,14 @@ export function AssessmentsScreen({
   const total = procedures.length;
   const comAvaliacao = assessments.filter((a) => a.status !== 'Encerrada').length;
   const ativas = assessments.filter((a) => a.status === 'Ativa').length;
+  // Only non-Encerrada assessments block the "Sem avaliação" state
   const semAvaliacao = procedures.filter(
-    (p) => !assessments.find((a) => a.procedureCode === p.code)
+    (p) => !assessments.find((a) => a.procedureCode === p.code && a.status !== 'Encerrada')
   ).length;
 
+  // Encerrada assessments are invisible — the card shows "Gerar via IA" again
   const getAssessmentForProc = (code: string) =>
-    assessments.find((a) => a.procedureCode === code) ?? null;
+    assessments.find((a) => a.procedureCode === code && a.status !== 'Encerrada') ?? null;
 
   const statusBadge = (status: Assessment['status']) => {
     switch (status) {
@@ -182,13 +188,23 @@ export function AssessmentsScreen({
                     </button>
                   )}
                   {assessment?.status === 'Rascunho' && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); onApproveAssessment(assessment.id); }}
-                      className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded border border-emerald-200 transition-colors"
-                    >
-                      <CheckCircle2 className="w-3 h-3" />
-                      Aprovar
-                    </button>
+                    <>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onDeleteAssessment(assessment.id); }}
+                        className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-red-600 bg-red-50 hover:bg-red-100 rounded border border-red-200 transition-colors"
+                        title="Descartar e gerar novamente"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        Descartar
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onApproveAssessment(assessment.id); }}
+                        className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded border border-emerald-200 transition-colors"
+                      >
+                        <CheckCircle2 className="w-3 h-3" />
+                        Aprovar
+                      </button>
+                    </>
                   )}
                   {assessment?.status === 'Ativa' && (
                     <button
@@ -239,11 +255,12 @@ export function AssessmentsScreen({
                           {assessment.status === 'Rascunho' && (
                             <>
                               <button
-                                onClick={() => onArchiveAssessment(assessment.id)}
-                                className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded border border-slate-300 transition-colors"
+                                onClick={() => onDeleteAssessment(assessment.id)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-red-600 bg-red-50 hover:bg-red-100 rounded border border-red-200 transition-colors"
+                                title="Descarta este rascunho e libera nova geração via IA"
                               >
-                                <Archive className="w-3 h-3" />
-                                Arquivar
+                                <Trash2 className="w-3 h-3" />
+                                Descartar
                               </button>
                               <button
                                 onClick={() => onApproveAssessment(assessment.id)}

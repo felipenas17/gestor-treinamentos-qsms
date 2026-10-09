@@ -35,6 +35,7 @@ import {
   fetchAllAssessments,
   updateAssessmentStatus,
   saveAssessmentDraft,
+  deleteAssessment,
 } from '@/lib/supabase';
 
 import { Procedure, TrainingRecord, Assessment, RespondentStatus } from '@/types';
@@ -259,9 +260,19 @@ export default function GestorTreinamentosApp() {
     const ok = await updateAssessmentStatus(id, 'Encerrada');
     if (ok) {
       setAssessments((prev) => prev.map((a) => a.id === id ? { ...a, status: 'Encerrada' } : a));
-      showToast('Avaliação encerrada e arquivada.');
+      showToast('Avaliação encerrada.');
     } else {
-      showToast('Erro ao arquivar avaliação.', 'error');
+      showToast('Erro ao encerrar avaliação.', 'error');
+    }
+  };
+
+  const handleDeleteAssessment = async (id: string) => {
+    const ok = await deleteAssessment(id);
+    if (ok) {
+      setAssessments((prev) => prev.filter((a) => a.id !== id));
+      showToast('Rascunho descartado. Você pode gerar novamente.');
+    } else {
+      showToast('Erro ao descartar avaliação.', 'error');
     }
   };
 
@@ -437,6 +448,7 @@ export default function GestorTreinamentosApp() {
               assessments={assessments}
               onApproveAssessment={handleApproveAssessment}
               onArchiveAssessment={handleArchiveAssessment}
+              onDeleteAssessment={handleDeleteAssessment}
               onOpenAssessmentTaker={(a) => {
                 setSelectedAssessmentForTaker(a);
                 setIsAssessmentTakerOpen(true);
