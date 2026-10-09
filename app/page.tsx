@@ -277,8 +277,15 @@ export default function GestorTreinamentosApp() {
       });
       const qData = await res.json();
       if (!qData.questions?.length) {
-        showToast('IA não retornou questões. Tente novamente.', 'error');
+        const errMsg = qData.error || 'IA não retornou questões. Tente novamente.';
+        showToast(errMsg, 'error');
         return;
+      }
+      // Avisa se usou mock (Gemini falhou mas salvou assim mesmo)
+      if (qData.source === 'mock' && qData.geminiError) {
+        console.warn('Gemini falhou, usando mock. Erro:', qData.geminiError);
+        showToast(`Gemini indisponível (${qData.geminiError.slice(0, 60)}). Usando questões padrão.`, 'error');
+        // Continua — salva as questões mock mesmo assim
       }
       const newId = await saveAssessmentDraft({
         procedure_code: proc.code,

@@ -32,6 +32,48 @@ Responda APENAS com este JSON (sem mais nada):
 }`;
 }
 
+function mockQuestions(promptText: string, procedureCode: string) {
+  const ts = Date.now();
+  return [
+    {
+      id: `q-mock-${ts}-1`,
+      question: `(${procedureCode}) Qual é o passo crítico obrigatório antes de acionar o sistema em "${promptText.slice(0, 50)}"?`,
+      options: [
+        "Verificar isolamento de energias (LOTO) e emitir Permissão de Trabalho (PT)",
+        "Iniciar em modo automático sem checklist",
+        "Substituir supervisor por rádio VHF",
+        "Desativar alarmes para evitar falsos positivos",
+      ],
+      correctOptionIndex: 0,
+      explanation: "LOTO e PT são requisitos inegociáveis conforme NR-37 e NR-10.",
+    },
+    {
+      id: `q-mock-${ts}-2`,
+      question: `(${procedureCode}) Em anomalia detectada durante "${promptText.slice(0, 45)}", qual é o protocolo de parada?`,
+      options: [
+        "Aguardar fim do turno para relatar no RDO",
+        "Exercer Stop Work Authority (SWA) e isolar o perímetro",
+        "Continuar com velocidade reduzida",
+        "Consultar gerência em terra antes de agir",
+      ],
+      correctOptionIndex: 1,
+      explanation: "Todo colaborador offshore tem o dever de exercer SWA perante risco iminente.",
+    },
+    {
+      id: `q-mock-${ts}-3`,
+      question: `(${procedureCode}) Qual documento deve acompanhar toda atividade de risco elevado conforme NR-37?`,
+      options: [
+        "Relatório Diário de Operações (RDO)",
+        "Permissão de Trabalho (PT) com ASO vigente",
+        "Comunicado de Bordo",
+        "Planilha de controle de turno",
+      ],
+      correctOptionIndex: 1,
+      explanation: "A PT é o instrumento formal que habilita a execução de atividades de risco, exigida pela NR-37.",
+    },
+  ];
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { promptText, procedureCode } = await req.json();
@@ -42,36 +84,12 @@ export async function POST(req: NextRequest) {
 
     const apiKey = process.env.GEMINI_API_KEY;
 
-    // ── Mock quando key ausente ───────────────────────────────────────────────
+    // ── Sem key: retorna mock ─────────────────────────────────────────────────
     if (!apiKey) {
-      const ts = Date.now();
+      console.log("[generate-questions] GEMINI_API_KEY não configurada, usando mock");
       return NextResponse.json({
-        questions: [
-          {
-            id: `q-mock-${ts}-1`,
-            question: `Conforme QSMS para "${promptText.slice(0, 50)}", qual é o passo obrigatório antes de acionar o sistema?`,
-            options: [
-              "Verificar isolamento de energias (LOTO) e emitir Permissão de Trabalho (PT)",
-              "Iniciar em modo automático sem checklist",
-              "Substituir supervisor por rádio VHF",
-              "Desativar alarmes para evitar falsos positivos",
-            ],
-            correctOptionIndex: 0,
-            explanation: "LOTO e PT são requisitos inegociáveis conforme NR-37 e NR-10.",
-          },
-          {
-            id: `q-mock-${ts}-2`,
-            question: `Em anomalia detectada durante "${promptText.slice(0, 45)}", qual é o protocolo?`,
-            options: [
-              "Aguardar fim do turno para relatar no RDO",
-              "Exercer Stop Work Authority (SWA) e isolar o perímetro",
-              "Continuar com velocidade reduzida",
-              "Consultar gerência em terra antes de agir",
-            ],
-            correctOptionIndex: 1,
-            explanation: "Todo colaborador offshore tem o dever de exercer SWA perante risco iminente.",
-          },
-        ],
+        questions: mockQuestions(promptText, procedureCode || "GERAL"),
+        source: "mock",
       });
     }
 
@@ -85,49 +103,67 @@ export async function POST(req: NextRequest) {
       },
     };
 
-    const geminiRes = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
+    let rawText: string | undefined;
+    let geminiError: string | undefined;
 
-    if (!geminiRes.ok) {
-      const errText = await geminiRes.text();
-      console.error(`[generate-questions] Gemini HTTP ${geminiRes.status}:`, errText.slice(0, 500));
-      return NextResponse.json(
-        { error: `Gemini retornou erro ${geminiRes.status}.` },
-        { status: 500 }
-      );
+    try {
+      const geminiRes = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      if (!geminiRes.ok) {
+        const errText = await geminiRes.text();
+        geminiError = `HTTP ${geminiRes.status}: ${errText.slice(0, 300)}`;
+        console.error("[generate-questions] Gemini API error:", geminiError);
+      } else {
+        const geminiData = await geminiRes.json();
+        rawText = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+        if (!rawText) {
+          const finishReason = geminiData?.candidates?.[0]?.finishReason;
+          geminiError = `Resposta vazia (finishReason: ${finishReason ?? "unknown"})`;
+          console.error("[generate-questions]", geminiError);
+        }
+      }
+    } catch (fetchErr: unknown) {
+      geminiError = fetchErr instanceof Error ? fetchErr.message : String(fetchErr);
+      console.error("[generate-questions] fetch error:", geminiError);
     }
 
-    const geminiData = await geminiRes.json();
-
-    // Extrair texto da resposta
-    const rawText: string | undefined =
-      geminiData?.candidates?.[0]?.content?.parts?.[0]?.text;
-
-    if (!rawText) {
-      const finishReason = geminiData?.candidates?.[0]?.finishReason;
-      console.error("[generate-questions] Sem texto na resposta. finishReason:", finishReason);
-      console.error("[generate-questions] Resposta completa:", JSON.stringify(geminiData).slice(0, 500));
-      return NextResponse.json({ error: "Gemini retornou resposta vazia." }, { status: 500 });
+    // ── Fallback para mock se Gemini falhou ──────────────────────────────────
+    if (geminiError || !rawText) {
+      console.warn("[generate-questions] Usando mock como fallback. Motivo:", geminiError);
+      return NextResponse.json({
+        questions: mockQuestions(promptText, procedureCode || "GERAL"),
+        source: "mock",
+        geminiError,
+      });
     }
 
-    // Parse JSON
+    // ── Parse JSON da resposta real ───────────────────────────────────────────
     let parsed: { questions: unknown[] };
     try {
       parsed = JSON.parse(extractJSON(rawText));
     } catch {
       console.error("[generate-questions] JSON parse error. raw:", rawText.slice(0, 400));
-      return NextResponse.json({ error: "Falha ao interpretar JSON da IA." }, { status: 500 });
+      return NextResponse.json({
+        questions: mockQuestions(promptText, procedureCode || "GERAL"),
+        source: "mock",
+        geminiError: "JSON parse error",
+      });
     }
 
     if (!Array.isArray(parsed?.questions) || parsed.questions.length === 0) {
-      console.error("[generate-questions] Sem questões no JSON:", JSON.stringify(parsed).slice(0, 300));
-      return NextResponse.json({ error: "IA não retornou questões." }, { status: 500 });
+      return NextResponse.json({
+        questions: mockQuestions(promptText, procedureCode || "GERAL"),
+        source: "mock",
+        geminiError: "Array de questões vazio",
+      });
     }
 
-    return NextResponse.json(parsed);
+    return NextResponse.json({ questions: parsed.questions, source: "gemini" });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[generate-questions] Erro inesperado:", msg);
