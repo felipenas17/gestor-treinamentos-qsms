@@ -181,10 +181,18 @@ export function EmployeesScreen() {
 
     if (!saved) throw new Error('Falha ao salvar no banco de dados. Verifique a conexão com o Supabase.');
 
-    // Reload from DB for consistency
-    await loadEmployees();
+    // Atualiza estado local imediatamente — não depende do reload para mostrar o colaborador
+    if (isNew) {
+      setEmployees(prev => [...prev, saved as Employee]);
+    } else {
+      setEmployees(prev => prev.map(e => e.id === saved.id ? (saved as Employee) : e));
+    }
+
     setSavedId(saved.id);
     setTimeout(() => setSavedId(null), 3000);
+
+    // Reload em background para sincronizar com DB (falha silenciosa — estado local já está correto)
+    loadEmployees().catch(() => {});
 
     // Auto-gerar matriz para novos colaboradores
     if (isNew && saved.id) {
