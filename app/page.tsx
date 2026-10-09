@@ -130,7 +130,7 @@ export default function GestorTreinamentosApp() {
             employeeId: r.employee_id,
             employeeName: r.employees?.name || '—',
             employeeRole: r.employees?.role || '—',
-            employeeAvatar: r.employees?.avatar_url || '/images/avatar_engineer.jpg',
+            employeeAvatar: r.employees?.avatar_url || '/images/avatar_engineer.svg',
             sector: r.employees?.sector || '—',
             procedureCode: r.procedures?.code || '—',
             procedureName: r.procedures?.name || '—',
