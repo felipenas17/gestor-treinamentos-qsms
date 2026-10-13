@@ -142,7 +142,10 @@ export async function POST(req: NextRequest) {
         employee_cpf: employeeCpf || null,
         employee_signature: signature || null,
       });
-    if (respErr) console.error('[submit] responses insert:', respErr);
+    if (respErr) {
+      console.error('[submit] responses insert ERROR:', JSON.stringify(respErr));
+      // Não bloqueia o retorno — apenas loga o erro de RLS/constraint
+    }
   }
 
   // ── Atualiza trainings (aprovado → Certificado, reprovado → compliance_rate) ──
