@@ -137,6 +137,7 @@ export default function GestorTreinamentosApp() {
             employeeAvatar: r.employees?.avatar_url || '/images/avatar_engineer.svg',
             sector: r.employees?.sector || '—',
             procedureCode: r.procedures?.code || '—',
+            procedureRevision: r.procedures?.revision || undefined,
             procedureName: r.procedures?.name || '—',
             completionDate: r.completion_date ? new Date(r.completion_date).toLocaleDateString('pt-BR') : '—',
             validityDate: r.validity_date ? new Date(r.validity_date).toLocaleDateString('pt-BR') : '—',
@@ -206,6 +207,7 @@ export default function GestorTreinamentosApp() {
           employeeAvatar: r.employees?.avatar_url || '/images/avatar_engineer.svg',
           sector: r.employees?.sector || '—',
           procedureCode: r.procedures?.code || '—',
+          procedureRevision: r.procedures?.revision || undefined,
           procedureName: r.procedures?.name || '—',
           completionDate: r.completion_date
             ? new Date(r.completion_date).toLocaleDateString('pt-BR')

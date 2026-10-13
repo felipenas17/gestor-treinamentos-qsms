@@ -8,7 +8,7 @@ import { supabase } from '@/lib/supabase';
 
 interface CertificateRecord {
   id: string; employeeName: string; employeeCpf: string; employeeSignature?: string; sector: string;
-  trainingName: string; trainingCode: string; completionDate: string;
+  trainingName: string; trainingCode: string; procedureRevision?: string; completionDate: string;
   validityDate: string; daysRemaining: number; hours: number; score?: number;
   type: 'interno' | 'normativo'; provider?: string;
   status: 'Certificado' | 'Reciclar' | 'Vencido';
@@ -56,6 +56,7 @@ function CertificatePreview({ cert, onClose }: { cert: CertificateRecord; onClos
                   <strong style={{fontSize:'13px'}}>{cert.employeeName}</strong>,<br/>
                   {cert.employeeCpf ? <>portador do CPF <strong>{cert.employeeCpf}</strong>,</> : <>que</>} concluiu o treinamento em<br/>
                   <strong>{cert.trainingName}</strong><br/>
+                  <span style={{fontFamily:'monospace',fontSize:'8px',color:'#555'}}>{cert.trainingCode}{cert.procedureRevision ? ` · Rev. ${cert.procedureRevision}` : ''}</span><br/>
                   ministrado pela Tiger Rentank do Brasil Equipamentos LTDA<br/>
                   no dia <strong>{cert.completionDate}</strong>, totalizando <strong>{cert.hours} hora{cert.hours!==1?'s':''}</strong>.
                   {cert.score && <><br/><br/>Nota de aprovação: <strong style={{color:'#15803d'}}>{cert.score}%</strong></>}
@@ -143,22 +144,33 @@ export function CertificatesScreen({ records = [] }: { records?: TrainingRecord[
 
   useEffect(() => {
     if (!supabase) return;
-    supabase
-      .from('responses')
-      .select(`id,employee_cpf,employee_signature,completed_at,assessment_links!link_id(assessment_id,assessments!assessment_id(procedure_code))`)
-      .eq('status','Entregue')
-      .order('completed_at',{ascending:false})
-      .then(({data})=>{
-        if (!data) return;
-        const map: Record<string,{cpf:string;signature:string}> = {};
-        for (const r of data as any[]) {
-          const pc = r.assessment_links?.assessments?.procedure_code;
-          if (pc && !map[pc]) {
-            map[pc] = { cpf: r.employee_cpf || '', signature: r.employee_signature || '' };
-          }
-        }
-        setResponsesMap(map);
-      });
+    (async () => {
+      // Step 1 — fetch responses
+      const { data: responses } = await supabase
+        .from('responses')
+        .select('id,employee_cpf,employee_signature,completed_at,link_id')
+        .eq('status','Entregue')
+        .order('completed_at',{ascending:false});
+      if (!responses?.length) return;
+      // Step 2 — resolve link_id → assessment_id
+      const linkIds = [...new Set((responses as any[]).map((r:any)=>r.link_id).filter(Boolean))];
+      const { data: links } = await supabase.from('assessment_links').select('id,assessment_id').in('id',linkIds);
+      // Step 3 — resolve assessment_id → procedure_code
+      const aIds = [...new Set((links||[]).map((l:any)=>l.assessment_id).filter(Boolean))];
+      const { data: assessments } = await supabase.from('assessments').select('id,procedure_code').in('id',aIds);
+      // Build lookup maps
+      const linkMap: Record<string,string> = {};
+      for (const l of (links||[]) as any[]) linkMap[l.id]=l.assessment_id;
+      const aMap: Record<string,string> = {};
+      for (const a of (assessments||[]) as any[]) aMap[a.id]=a.procedure_code;
+      // Build final responsesMap keyed by procedure_code
+      const map: Record<string,{cpf:string;signature:string}> = {};
+      for (const r of responses as any[]) {
+        const pc = aMap[linkMap[r.link_id]];
+        if (pc && !map[pc]) map[pc]={ cpf: r.employee_cpf||'', signature: r.employee_signature||'' };
+      }
+      setResponsesMap(map);
+    })();
   }, [records]);
 
   // Deriva certificados internos dos records do pai (status Certificado)
@@ -174,6 +186,7 @@ export function CertificatesScreen({ records = [] }: { records?: TrainingRecord[
         sector: r.sector,
         trainingName: r.procedureName,
         trainingCode: r.procedureCode,
+        procedureRevision: r.procedureRevision,
         completionDate: r.completionDate,
         validityDate: r.validityDate,
         daysRemaining: r.daysRemaining ?? 0,
