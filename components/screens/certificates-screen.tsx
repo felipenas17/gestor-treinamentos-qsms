@@ -3,6 +3,7 @@
 import React, { useState, useRef } from 'react';
 import { SignatureModal } from '@/components/modals/signature-modal';
 import { Check, Search, Plus, Eye, Printer, CheckCircle2, Clock, AlertTriangle, X } from 'lucide-react';
+import { TrainingRecord } from '@/types';
 
 interface CertificateRecord {
   id: string; employeeName: string; employeeCpf: string; sector: string;
@@ -120,22 +121,43 @@ function RegisterModal({ onClose, onSave }: { onClose:()=>void; onSave:(c:Certif
   );
 }
 
-export function CertificatesScreen() {
+export function CertificatesScreen({ records = [] }: { records?: TrainingRecord[] }) {
   const [tab,setTab]=useState<'internos'|'normativos'>('internos');
   const [search,setSearch]=useState('');
   const [preview,setPreview]=useState<CertificateRecord|null>(null);
   const [showReg,setShowReg]=useState(false);
   const [signTarget,setSignTarget]=useState<CertificateRecord|null>(null);
   const [signatures,setSignatures]=useState<Record<string,string>>({});
-  const [certs,setCerts]=useState<CertificateRecord[]>([]);
-  const filtered=certs.filter(c=>c.type===(tab==='internos'?'interno':'normativo')&&(c.employeeName.toLowerCase().includes(search.toLowerCase())||c.trainingName.toLowerCase().includes(search.toLowerCase())));
-  const internos=certs.filter(c=>c.type==='interno');
+  const [certs,setCerts]=useState<CertificateRecord[]>([]); // normativo only
+
+  // Deriva certificados internos dos records do pai (status Certificado)
+  const internos: CertificateRecord[] = records
+    .filter(r => r.status === 'Certificado')
+    .map(r => ({
+      id: r.id,
+      employeeName: r.employeeName,
+      employeeCpf: '',
+      sector: r.sector,
+      trainingName: r.procedureName,
+      trainingCode: r.procedureCode,
+      completionDate: r.completionDate,
+      validityDate: r.validityDate,
+      daysRemaining: r.daysRemaining ?? 0,
+      hours: 8,
+      score: r.complianceRate,
+      type: 'interno' as const,
+      status: 'Certificado' as const,
+      certificateHash: r.certificateHash || `CERT-${new Date().getFullYear()}-BR-0000`,
+    }));
+
   const normativos=certs.filter(c=>c.type==='normativo');
-  const vencidos=certs.filter(c=>c.status==='Vencido').length;
+  const allCerts=[...internos,...normativos];
+  const filtered=(tab==='internos'?internos:normativos).filter(c=>c.employeeName.toLowerCase().includes(search.toLowerCase())||c.trainingName.toLowerCase().includes(search.toLowerCase()));
+  const vencidos=allCerts.filter(c=>c.status==='Vencido').length;
   return (
     <div className="p-6">
       <div className="grid grid-cols-4 gap-3 mb-5">
-        {[{l:'Total',v:certs.length,c:'text-blue-600'},{l:'Internos (app)',v:internos.length,c:'text-purple-600'},{l:'Normativos (NRs)',v:normativos.length,c:'text-teal-600'},{l:'Vencidos',v:vencidos,c:'text-red-600'}].map(k=>(
+        {[{l:'Total',v:allCerts.length,c:'text-blue-600'},{l:'Internos (app)',v:internos.length,c:'text-purple-600'},{l:'Normativos (NRs)',v:normativos.length,c:'text-teal-600'},{l:'Vencidos',v:vencidos,c:'text-red-600'}].map(k=>(
           <div key={k.l} className="bg-white border border-slate-200 rounded-xl p-4">
             <div className="text-xs text-slate-500 mb-1">{k.l}</div>
             <div className={`text-2xl font-semibold ${k.c}`}>{k.v}</div>

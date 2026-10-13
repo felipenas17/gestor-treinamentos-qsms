@@ -138,9 +138,9 @@ export default function GestorTreinamentosApp() {
             sector: r.employees?.sector || '—',
             procedureCode: r.procedures?.code || '—',
             procedureName: r.procedures?.name || '—',
-            completionDate: new Date(r.completion_date).toLocaleDateString('pt-BR'),
-            validityDate: new Date(r.validity_date).toLocaleDateString('pt-BR'),
-            daysRemaining: r.days_remaining,
+            completionDate: r.completion_date ? new Date(r.completion_date).toLocaleDateString('pt-BR') : '—',
+            validityDate: r.validity_date ? new Date(r.validity_date).toLocaleDateString('pt-BR') : '—',
+            daysRemaining: r.days_remaining ?? (r.validity_date ? Math.floor((new Date(r.validity_date).getTime() - Date.now()) / 86400000) : 0),
             complianceRate: r.compliance_rate,
             status: r.status,
             instructor: r.instructor,
@@ -212,7 +212,7 @@ export default function GestorTreinamentosApp() {
           validityDate: r.validity_date
             ? new Date(r.validity_date).toLocaleDateString('pt-BR')
             : '—',
-          daysRemaining: r.days_remaining,
+          daysRemaining: r.days_remaining ?? (r.validity_date ? Math.floor((new Date(r.validity_date).getTime() - Date.now()) / 86400000) : 0),
           complianceRate: r.compliance_rate,
           status: r.status,
           instructor: r.instructor,
@@ -519,7 +519,7 @@ export default function GestorTreinamentosApp() {
             />
           )}
           {currentTab === 'colaboradores' && <EmployeesScreen />}
-          {currentTab === 'certificados' && <CertificatesScreen />}
+          {currentTab === 'certificados' && <CertificatesScreen records={records} />}
           {currentTab === 'matriz' && (
             <MatrixScreen
               records={records}
