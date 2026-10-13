@@ -6,6 +6,7 @@ export async function POST(req: NextRequest) {
     token: string;
     answers: Record<string, number>;
     employeeName: string;
+    employeeCpf?: string;
     signature: string;
   };
 
@@ -15,7 +16,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  const { token, answers, employeeName, signature } = body;
+  const { token, answers, employeeName, employeeCpf, signature } = body;
 
   if (!token || !answers || !employeeName) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -138,6 +139,8 @@ export async function POST(req: NextRequest) {
         status: passed ? 'Entregue' : 'Reprovado',
         answers,
         completed_at: new Date().toISOString(),
+        employee_cpf: employeeCpf || null,
+        employee_signature: signature || null,
       });
     if (respErr) console.error('[submit] responses insert:', respErr);
   }

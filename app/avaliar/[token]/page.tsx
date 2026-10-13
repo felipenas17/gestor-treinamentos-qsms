@@ -52,6 +52,7 @@ export default function ExamPage() {
   const [step, setStep] = useState<Step>('loading');
   const [assessment, setAssessment] = useState<PublicAssessment | null>(null);
   const [employeeName, setEmployeeName] = useState('');
+  const [employeeCpf, setEmployeeCpf] = useState('');
   const [currentQ, setCurrentQ] = useState(0);
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [timeLeft, setTimeLeft] = useState(0);
@@ -181,6 +182,15 @@ export default function ExamPage() {
   };
 
   // ── Start exam ───────────────────────────────────────────────────────────────
+  // Formata CPF: 000.000.000-00
+  const formatCpf = (v: string) => {
+    const digits = v.replace(/\D/g, '').slice(0, 11);
+    return digits
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+  };
+
   const handleStart = () => {
     if (!employeeName.trim()) return;
     setStep('exam');
@@ -220,6 +230,7 @@ export default function ExamPage() {
           token,
           answers,
           employeeName,
+          employeeCpf,
           signature: signatureData,
         }),
       });
@@ -311,20 +322,37 @@ export default function ExamPage() {
             <p className="text-white text-sm font-medium">{assessment.procedureTitle}</p>
           </div>
 
-          {/* Name input */}
-          <div className="mb-6">
-            <label className="block text-white/70 text-sm mb-2">
-              Nome completo <span className="text-blue-400">*</span>
-            </label>
-            <input
-              type="text"
-              value={employeeName}
-              onChange={(e) => setEmployeeName(e.target.value)}
-              placeholder="Digite seu nome completo"
-              className="w-full px-4 py-3 rounded-xl text-white placeholder-white/30 text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-              style={{ background: '#1a1f2e', border: '1px solid rgba(255,255,255,0.12)' }}
-              onKeyDown={(e) => { if (e.key === 'Enter') handleStart(); }}
-            />
+          {/* Name + CPF inputs */}
+          <div className="mb-6 space-y-4">
+            <div>
+              <label className="block text-white/70 text-sm mb-2">
+                Nome completo <span className="text-blue-400">*</span>
+              </label>
+              <input
+                type="text"
+                value={employeeName}
+                onChange={(e) => setEmployeeName(e.target.value)}
+                placeholder="Digite seu nome completo"
+                className="w-full px-4 py-3 rounded-xl text-white placeholder-white/30 text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                style={{ background: '#1a1f2e', border: '1px solid rgba(255,255,255,0.12)' }}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleStart(); }}
+              />
+            </div>
+            <div>
+              <label className="block text-white/70 text-sm mb-2">
+                CPF <span className="text-blue-400">*</span>
+              </label>
+              <input
+                type="text"
+                value={employeeCpf}
+                onChange={(e) => setEmployeeCpf(formatCpf(e.target.value))}
+                placeholder="000.000.000-00"
+                inputMode="numeric"
+                className="w-full px-4 py-3 rounded-xl text-white placeholder-white/30 text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                style={{ background: '#1a1f2e', border: '1px solid rgba(255,255,255,0.12)' }}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleStart(); }}
+              />
+            </div>
           </div>
 
           {/* Instructions */}
@@ -339,9 +367,9 @@ export default function ExamPage() {
 
           <button
             onClick={handleStart}
-            disabled={!employeeName.trim()}
+            disabled={!employeeName.trim() || employeeCpf.length < 14}
             className="w-full py-3.5 rounded-xl text-white font-semibold text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-            style={{ background: employeeName.trim() ? '#2563eb' : '#374151' }}
+            style={{ background: (employeeName.trim() && employeeCpf.length >= 14) ? '#2563eb' : '#374151' }}
           >
             Iniciar Prova →
           </button>
