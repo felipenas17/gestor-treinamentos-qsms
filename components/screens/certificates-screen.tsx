@@ -54,7 +54,7 @@ function CertificatePreview({ cert, onClose }: { cert: CertificateRecord; onClos
                 <div style={{fontSize:'9.5px',lineHeight:'1.9',color:'#111',textAlign:'center'}}>
                   Certificamos para os devidos fins que o colaborador<br/>
                   <strong style={{fontSize:'13px'}}>{cert.employeeName}</strong>,<br/>
-                  portador do CPF <strong>{cert.employeeCpf}</strong> concluiu o treinamento em<br/>
+                  {cert.employeeCpf ? <>portador do CPF <strong>{cert.employeeCpf}</strong>,</> : <>que</>} concluiu o treinamento em<br/>
                   <strong>{cert.trainingName}</strong><br/>
                   ministrado pela Tiger Rentank do Brasil Equipamentos LTDA<br/>
                   no dia <strong>{cert.completionDate}</strong>, totalizando <strong>{cert.hours} hora{cert.hours!==1?'s':''}</strong>.
@@ -65,11 +65,6 @@ function CertificatePreview({ cert, onClose }: { cert: CertificateRecord; onClos
                   <div style={{textAlign:'center',fontSize:'7.5px',color:'#111'}}>
                     <img src="/diogo-signature.png" alt="Assinatura" style={{height:'14mm',objectFit:'contain',display:'block',margin:'0 auto 1mm'}} onError={(e)=>{(e.target as HTMLImageElement).style.display='none'}}/>
                     <div style={{borderTop:'1px solid #333',paddingTop:'2.5mm',width:'52mm'}}><strong>Diogo Sermoud</strong><br/>Responsável Técnico / Instrutor<br/>Téc de Segurança do Trabalho<br/>CREA: 2019109774</div>
-                  </div>
-                  {/* Assistente QSMS */}
-                  <div style={{textAlign:'center',fontSize:'7.5px',color:'#111'}}>
-                    <div style={{height:'14mm'}}/>
-                    <div style={{borderTop:'1px solid #333',paddingTop:'2.5mm',width:'52mm'}}><strong>Luiz Felipe Nascimento</strong><br/>Assistente de QSMS<br/>Tiger Rentank do Brasil</div>
                   </div>
                   {/* Colaborador */}
                   <div style={{textAlign:'center',fontSize:'7.5px',color:'#111'}}>
@@ -150,7 +145,7 @@ export function CertificatesScreen({ records = [] }: { records?: TrainingRecord[
     if (!supabase) return;
     supabase
       .from('responses')
-      .select(`id,employee_cpf,employee_signature,completed_at,assessment_links(assessment_id,assessments(procedure_code))`)
+      .select(`id,employee_cpf,employee_signature,completed_at,assessment_links!link_id(assessment_id,assessments!assessment_id(procedure_code))`)
       .eq('status','Entregue')
       .order('completed_at',{ascending:false})
       .then(({data})=>{
