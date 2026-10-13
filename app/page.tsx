@@ -145,6 +145,7 @@ export default function GestorTreinamentosApp() {
             status: r.status,
             instructor: r.instructor,
             certificateHash: r.certificate_hash,
+            hours: r.procedures?.hours || 8,
           })));
         }
         if (dbAssessmentList && dbAssessmentList.length > 0) {
@@ -217,6 +218,7 @@ export default function GestorTreinamentosApp() {
           status: r.status,
           instructor: r.instructor,
           certificateHash: r.certificate_hash,
+          hours: r.procedures?.hours || 8,
         })));
       }
     } catch (err) {

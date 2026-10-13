@@ -65,6 +65,7 @@ export interface TrainingRecord {
   status: ComplianceStatus;
   instructor?: string;
   certificateHash?: string;
+  hours?: number;
 }
 
 export interface AssessmentQuestion {

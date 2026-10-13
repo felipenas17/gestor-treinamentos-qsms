@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { SignatureModal } from '@/components/modals/signature-modal';
 import { Check, Search, Plus, Eye, Printer, CheckCircle2, Clock, AlertTriangle, X } from 'lucide-react';
 import { TrainingRecord } from '@/types';
+import { supabase } from '@/lib/supabase';
 
 interface CertificateRecord {
-  id: string; employeeName: string; employeeCpf: string; sector: string;
+  id: string; employeeName: string; employeeCpf: string; employeeSignature?: string; sector: string;
   trainingName: string; trainingCode: string; completionDate: string;
   validityDate: string; daysRemaining: number; hours: number; score?: number;
   type: 'interno' | 'normativo'; provider?: string;
@@ -59,12 +60,25 @@ function CertificatePreview({ cert, onClose }: { cert: CertificateRecord; onClos
                   no dia <strong>{cert.completionDate}</strong>, totalizando <strong>{cert.hours} hora{cert.hours!==1?'s':''}</strong>.
                   {cert.score && <><br/><br/>Nota de aprovação: <strong style={{color:'#15803d'}}>{cert.score}%</strong></>}
                 </div>
-                <div style={{marginTop:'9mm',display:'flex',justifyContent:'space-around'}}>
-                  {([['Diogo Sermoud','Responsável Técnico / Instrutor','Téc de Segurança do Trabalho','CREA: 2019109774'],['Luiz Felipe Nascimento','Assistente de QSMS','Tiger Rentank do Brasil','']] as string[][]).map(([name,r1,r2,r3])=>(
-                    <div key={name} style={{textAlign:'center',fontSize:'7.5px',color:'#111'}}>
-                      <div style={{borderTop:'1px solid #333',paddingTop:'2.5mm',width:'52mm'}}><strong>{name}</strong><br/>{r1}<br/>{r2}{r3?<><br/>{r3}</>:null}</div>
-                    </div>
-                  ))}
+                <div style={{marginTop:'9mm',display:'flex',justifyContent:'space-around',alignItems:'flex-end'}}>
+                  {/* Instrutor */}
+                  <div style={{textAlign:'center',fontSize:'7.5px',color:'#111'}}>
+                    <img src="/diogo-signature.png" alt="Assinatura" style={{height:'14mm',objectFit:'contain',display:'block',margin:'0 auto 1mm'}} onError={(e)=>{(e.target as HTMLImageElement).style.display='none'}}/>
+                    <div style={{borderTop:'1px solid #333',paddingTop:'2.5mm',width:'52mm'}}><strong>Diogo Sermoud</strong><br/>Responsável Técnico / Instrutor<br/>Téc de Segurança do Trabalho<br/>CREA: 2019109774</div>
+                  </div>
+                  {/* Assistente QSMS */}
+                  <div style={{textAlign:'center',fontSize:'7.5px',color:'#111'}}>
+                    <div style={{height:'14mm'}}/>
+                    <div style={{borderTop:'1px solid #333',paddingTop:'2.5mm',width:'52mm'}}><strong>Luiz Felipe Nascimento</strong><br/>Assistente de QSMS<br/>Tiger Rentank do Brasil</div>
+                  </div>
+                  {/* Colaborador */}
+                  <div style={{textAlign:'center',fontSize:'7.5px',color:'#111'}}>
+                    {cert.employeeSignature
+                      ? <img src={cert.employeeSignature} alt="Assinatura do colaborador" style={{height:'14mm',objectFit:'contain',display:'block',margin:'0 auto 1mm',border:'0'}}/>
+                      : <div style={{height:'14mm'}}/>
+                    }
+                    <div style={{borderTop:'1px solid #333',paddingTop:'2.5mm',width:'52mm'}}><strong>{cert.employeeName}</strong><br/>Colaborador{cert.employeeCpf?<><br/>CPF: {cert.employeeCpf}</>:null}</div>
+                  </div>
                 </div>
                 <div style={{marginTop:'3mm',textAlign:'center',fontSize:'6.5px',color:'#777'}}>Código: {cert.certificateHash} · Válido até: {cert.validityDate}</div>
               </div>
@@ -129,26 +143,52 @@ export function CertificatesScreen({ records = [] }: { records?: TrainingRecord[
   const [signTarget,setSignTarget]=useState<CertificateRecord|null>(null);
   const [signatures,setSignatures]=useState<Record<string,string>>({});
   const [certs,setCerts]=useState<CertificateRecord[]>([]); // normativo only
+  // Map de procedure_code → { cpf, signature } buscado das respostas
+  const [responsesMap,setResponsesMap]=useState<Record<string,{cpf:string;signature:string}>>({});
+
+  useEffect(() => {
+    if (!supabase) return;
+    supabase
+      .from('responses')
+      .select(`id,employee_cpf,employee_signature,completed_at,assessment_links(assessment_id,assessments(procedure_code))`)
+      .eq('status','Entregue')
+      .order('completed_at',{ascending:false})
+      .then(({data})=>{
+        if (!data) return;
+        const map: Record<string,{cpf:string;signature:string}> = {};
+        for (const r of data as any[]) {
+          const pc = r.assessment_links?.assessments?.procedure_code;
+          if (pc && !map[pc]) {
+            map[pc] = { cpf: r.employee_cpf || '', signature: r.employee_signature || '' };
+          }
+        }
+        setResponsesMap(map);
+      });
+  }, [records]);
 
   // Deriva certificados internos dos records do pai (status Certificado)
   const internos: CertificateRecord[] = records
     .filter(r => r.status === 'Certificado')
-    .map(r => ({
-      id: r.id,
-      employeeName: r.employeeName,
-      employeeCpf: '',
-      sector: r.sector,
-      trainingName: r.procedureName,
-      trainingCode: r.procedureCode,
-      completionDate: r.completionDate,
-      validityDate: r.validityDate,
-      daysRemaining: r.daysRemaining ?? 0,
-      hours: 8,
-      score: r.complianceRate,
-      type: 'interno' as const,
-      status: 'Certificado' as const,
-      certificateHash: r.certificateHash || `CERT-${new Date().getFullYear()}-BR-0000`,
-    }));
+    .map(r => {
+      const resp = responsesMap[r.procedureCode] || { cpf: '', signature: '' };
+      return {
+        id: r.id,
+        employeeName: r.employeeName,
+        employeeCpf: resp.cpf,
+        employeeSignature: resp.signature,
+        sector: r.sector,
+        trainingName: r.procedureName,
+        trainingCode: r.procedureCode,
+        completionDate: r.completionDate,
+        validityDate: r.validityDate,
+        daysRemaining: r.daysRemaining ?? 0,
+        hours: r.hours || 8,
+        score: r.complianceRate,
+        type: 'interno' as const,
+        status: 'Certificado' as const,
+        certificateHash: r.certificateHash || `CERT-${new Date().getFullYear()}-BR-0000`,
+      };
+    });
 
   const normativos=certs.filter(c=>c.type==='normativo');
   const allCerts=[...internos,...normativos];

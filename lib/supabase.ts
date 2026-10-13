@@ -28,7 +28,7 @@ export async function fetchTrainingRecords() {
     .select(`
       *,
       employees (id, name, role, sector, email, avatar_url),
-      procedures (id, code, name, sector)
+      procedures (id, code, name, sector, hours)
     `)
     .order('validity_date');
   if (error) { console.error('fetchTrainingRecords:', error); return null; }
