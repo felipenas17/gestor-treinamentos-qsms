@@ -361,6 +361,28 @@ export async function deleteAssessment(id: string) {
 // ─── Auto-Matriz: ao ativar prova, cria registros pendentes para colaboradores ─
 // Inverso de autoGenerateMatrixForEmployee: dado um procedimento + setores,
 // garante que todos os colaboradores desses setores tenham um registro na trainings.
+// ─── Sync: garante que todos os colaboradores têm registros para procedimentos ativos ─
+export async function syncMatrixForAllActiveProcedures(): Promise<{ total: number }> {
+  if (!supabase) return { total: 0 };
+
+  // Busca todos os procedimentos ativos com seus setores
+  const { data: procs, error: procError } = await supabase
+    .from('procedures')
+    .select('id, sector_procedure_matrix(sector)')
+    .eq('status', 'Ativo');
+
+  if (procError || !procs || procs.length === 0) return { total: 0 };
+
+  let total = 0;
+  for (const proc of procs as any[]) {
+    const sectors: string[] = (proc.sector_procedure_matrix || []).map((s: any) => s.sector);
+    if (sectors.length === 0) continue;
+    const { count } = await autoGenerateMatrixForProcedure(proc.id, sectors);
+    total += count;
+  }
+  return { total };
+}
+
 export async function autoGenerateMatrixForProcedure(
   procedureId: string,
   sectors: string[]

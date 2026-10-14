@@ -34,6 +34,7 @@ interface AssessmentsScreenProps {
   onOpenAssessmentTaker: (assessment: Assessment) => void;
   onGenerateAssessment: (proc: Procedure) => Promise<void>;
   onGenerateEmployeeLink: (assessmentId: string, employeeId: string) => Promise<string | null>;
+  onSyncMatrix: () => Promise<void>;
 }
 
 export function AssessmentsScreen({
@@ -47,7 +48,9 @@ export function AssessmentsScreen({
   onOpenAssessmentTaker,
   onGenerateAssessment,
   onGenerateEmployeeLink,
+  onSyncMatrix,
 }: AssessmentsScreenProps) {
+  const [syncingMatrix, setSyncingMatrix] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [generatingFor, setGeneratingFor] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -176,13 +179,23 @@ export function AssessmentsScreen({
   return (
     <div className="p-6 space-y-6 max-w-5xl mx-auto">
       {/* Header */}
-      <div>
+      <div className="flex items-start justify-between gap-4">
+        <div>
         <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
           Gestão de Provas
         </h2>
         <p className="text-xs text-slate-500 mt-0.5">
           {total} procedimento{total !== 1 ? 's' : ''} · avaliações geradas por IA, revise e ative para liberar o link/QR Code
         </p>
+        </div>
+        <button
+          onClick={async () => { setSyncingMatrix(true); await onSyncMatrix(); setSyncingMatrix(false); }}
+          disabled={syncingMatrix}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 disabled:opacity-60 shrink-0 self-start mt-1"
+        >
+          {syncingMatrix ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Users className="w-3.5 h-3.5" />}
+          Sincronizar Matriz
+        </button>
       </div>
 
       {/* KPI Row */}

@@ -40,6 +40,7 @@ import {
   saveAssessmentDraft,
   deleteAssessment,
   autoGenerateMatrixForProcedure,
+  syncMatrixForAllActiveProcedures,
 } from '@/lib/supabase';
 
 import { Employee, Procedure, TrainingRecord, Assessment, RespondentStatus } from '@/types';
@@ -598,6 +599,40 @@ export default function GestorTreinamentosApp() {
               }}
               onGenerateAssessment={handleGenerateAssessmentForProcedure}
               onGenerateEmployeeLink={handleGenerateEmployeeLink}
+              onSyncMatrix={async () => {
+                showToast('Sincronizando matriz com procedimentos ativos...');
+                const { total } = await syncMatrixForAllActiveProcedures();
+                if (total > 0) {
+                  const updated = await fetchTrainingRecords();
+                  if (updated) {
+                    setRecords(updated.map((r: any) => {
+                      const isPendente = r.status === 'Pendente';
+                      return {
+                        id: r.id,
+                        employeeId: r.employee_id,
+                        employeeName: r.employees?.name || '—',
+                        employeeRole: r.employees?.role || '—',
+                        employeeAvatar: r.employees?.avatar_url || '/images/avatar_engineer.svg',
+                        sector: r.employees?.sector || '—',
+                        procedureCode: r.procedures?.code || '—',
+                        procedureRevision: r.procedures?.revision || undefined,
+                        procedureName: r.procedures?.name || '—',
+                        completionDate: isPendente ? '—' : (r.completion_date ? new Date(r.completion_date).toLocaleDateString('pt-BR') : '—'),
+                        validityDate: isPendente ? '—' : (r.validity_date ? new Date(r.validity_date).toLocaleDateString('pt-BR') : '—'),
+                        daysRemaining: isPendente ? 0 : (r.days_remaining ?? 0),
+                        complianceRate: r.compliance_rate ?? 0,
+                        status: r.status || 'Pendente',
+                        instructor: r.instructor,
+                        certificateHash: r.certificate_hash || undefined,
+                        hours: r.procedures?.hours || 8,
+                      };
+                    }));
+                  }
+                  showToast(`✅ ${total} registro(s) criado(s) na matriz.`);
+                } else {
+                  showToast('Matriz já está sincronizada.');
+                }
+              }}
             />
           )}
           {currentTab === 'colaboradores' && <EmployeesScreen />}
