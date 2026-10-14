@@ -283,7 +283,10 @@ export default function GestorTreinamentosApp() {
 
   const handleProcedureCreated = (newProc: Procedure) => {
     setProcedures((prev) => [newProc, ...prev]);
-    showToast(`Procedimento ${newProc.code} criado via IA!`);
+    const sectors = newProc.sectors?.length ? newProc.sectors.join(', ') : newProc.sector;
+    showToast(`Procedimento ${newProc.code} criado! Gerando avaliação para ${sectors}...`);
+    // Dispara geração automática de avaliação logo após criar o procedimento
+    handleGenerateAssessmentForProcedure(newProc);
   };
 
   const handleProcedureImported = (importedProc: Procedure) => {
