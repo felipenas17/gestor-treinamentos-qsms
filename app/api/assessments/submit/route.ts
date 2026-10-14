@@ -170,7 +170,7 @@ export async function POST(req: NextRequest) {
               status: 'Certificado',
               completion_date: completionDate,
               validity_date: validityDate.toISOString().split('T')[0],
-              compliance_rate: 100,
+              compliance_rate: score,
             })
             .eq('procedure_id', proc.id);
         } else {
