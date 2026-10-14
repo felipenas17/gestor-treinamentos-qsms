@@ -133,25 +133,28 @@ export default function GestorTreinamentosApp() {
         }
 
         if (dbRecords && dbRecords.length > 0) {
-          setRecords(dbRecords.map((r: any) => ({
-            id: r.id,
-            employeeId: r.employee_id,
-            employeeName: r.employees?.name || '—',
-            employeeRole: r.employees?.role || '—',
-            employeeAvatar: r.employees?.avatar_url || '/images/avatar_engineer.svg',
-            sector: r.employees?.sector || '—',
-            procedureCode: r.procedures?.code || '—',
-            procedureRevision: r.procedures?.revision || undefined,
-            procedureName: r.procedures?.name || '—',
-            completionDate: r.completion_date ? new Date(r.completion_date).toLocaleDateString('pt-BR') : '—',
-            validityDate: r.validity_date ? new Date(r.validity_date).toLocaleDateString('pt-BR') : '—',
-            daysRemaining: r.days_remaining ?? (r.validity_date ? Math.floor((new Date(r.validity_date).getTime() - Date.now()) / 86400000) : 0),
-            complianceRate: r.compliance_rate,
-            status: r.status,
-            instructor: r.instructor,
-            certificateHash: r.certificate_hash,
-            hours: r.procedures?.hours || 8,
-          })));
+          setRecords(dbRecords.map((r: any) => {
+            const isPendente = r.status === 'Pendente';
+            return {
+              id: r.id,
+              employeeId: r.employee_id,
+              employeeName: r.employees?.name || '—',
+              employeeRole: r.employees?.role || '—',
+              employeeAvatar: r.employees?.avatar_url || '/images/avatar_engineer.svg',
+              sector: r.employees?.sector || '—',
+              procedureCode: r.procedures?.code || '—',
+              procedureRevision: r.procedures?.revision || undefined,
+              procedureName: r.procedures?.name || '—',
+              completionDate: isPendente ? '—' : (r.completion_date ? new Date(r.completion_date).toLocaleDateString('pt-BR') : '—'),
+              validityDate: isPendente ? '—' : (r.validity_date ? new Date(r.validity_date).toLocaleDateString('pt-BR') : '—'),
+              daysRemaining: isPendente ? 0 : (r.days_remaining ?? (r.validity_date ? Math.floor((new Date(r.validity_date).getTime() - Date.now()) / 86400000) : 0)),
+              complianceRate: r.compliance_rate,
+              status: r.status,
+              instructor: r.instructor,
+              certificateHash: r.certificate_hash,
+              hours: r.procedures?.hours || 8,
+            };
+          }));
         }
         if (dbAssessmentList && dbAssessmentList.length > 0) {
           setAssessments(dbAssessmentList.map((a: any) => {
@@ -325,49 +328,65 @@ export default function GestorTreinamentosApp() {
 
   const handleApproveAssessment = async (id: string) => {
     const ok = await updateAssessmentStatus(id, 'Ativa');
-    if (ok) {
-      setAssessments((prev) => prev.map((a) => a.id === id ? { ...a, status: 'Ativa' } : a));
-      showToast('Avaliação aprovada! Vinculando aos colaboradores dos setores...');
-
-      // Busca a avaliação aprovada para encontrar o procedimento e seus setores
-      const assessment = assessments.find((a) => a.id === id);
-      if (assessment) {
-        const proc = procedures.find((p) => p.code === assessment.procedureCode);
-        if (proc) {
-          const sectors = proc.sectors?.length ? proc.sectors : [proc.sector];
-          const { count } = await autoGenerateMatrixForProcedure(proc.id, sectors);
-          if (count > 0) {
-            // Recarrega os registros da matriz para refletir os novos pendentes
-            const updated = await fetchTrainingRecords();
-            if (updated) {
-              setRecords(updated.map((r: any) => ({
-                id: r.id,
-                employeeId: r.employee_id,
-                employeeName: r.employees?.name || '—',
-                employeeRole: r.employees?.role || '—',
-                employeeAvatar: r.employees?.avatar_url || '/images/avatar_engineer.svg',
-                sector: r.employees?.sector || '—',
-                procedureCode: r.procedures?.code || '—',
-                procedureRevision: r.procedures?.revision || undefined,
-                procedureName: r.procedures?.name || '—',
-                completionDate: r.completion_date ? new Date(r.completion_date).toLocaleDateString('pt-BR') : '—',
-                validityDate: r.validity_date ? new Date(r.validity_date).toLocaleDateString('pt-BR') : '—',
-                daysRemaining: r.days_remaining ?? (r.validity_date ? Math.floor((new Date(r.validity_date).getTime() - Date.now()) / 86400000) : 0),
-                status: r.status || 'Pendente',
-                complianceRate: r.compliance_rate ?? 0,
-                instructor: r.instructor,
-                certificateHash: r.certificate_hash || undefined,
-                hours: r.procedures?.hours || 8,
-              })));
-            }
-            showToast(`✅ Avaliação ativa! ${count} colaborador(es) de "${sectors.join(', ')}" vinculado(s) automaticamente.`);
-          } else {
-            showToast('Avaliação ativa! Todos os colaboradores do setor já estão na matriz.');
-          }
-        }
-      }
-    } else {
+    if (!ok) {
       showToast('Erro ao aprovar avaliação.', 'error');
+      return;
+    }
+
+    setAssessments((prev) => prev.map((a) => a.id === id ? { ...a, status: 'Ativa' } : a));
+    showToast('Avaliação aprovada! Vinculando aos colaboradores dos setores...');
+
+    // Busca a avaliação aprovada para encontrar o procedimento e seus setores
+    const assessment = assessments.find((a) => a.id === id);
+    if (!assessment) {
+      console.warn('handleApproveAssessment: avaliação não encontrada no estado', id);
+      return;
+    }
+
+    const proc = procedures.find((p) => p.code === assessment.procedureCode);
+    if (!proc) {
+      console.warn('handleApproveAssessment: procedimento não encontrado para código', assessment.procedureCode);
+      showToast('Avaliação ativa! (Procedimento não localizado — recarregue a página para vincular colaboradores.)', 'error');
+      return;
+    }
+
+    const sectors = proc.sectors?.length ? proc.sectors : (proc.sector ? [proc.sector] : []);
+    if (sectors.length === 0) {
+      showToast('Avaliação ativa! Nenhum setor configurado para este procedimento.');
+      return;
+    }
+
+    const { count } = await autoGenerateMatrixForProcedure(proc.id, sectors);
+    if (count > 0) {
+      // Recarrega os registros da matriz para refletir os novos pendentes
+      const updated = await fetchTrainingRecords();
+      if (updated) {
+        setRecords(updated.map((r: any) => {
+          const isPendente = r.status === 'Pendente';
+          return {
+            id: r.id,
+            employeeId: r.employee_id,
+            employeeName: r.employees?.name || '—',
+            employeeRole: r.employees?.role || '—',
+            employeeAvatar: r.employees?.avatar_url || '/images/avatar_engineer.svg',
+            sector: r.employees?.sector || '—',
+            procedureCode: r.procedures?.code || '—',
+            procedureRevision: r.procedures?.revision || undefined,
+            procedureName: r.procedures?.name || '—',
+            completionDate: isPendente ? '—' : (r.completion_date ? new Date(r.completion_date).toLocaleDateString('pt-BR') : '—'),
+            validityDate: isPendente ? '—' : (r.validity_date ? new Date(r.validity_date).toLocaleDateString('pt-BR') : '—'),
+            daysRemaining: isPendente ? 0 : (r.days_remaining ?? (r.validity_date ? Math.floor((new Date(r.validity_date).getTime() - Date.now()) / 86400000) : 0)),
+            status: r.status || 'Pendente',
+            complianceRate: r.compliance_rate ?? 0,
+            instructor: r.instructor,
+            certificateHash: r.certificate_hash || undefined,
+            hours: r.procedures?.hours || 8,
+          };
+        }));
+      }
+      showToast(`✅ Avaliação ativa! ${count} colaborador(es) de "${sectors.join(', ')}" vinculado(s) automaticamente.`);
+    } else {
+      showToast('Avaliação ativa! Todos os colaboradores do setor já estão na matriz.');
     }
   };
 

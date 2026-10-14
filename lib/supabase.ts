@@ -182,12 +182,15 @@ export async function autoGenerateMatrixForEmployee(employeeId: string, sector: 
   if (missing.length === 0) return { count: 0 };
 
   // 3. Insere registros pendentes para os procedimentos que faltam
+  // Nota: completion_date e validity_date usam data-sentinel (hoje) pois a tabela
+  // tem NOT NULL. A UI exibe '—' para registros Pendentes independente da data.
+  const today = new Date().toISOString().split('T')[0];
   const records = missing.map((procedure_id: string) => ({
     employee_id: employeeId,
     procedure_id,
     status: 'Pendente',
-    completion_date: null,
-    validity_date: null,
+    completion_date: today,
+    validity_date: today,
     compliance_rate: 0,
   }));
 
@@ -390,12 +393,14 @@ export async function autoGenerateMatrixForProcedure(
   if (missing.length === 0) return { count: 0 };
 
   // 3. Insere registros pendentes
+  // Nota: datas são sentinel (hoje) pois a tabela tem NOT NULL — a UI exibe '—' para Pendente.
+  const today = new Date().toISOString().split('T')[0];
   const records = missing.map((employee_id) => ({
     employee_id,
     procedure_id: procedureId,
     status: 'Pendente',
-    completion_date: null,
-    validity_date: null,
+    completion_date: today,
+    validity_date: today,
     compliance_rate: 0,
   }));
 
