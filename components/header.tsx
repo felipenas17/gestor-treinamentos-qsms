@@ -15,16 +15,12 @@ interface HeaderProps {
   currentTab: string;
   onOpenSchemaModal: () => void;
   onOpenImagesModal: () => void;
-  onQuickAction?: () => void;
-  quickActionLabel?: string;
 }
 
 export function Header({
   currentTab,
   onOpenSchemaModal,
   onOpenImagesModal,
-  onQuickAction,
-  quickActionLabel,
 }: HeaderProps) {
   const getTabTitle = () => {
     switch (currentTab) {
@@ -74,15 +70,6 @@ export function Header({
       {/* Zone 3: Primary and Secondary Actions */}
       <div className="flex items-center gap-2.5 shrink-0">
         {/* Botões Links Imagens e Esquema SQL — ocultos até modal estar ativo */}
-
-        {onQuickAction && quickActionLabel && (
-          <button
-            onClick={onQuickAction}
-            className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 rounded-lg shadow-sm transition-colors whitespace-nowrap"
-          >
-            <span>{quickActionLabel}</span>
-          </button>
-        )}
       </div>
     </header>
   );

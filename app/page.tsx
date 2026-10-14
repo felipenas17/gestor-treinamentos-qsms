@@ -499,18 +499,6 @@ export default function GestorTreinamentosApp() {
           currentTab={currentTab}
           onOpenSchemaModal={() => setIsSchemaModalOpen(true)}
           onOpenImagesModal={() => setIsImagesModalOpen(true)}
-          onQuickAction={
-            currentTab === 'dashboard' ? () => setIsNewPlanModalOpen(true)
-            : currentTab === 'procedimentos' ? () => setIsNewProcedureModalOpen(true)
-            : currentTab === 'provas' ? () => setIsAssessmentTakerOpen(true)
-            : () => setIsRegisterTrainingOpen(true)
-          }
-          quickActionLabel={
-            currentTab === 'dashboard' ? 'Gerar Novo Plano de Treino'
-            : currentTab === 'procedimentos' ? '+ Gerar POP c/ IA'
-            : currentTab === 'provas' ? 'Simular Link de Prova'
-            : 'Registrar Treinamento'
-          }
         />
 
         {isLoading && (

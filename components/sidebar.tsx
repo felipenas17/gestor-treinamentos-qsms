@@ -1,17 +1,14 @@
 'use client';
 
 import React from 'react';
-import { 
-  LayoutDashboard, 
-  FileText, 
-  CheckSquare, 
-  Users, 
-  Database, 
+import {
+  LayoutDashboard,
+  FileText,
+  CheckSquare,
+  Users,
+  Database,
   Image as ImageIcon,
-  ShieldCheck,
   Anchor,
-  Sparkles,
-  Radio,
   Award,
 } from 'lucide-react';
 
@@ -36,39 +33,30 @@ export function Sidebar({
       label: 'Dashboard',
       sublabel: 'Painel Geral',
       icon: LayoutDashboard,
-      badge: '94.2%',
-      badgeColor: 'text-emerald-400 bg-emerald-950/60 border-emerald-800/40',
     },
     {
       id: 'procedimentos',
       label: 'Procedimentos & POPs',
       sublabel: 'Biblioteca Oficial',
       icon: FileText,
-      badge: '8 POPs',
-      badgeColor: 'text-blue-400 bg-blue-950/60 border-blue-800/40',
     },
     {
       id: 'provas',
       label: 'Gestão de Provas & Links',
       sublabel: 'Avaliações de Eficácia',
       icon: CheckSquare,
-      badge: 'UUID Ativo',
-      badgeColor: 'text-cyan-400 bg-cyan-950/60 border-cyan-800/40',
     },
     {
       id: 'certificados',
       label: 'Certificados',
+      sublabel: 'Internos e Normativos',
       icon: Award,
-      badge: '',
-      description: 'Internos e Normativos',
     },
     {
       id: 'matriz',
       label: 'Matriz & Colaboradores',
       sublabel: 'Conformidade de Equipes',
       icon: Users,
-      badge: '478 Cert.',
-      badgeColor: 'text-amber-400 bg-amber-950/60 border-amber-800/40',
     },
   ];
 
@@ -95,16 +83,6 @@ export function Sidebar({
           </div>
         </div>
 
-        {/* Offshore vessel / telemetry pill */}
-        <div className="mt-3.5 px-3 py-2 rounded-lg bg-slate-900/90 border border-slate-800 flex items-center justify-between text-xs">
-          <div className="flex items-center gap-2 truncate">
-            <Radio className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-            <span className="text-slate-300 font-medium truncate">FPSO Guanabara / DP2</span>
-          </div>
-          <span className="text-[11px] font-mono text-emerald-400 font-semibold tabular-nums">
-            NR-37 OK
-          </span>
-        </div>
       </div>
 
       {/* Main Navigation */}
@@ -137,15 +115,6 @@ export function Sidebar({
                   {item.sublabel}
                 </div>
               </div>
-              <span
-                className={`text-[11px] font-mono px-2 py-0.5 rounded border ${
-                  isActive
-                    ? 'bg-blue-700/80 text-blue-100 border-blue-500'
-                    : item.badgeColor
-                }`}
-              >
-                {item.badge}
-              </span>
             </button>
           );
         })}
