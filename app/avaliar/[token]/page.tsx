@@ -16,6 +16,7 @@ interface PublicAssessment {
   title: string;
   procedureCode: string;
   procedureTitle: string;
+  procedureFileUrl: string | null;
   questionsCount: number;
   minScorePercent: number;
   durationMinutes: number;
@@ -31,7 +32,7 @@ interface SubmitResult {
   totalQuestions: number;
 }
 
-type Step = 'loading' | 'notfound' | 'intro' | 'exam' | 'signature' | 'result';
+type Step = 'loading' | 'notfound' | 'intro' | 'procedure' | 'exam' | 'signature' | 'result';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -58,6 +59,7 @@ export default function ExamPage() {
   const [timeLeft, setTimeLeft] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<SubmitResult | null>(null);
+  const [attemptNumber, setAttemptNumber] = useState(1);
 
   // Refs
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -191,8 +193,25 @@ export default function ExamPage() {
       .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
   };
 
+  // Identificação → leitura do procedimento
   const handleStart = () => {
-    if (!employeeName.trim()) return;
+    if (!employeeName.trim() || employeeCpf.length < 14) return;
+    setStep('procedure');
+  };
+
+  // Leitura → prova
+  const handleStartExam = () => {
+    setStep('exam');
+    startTimer();
+  };
+
+  // Retentativa após reprovação
+  const handleRetry = () => {
+    setAnswers({});
+    setCurrentQ(0);
+    setResult(null);
+    setAttemptNumber((a) => a + 1);
+    setTimeLeft(assessment!.durationMinutes * 60);
     setStep('exam');
     startTimer();
   };
@@ -372,6 +391,79 @@ export default function ExamPage() {
             style={{ background: (employeeName.trim() && employeeCpf.length >= 14) ? '#2563eb' : '#374151' }}
           >
             Iniciar Prova →
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Procedure reading screen ──────────────────────────────────────────────────
+  if (step === 'procedure') {
+    return (
+      <div className="min-h-screen py-8 px-4" style={{ background: '#0f1117' }}>
+        <div className="max-w-lg mx-auto">
+          {/* Header */}
+          <div className="text-center mb-6">
+            <div className="inline-flex items-center gap-2 bg-blue-600/20 border border-blue-500/30 rounded-full px-4 py-1.5 mb-4">
+              <span className="text-blue-400 text-xs font-medium tracking-wider uppercase">Etapa 1 de 2 · Leitura</span>
+            </div>
+            <h2 className="text-xl font-bold text-white mb-1">Leia o Procedimento</h2>
+            <p className="text-white/50 text-sm">Leia o documento abaixo antes de iniciar a avaliação</p>
+          </div>
+
+          {/* Procedure card */}
+          <div className="rounded-xl p-4 mb-5" style={{ background: '#1a1f2e', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <p className="text-white/40 text-xs uppercase tracking-wider mb-1">Procedimento</p>
+            <p className="text-white text-sm font-medium mb-1">{assessment.procedureTitle}</p>
+            <p className="text-white/40 text-xs font-mono">{assessment.procedureCode}</p>
+          </div>
+
+          {/* PDF viewer / download */}
+          {assessment.procedureFileUrl ? (
+            <div className="mb-5">
+              {/* Embed para desktop */}
+              <div
+                className="rounded-xl overflow-hidden mb-3 hidden md:block"
+                style={{ border: '1px solid rgba(255,255,255,0.08)', height: '60vh' }}
+              >
+                <iframe
+                  src={assessment.procedureFileUrl}
+                  className="w-full h-full"
+                  title="Procedimento"
+                />
+              </div>
+              {/* Botão para mobile (iframe não funciona bem) */}
+              <a
+                href={assessment.procedureFileUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl text-white text-sm font-medium transition-all"
+                style={{ background: '#1a1f2e', border: '1px solid rgba(37,99,235,0.4)', color: '#60a5fa' }}
+              >
+                <span>📄</span>
+                <span>Abrir Procedimento (PDF)</span>
+              </a>
+            </div>
+          ) : (
+            <div className="rounded-xl p-4 mb-5 text-center" style={{ background: '#1a1f2e', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <p className="text-white/40 text-sm">Nenhum arquivo vinculado a este procedimento.</p>
+            </div>
+          )}
+
+          {/* Confirmação */}
+          <div className="rounded-xl p-4 mb-5" style={{ background: 'rgba(234,179,8,0.08)', border: '1px solid rgba(234,179,8,0.2)' }}>
+            <p className="text-yellow-400 text-xs font-medium mb-1">⚠ Atenção</p>
+            <p className="text-white/60 text-xs">
+              Ao clicar em "Li e entendi", você confirma que leu e compreendeu o procedimento e está pronto para a avaliação.
+            </p>
+          </div>
+
+          <button
+            onClick={handleStartExam}
+            className="w-full py-3.5 rounded-xl text-white font-semibold text-sm transition-all"
+            style={{ background: '#2563eb' }}
+          >
+            Li e entendi — Iniciar Avaliação →
           </button>
         </div>
       </div>
@@ -588,7 +680,7 @@ export default function ExamPage() {
 
           {/* Message */}
           <div
-            className="rounded-xl p-4 mb-6"
+            className="rounded-xl p-4 mb-5"
             style={{
               background: passed ? 'rgba(22,163,74,0.08)' : 'rgba(234,179,8,0.08)',
               border: `1px solid ${passed ? 'rgba(22,163,74,0.2)' : 'rgba(234,179,8,0.2)'}`,
@@ -597,9 +689,22 @@ export default function ExamPage() {
             <p className={`text-sm ${passed ? 'text-green-400' : 'text-yellow-400'}`}>
               {passed
                 ? '🎓 Parabéns! Seu certificado foi registrado no sistema. O gestor de QSMS receberá a confirmação.'
-                : `📋 Nota mínima exigida: ${minScore}%. Aguarde novo agendamento de treinamento.`}
+                : attemptNumber < (assessment?.maxAttempts ?? 2)
+                  ? `📋 Nota mínima: ${minScore}%. Você ainda tem ${(assessment?.maxAttempts ?? 2) - attemptNumber} tentativa(s) restante(s).`
+                  : `📋 Nota mínima exigida: ${minScore}%. Limite de tentativas atingido. Aguarde novo agendamento.`}
             </p>
           </div>
+
+          {/* Botão retentativa */}
+          {!passed && attemptNumber < (assessment?.maxAttempts ?? 2) && (
+            <button
+              onClick={handleRetry}
+              className="w-full py-3.5 rounded-xl text-white font-semibold text-sm mb-4 transition-all"
+              style={{ background: '#d97706' }}
+            >
+              Tentar novamente →
+            </button>
+          )}
         </div>
 
         {/* Footer */}

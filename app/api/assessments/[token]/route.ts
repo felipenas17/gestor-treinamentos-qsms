@@ -52,6 +52,17 @@ export async function GET(
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
+  // Busca file_url do procedimento associado
+  let procedureFileUrl: string | null = null;
+  if (data.procedure_code) {
+    const { data: proc } = await supabase
+      .from('procedures')
+      .select('file_url')
+      .eq('code', data.procedure_code)
+      .maybeSingle();
+    procedureFileUrl = proc?.file_url ?? null;
+  }
+
   // Strip correct answers — nunca expõe ao cliente
   const questions = (data.assessment_questions || []).map((q: any) => ({
     id: q.id,
@@ -65,6 +76,7 @@ export async function GET(
     title: data.title,
     procedureCode: data.procedure_code,
     procedureTitle: data.procedure_title || data.title,
+    procedureFileUrl,
     questionsCount: questions.length,
     minScorePercent: data.min_score_percent ?? 80,
     durationMinutes: data.duration_minutes ?? 20,
