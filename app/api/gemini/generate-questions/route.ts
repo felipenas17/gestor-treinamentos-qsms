@@ -80,6 +80,12 @@ function shuffleCorrectAnswer(q: {
 function mockQuestions(promptText: string, procedureCode: string, procedureName: string) {
   const ts = Date.now();
   const name = procedureName || procedureCode || "Geral";
+
+  // Extrai trecho da descrição do procedimento para referenciar nas questões
+  const descMatch = promptText.match(/Descrição\/Conteúdo:\s*(.{10,})/i);
+  const desc = descMatch ? descMatch[1].slice(0, 200).trim() : '';
+  const hasDesc = desc.length > 20;
+
   // Posições embaralhadas via Fisher-Yates — sem padrão repetitivo
   const positions = makeShuffledPositions(10);
   return [
@@ -87,121 +93,132 @@ function mockQuestions(promptText: string, procedureCode: string, procedureName:
       id: `q-mock-${ts}-1`,
       question: `(${procedureCode}) Qual é o objetivo principal do procedimento "${name}"?`,
       options: [
-        "Estabelecer metodologia para identificar, avaliar e controlar aspectos/impactos e perigos/riscos das atividades",
-        "Registrar ocorrências de acidentes de trabalho para fins estatísticos",
-        "Definir o cronograma de treinamentos obrigatórios da unidade",
-        "Controlar o estoque de EPIs utilizados nas operações offshore",
+        `Estabelecer as diretrizes, responsabilidades e etapas para a execução padronizada e segura das atividades descritas em "${name}"`,
+        "Registrar ocorrências de não-conformidades para fins de auditoria interna exclusivamente",
+        "Definir o cronograma de manutenção preventiva dos equipamentos da unidade",
+        "Controlar o estoque de materiais e EPIs utilizados nas operações",
       ],
       correctOptionIndex: 0,
-      explanation: `O procedimento "${name}" define a metodologia sistemática de identificação e controle, conforme requisitos ISO 14001 e ISO 45001.`,
+      explanation: `O objetivo de um procedimento operacional (POP) é estabelecer de forma clara as diretrizes, responsabilidades e etapas para execução padronizada e segura das atividades que compõem "${name}".`,
     },
     {
       id: `q-mock-${ts}-2`,
-      question: `(${procedureCode}) Segundo o procedimento, o que é "Aspecto Ambiental"?`,
+      question: `(${procedureCode}) Por que é fundamental seguir o procedimento "${name}" na íntegra durante sua execução?`,
       options: [
-        "Elemento das atividades, produtos ou serviços de uma organização que interage ou pode interagir com o meio ambiente",
-        "Modificação no meio ambiente resultante das atividades da organização",
-        "Fonte com potencial para provocar danos humanos em termos de lesão ou doença",
-        "Probabilidade de ocorrência de um evento perigoso com determinada gravidade",
+        "Para garantir a padronização, rastreabilidade e conformidade com os requisitos de segurança e qualidade estabelecidos",
+        "Apenas para atender exigências formais de auditoria sem impacto prático na operação",
+        "Para aumentar a velocidade de execução das tarefas, dispensando etapas de verificação",
+        "Para eliminar a necessidade de supervisão técnica durante atividades de rotina",
       ],
       correctOptionIndex: 0,
-      explanation: "Aspecto Ambiental é o elemento que PODE interagir com o meio ambiente — distinto do Impacto Ambiental, que é a modificação resultante, conforme definição do procedimento e ISO 14001.",
+      explanation: "Seguir o procedimento na íntegra garante padronização, rastreabilidade das ações e conformidade com requisitos operacionais, de segurança e regulatórios aplicáveis.",
     },
     {
       id: `q-mock-${ts}-3`,
-      question: `(${procedureCode}) Qual é a diferença entre "Impacto Ambiental" e "Aspecto Ambiental"?`,
+      question: `(${procedureCode}) Quem tem a responsabilidade primária de garantir a aplicação correta do procedimento "${name}"?`,
       options: [
-        "Aspecto é o elemento da atividade; impacto é a modificação no meio ambiente causada por esse aspecto",
-        "São sinônimos — ambos descrevem danos ao meio ambiente",
-        "Impacto é a causa e aspecto é a consequência",
-        "Aspecto refere-se a aspectos legais; impacto refere-se a aspectos operacionais",
+        "O responsável pela execução da atividade, com supervisão do encarregado ou coordenador designado",
+        "Somente a equipe de QSMS, que deve estar presente em todas as etapas do procedimento",
+        "O departamento de RH, responsável por garantir que todos os colaboradores estejam treinados",
+        "A Alta Direção, que valida cada execução antes de autorizar o início das atividades",
       ],
       correctOptionIndex: 0,
-      explanation: "O procedimento define claramente: Aspecto (causa) → Impacto (efeito/modificação no meio ambiente). Essa relação causa-efeito é fundamental para o levantamento.",
+      explanation: "A responsabilidade primária recai sobre o executor da atividade, com supervisão do encarregado ou coordenador designado, conforme hierarquia de responsabilidades do sistema de gestão.",
     },
     {
       id: `q-mock-${ts}-4`,
-      question: `(${procedureCode}) O que é "Perigo" conforme definição do procedimento?`,
-      options: [
-        "Fonte, situação ou ato com potencial para provocar danos humanos em termos de lesão ou doença, ou combinação destas",
-        "Probabilidade de ocorrência de um evento perigoso multiplicada pela gravidade",
-        "Resultado de uma avaliação quantitativa de riscos operacionais",
-        "Documento que registra as condições inseguras identificadas na inspeção",
-      ],
+      question: hasDesc
+        ? `(${procedureCode}) Com base no conteúdo de "${name}", qual das alternativas melhor descreve sua aplicação?`
+        : `(${procedureCode}) Em que situações o procedimento "${name}" deve ser obrigatoriamente aplicado?`,
+      options: hasDesc
+        ? [
+            `Atividades relacionadas a: ${desc.slice(0, 80)}...`,
+            "Apenas em situações de emergência ou não-conformidade identificada em auditoria",
+            "Exclusivamente em atividades de alto risco classificadas pela área de segurança",
+            "Somente durante inspeções programadas pela equipe de QSMS",
+          ]
+        : [
+            "Sempre que a atividade coberta pelo procedimento for executada, independentemente da frequência ou turno",
+            "Apenas quando solicitado pelo supervisor imediato antes do início da jornada",
+            "Somente durante auditorias internas e inspeções regulatórias externas",
+            "Exclusivamente em situações de emergência ou paralisação não planejada",
+          ],
       correctOptionIndex: 0,
-      explanation: "A definição de Perigo do procedimento é: fonte, situação ou ato com potencial de dano humano. Diferente de Risco, que envolve probabilidade × gravidade, conforme ISO 45001.",
+      explanation: hasDesc
+        ? `O procedimento "${name}" define as atividades e condições em que deve ser aplicado. Todo colaborador envolvido deve conhecer seu escopo para garantir conformidade.`
+        : `O procedimento deve ser aplicado sempre que a atividade nele descrita for executada, garantindo padronização e segurança em todas as ocorrências.`,
     },
     {
       id: `q-mock-${ts}-5`,
-      question: `(${procedureCode}) O que é "Risco" segundo o procedimento?`,
+      question: `(${procedureCode}) O que deve ser feito caso um colaborador identifique uma condição que impeça a execução segura do procedimento "${name}"?`,
       options: [
-        "Combinação da probabilidade de ocorrência de um evento perigoso com a gravidade da lesão ou doença",
-        "Evento não planejado que resulta em lesão ou dano ao patrimônio",
-        "Ausência de medidas de controle em uma atividade de risco elevado",
-        "Qualquer situação que exija uso de EPI nível 3",
+        "Interromper a atividade, comunicar imediatamente o supervisor e aguardar análise e orientação antes de prosseguir",
+        "Adaptar o procedimento por conta própria para contornar a condição identificada",
+        "Prosseguir com a atividade utilizando cautela redobrada e registrar a ocorrência ao final",
+        "Acionar diretamente a equipe de manutenção sem comunicar a supervisão",
       ],
       correctOptionIndex: 0,
-      explanation: "Risco = Probabilidade × Severidade. O procedimento define risco como combinação da probabilidade de ocorrência com a gravidade do dano, alinhado à ISO 45001.",
+      explanation: "Ao identificar condição impeditiva, o colaborador deve parar, comunicar o supervisor e aguardar orientação — princípio básico de gestão de riscos e hierarquia de controles.",
     },
     {
       id: `q-mock-${ts}-6`,
-      question: `(${procedureCode}) O que é "Identificação do Aspecto" conforme o procedimento?`,
+      question: `(${procedureCode}) Qual é a finalidade do registro de execução do procedimento "${name}"?`,
       options: [
-        "Processo de reconhecimento da existência de um aspecto e definição de suas características",
-        "Avaliação quantitativa da gravidade dos impactos ambientais da atividade",
-        "Elaboração do relatório de conformidade ambiental para a ANP",
-        "Cadastramento de fornecedores com certificação ambiental ISO 14001",
+        "Garantir rastreabilidade, evidenciar conformidade e subsidiar análises de melhoria contínua do processo",
+        "Servir exclusivamente para comprovar a presença dos colaboradores durante a atividade",
+        "Substituir a necessidade de treinamento periódico dos executantes",
+        "Atender requisito burocrático sem impacto prático na operação ou segurança",
       ],
       correctOptionIndex: 0,
-      explanation: "Identificação do Aspecto é o processo de RECONHECIMENTO da existência do aspecto e definição de suas características — primeiro passo antes da avaliação de significância.",
+      explanation: "O registro garante rastreabilidade das ações executadas, evidencia conformidade com os requisitos e fornece dados para análise crítica e melhoria contínua.",
     },
     {
       id: `q-mock-${ts}-7`,
-      question: `(${procedureCode}) Qual norma internacional trata do Sistema de Gestão Ambiental referenciado no procedimento?`,
+      question: `(${procedureCode}) Como o procedimento "${name}" contribui para a segurança operacional?`,
       options: [
-        "ISO 14001",
-        "ISO 9001",
-        "OHSAS 18001",
-        "NBR 16001",
+        "Estabelecendo etapas padronizadas que minimizam a variabilidade e reduzem a exposição a riscos durante a execução",
+        "Eliminando completamente todos os riscos associados à atividade sem necessidade de outras medidas",
+        "Transferindo a responsabilidade pela segurança para o departamento de QSMS",
+        "Reduzindo o tempo de execução, o que diminui automaticamente a exposição a riscos",
       ],
       correctOptionIndex: 0,
-      explanation: "O Sistema de Gestão Ambiental (SGA) é regido pela ISO 14001, que define requisitos para identificar e controlar aspectos e impactos ambientais das atividades.",
+      explanation: "Procedimentos padronizados reduzem variabilidade humana nas atividades, minimizando a exposição a riscos e contribuindo para a segurança operacional.",
     },
     {
       id: `q-mock-${ts}-8`,
-      question: `(${procedureCode}) Qual norma rege o Sistema de Gestão de Segurança e Saúde Ocupacional mencionado no procedimento?`,
+      question: `(${procedureCode}) Com que frequência o procedimento "${name}" deve ser revisado?`,
       options: [
-        "ISO 45001",
-        "ISO 14001",
-        "ISO 9001",
-        "NR-37",
+        "Conforme periodicidade definida no próprio documento ou quando ocorrerem alterações significativas no processo, equipamentos ou legislação",
+        "Apenas quando ocorrer um acidente ou incidente relacionado à atividade descrita",
+        "Somente quando exigido por auditoria externa ou inspeção regulatória",
+        "Uma única vez após sua criação, pois representa a melhor prática consolidada",
       ],
       correctOptionIndex: 0,
-      explanation: "A ISO 45001 substituiu a OHSAS 18001 e é a norma internacional que rege o Sistema de Gestão de Segurança e Saúde Ocupacional (SGSSaO), exigindo identificação de perigos e avaliação de riscos.",
+      explanation: "Procedimentos devem ser revisados conforme periodicidade definida ou quando há mudanças no processo, equipamentos, legislação ou lições aprendidas de incidentes.",
     },
     {
       id: `q-mock-${ts}-9`,
-      question: `(${procedureCode}) Qual é o papel da "Identificação de Perigos" dentro do procedimento?`,
+      question: `(${procedureCode}) Qual atitude é esperada do colaborador antes de iniciar a execução do procedimento "${name}"?`,
       options: [
-        "Reconhecer que um perigo existe e definir suas características antes de avaliar o risco",
-        "Eliminar automaticamente todos os perigos identificados nas operações",
-        "Emitir a Permissão de Trabalho para atividades com perigos elevados",
-        "Classificar os perigos apenas após a ocorrência de um acidente",
+        "Ler o procedimento, confirmar que está na revisão vigente, verificar os recursos necessários e esclarecer dúvidas com o supervisor",
+        "Iniciar a execução imediatamente com base na experiência prévia, sem necessidade de consultar o documento",
+        "Verificar apenas se os EPIs estão disponíveis, pois os demais itens são de responsabilidade da supervisão",
+        "Aguardar autorização formal da Alta Direção antes de qualquer ação preparatória",
       ],
       correctOptionIndex: 0,
-      explanation: "Identificação de Perigos é o RECONHECIMENTO proativo da existência de perigos — etapa anterior à avaliação e controle de riscos, conforme o procedimento e ISO 45001.",
+      explanation: "Antes de executar, o colaborador deve ler o procedimento, confirmar a revisão vigente, checar recursos e esclarecer dúvidas — prática essencial de trabalho seguro.",
     },
     {
       id: `q-mock-${ts}-10`,
-      question: `(${procedureCode}) Na sequência lógica do procedimento, qual é a ordem correta das etapas?`,
+      question: `(${procedureCode}) O que caracteriza um procedimento operacional bem elaborado, como "${name}"?`,
       options: [
-        "Identificar aspecto/perigo → Avaliar impacto/risco → Definir controles → Monitorar",
-        "Definir controles → Identificar perigos → Avaliar riscos → Registrar",
-        "Avaliar riscos → Identificar perigos → Monitorar → Definir controles",
-        "Registrar ocorrências → Identificar aspectos → Avaliar impactos → Treinar",
+        "Linguagem clara, etapas sequenciais definidas, responsabilidades atribuídas, critérios de aceitação e referências normativas aplicáveis",
+        "Volume máximo de texto técnico para cobrir todas as possíveis variações da atividade",
+        "Ausência de referências a normas externas para garantir autonomia operacional",
+        "Aprovação exclusiva pela equipe de QSMS, sem participação dos executantes",
       ],
       correctOptionIndex: 0,
-      explanation: "O procedimento segue a metodologia PDCA: identificação (aspecto/perigo) → avaliação (impacto/risco) → controles → monitoramento, alinhado com ISO 14001 e ISO 45001.",
+      explanation: "Um bom procedimento tem linguagem clara, etapas sequenciais, responsabilidades definidas, critérios de aceitação e referências normativas — tornando-o aplicável e auditável.",
     },
   ].map((q, i) => shuffleCorrectAnswer(q, positions[i]));
 }
@@ -216,12 +233,13 @@ export async function POST(req: NextRequest) {
 
     const apiKey = process.env.GEMINI_API_KEY;
 
-    // ── Sem key: retorna mock ─────────────────────────────────────────────────
+    // ── Sem key: retorna mock com aviso ──────────────────────────────────────
     if (!apiKey) {
-      console.log("[generate-questions] GEMINI_API_KEY não configurada, usando mock");
+      console.log("[generate-questions] GEMINI_API_KEY não configurada, usando questões padrão");
       return NextResponse.json({
         questions: mockQuestions(promptText, procedureCode || "GERAL", procedureName || procedureCode || "Geral"),
         source: "mock",
+        geminiError: "GEMINI_API_KEY não configurada — configure a chave em Settings > Environment Variables no Vercel",
       });
     }
 

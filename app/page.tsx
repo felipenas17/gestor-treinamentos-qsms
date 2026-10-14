@@ -394,11 +394,12 @@ export default function GestorTreinamentosApp() {
         showToast(errMsg, 'error');
         return;
       }
-      // Avisa se usou mock (Gemini falhou mas salvou assim mesmo)
-      if (qData.source === 'mock' && qData.geminiError) {
-        console.warn('Gemini falhou, usando mock. Erro:', qData.geminiError);
-        showToast(`Gemini indisponível (${qData.geminiError.slice(0, 60)}). Usando questões padrão.`, 'error');
-        // Continua — salva as questões mock mesmo assim
+      // Avisa se usou questões padrão (Gemini indisponível ou sem chave configurada)
+      if (qData.source === 'mock') {
+        const reason = qData.geminiError || 'IA indisponível';
+        console.warn('Usando questões padrão. Motivo:', reason);
+        showToast(`Questões padrão geradas — IA indisponível. Configure GEMINI_API_KEY no Vercel para questões personalizadas ao procedimento.`, 'error');
+        // Continua — salva as questões padrão mesmo assim
       }
       const newId = await saveAssessmentDraft({
         procedure_code: proc.code,
