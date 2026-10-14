@@ -17,35 +17,48 @@ import {
   Trash2,
   CalendarClock,
   Users,
+  Link2,
+  Search,
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
-import { Assessment, Procedure, TrainingRecord } from '@/types';
+import { Assessment, Employee, Procedure, TrainingRecord } from '@/types';
 
 interface AssessmentsScreenProps {
   procedures: Procedure[];
   assessments: Assessment[];
   records: TrainingRecord[];
+  employees: Employee[];
   onApproveAssessment: (id: string) => void;
   onArchiveAssessment: (id: string) => void;
   onDeleteAssessment: (id: string) => void;
   onOpenAssessmentTaker: (assessment: Assessment) => void;
   onGenerateAssessment: (proc: Procedure) => Promise<void>;
+  onGenerateEmployeeLink: (assessmentId: string, employeeId: string) => Promise<string | null>;
 }
 
 export function AssessmentsScreen({
   procedures,
   assessments,
   records,
+  employees,
   onApproveAssessment,
   onArchiveAssessment,
   onDeleteAssessment,
   onOpenAssessmentTaker,
   onGenerateAssessment,
+  onGenerateEmployeeLink,
 }: AssessmentsScreenProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [generatingFor, setGeneratingFor] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
+
+  // Per-employee link state
+  const [showEmployeeLinks, setShowEmployeeLinks] = useState<string | null>(null); // assessment id
+  const [employeeSearch, setEmployeeSearch] = useState('');
+  const [generatingEmpLink, setGeneratingEmpLink] = useState<string | null>(null); // employee id
+  const [empLinksCopied, setEmpLinksCopied] = useState<Record<string, string>>({}); // employeeId → token
+  const [empLinkTokens, setEmpLinkTokens] = useState<Record<string, string>>({}); // employeeId → token
 
   // Agrupar registros da matriz por data de validade, ordenados pela urgência
   const expirationGroups = useMemo(() => {
@@ -111,6 +124,42 @@ export function AssessmentsScreen({
       setGeneratingFor(null);
     }
   };
+
+  const getEmployeeLink = (token: string) => {
+    const base = typeof window !== 'undefined' ? window.location.origin : 'https://app.tigertank.com.br';
+    return `${base}/avaliar/${token}`;
+  };
+
+  const handleGenerateEmployeeLink = async (assessmentId: string, employeeId: string) => {
+    setGeneratingEmpLink(employeeId);
+    try {
+      const token = await onGenerateEmployeeLink(assessmentId, employeeId);
+      if (token) {
+        setEmpLinkTokens((prev) => ({ ...prev, [employeeId]: token }));
+        const url = getEmployeeLink(token);
+        await navigator.clipboard.writeText(url);
+        setEmpLinksCopied((prev) => ({ ...prev, [employeeId]: token }));
+        setTimeout(() => setEmpLinksCopied((prev) => { const n = { ...prev }; delete n[employeeId]; return n; }), 3000);
+      }
+    } finally {
+      setGeneratingEmpLink(null);
+    }
+  };
+
+  const handleCopyEmpLink = async (employeeId: string) => {
+    const token = empLinkTokens[employeeId];
+    if (!token) return;
+    await navigator.clipboard.writeText(getEmployeeLink(token));
+    setEmpLinksCopied((prev) => ({ ...prev, [employeeId]: token }));
+    setTimeout(() => setEmpLinksCopied((prev) => { const n = { ...prev }; delete n[employeeId]; return n; }), 2000);
+  };
+
+  const filteredEmployees = (search: string) =>
+    employees.filter((e) =>
+      e.name.toLowerCase().includes(search.toLowerCase()) ||
+      e.role.toLowerCase().includes(search.toLowerCase()) ||
+      e.sector.toLowerCase().includes(search.toLowerCase())
+    ).slice(0, 20);
 
   if (procedures.length === 0) {
     return (
@@ -404,40 +453,144 @@ export function AssessmentsScreen({
 
                       {/* QR Code + Link (only for Ativa) */}
                       {assessment.status === 'Ativa' && (
-                        <div className="px-4 py-4 border-b border-slate-200 bg-white">
-                          <div className="flex items-start gap-6 flex-wrap">
-                            <div className="flex flex-col items-center gap-2">
-                              <QRCodeSVG
-                                value={getAssessmentLink(assessment)}
-                                size={96}
-                                bgColor="#ffffff"
-                                fgColor="#1e293b"
-                                level="M"
-                              />
-                              <span className="text-[10px] text-slate-400 font-medium">QR Code da prova</span>
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-[11px] font-semibold text-slate-600 mb-1 flex items-center gap-1">
-                                <QrCode className="w-3 h-3" /> Link seguro de acesso
-                              </p>
-                              <div className="flex items-center gap-2">
-                                <code className="flex-1 truncate text-[11px] bg-slate-100 border border-slate-200 rounded px-2 py-1.5 text-slate-700 font-mono">
-                                  {getAssessmentLink(assessment)}
-                                </code>
-                                <button
-                                  onClick={() => handleCopyLink(assessment)}
-                                  className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded border border-slate-300 transition-colors"
-                                >
-                                  {copiedId === assessment.id ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
-                                  {copiedId === assessment.id ? 'Copiado!' : 'Copiar'}
-                                </button>
+                        <>
+                          <div className="px-4 py-4 border-b border-slate-200 bg-white">
+                            <div className="flex items-start gap-6 flex-wrap">
+                              <div className="flex flex-col items-center gap-2">
+                                <QRCodeSVG
+                                  value={getAssessmentLink(assessment)}
+                                  size={96}
+                                  bgColor="#ffffff"
+                                  fgColor="#1e293b"
+                                  level="M"
+                                />
+                                <span className="text-[10px] text-slate-400 font-medium">QR Code da prova</span>
                               </div>
-                              <p className="text-[10px] text-slate-400 mt-1.5">
-                                Envie este link ou o QR Code ao colaborador. Válido por 7 dias · máx. {assessment.maxAttempts} tentativas.
-                              </p>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[11px] font-semibold text-slate-600 mb-1 flex items-center gap-1">
+                                  <QrCode className="w-3 h-3" /> Link seguro de acesso
+                                </p>
+                                <div className="flex items-center gap-2">
+                                  <code className="flex-1 truncate text-[11px] bg-slate-100 border border-slate-200 rounded px-2 py-1.5 text-slate-700 font-mono">
+                                    {getAssessmentLink(assessment)}
+                                  </code>
+                                  <button
+                                    onClick={() => handleCopyLink(assessment)}
+                                    className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded border border-slate-300 transition-colors"
+                                  >
+                                    {copiedId === assessment.id ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
+                                    {copiedId === assessment.id ? 'Copiado!' : 'Copiar'}
+                                  </button>
+                                </div>
+                                <p className="text-[10px] text-slate-400 mt-1.5">
+                                  Link geral · qualquer colaborador. Para links individuais, use <strong>Links por Colaborador</strong> abaixo.
+                                </p>
+                              </div>
                             </div>
                           </div>
-                        </div>
+
+                          {/* Per-employee links panel */}
+                          <div className="border-b border-slate-200 bg-white">
+                            <button
+                              onClick={() => {
+                                setShowEmployeeLinks(showEmployeeLinks === assessment.id ? null : assessment.id);
+                                setEmployeeSearch('');
+                              }}
+                              className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-50 transition-colors text-left"
+                            >
+                              <div className="flex items-center gap-2">
+                                <Link2 className="w-3.5 h-3.5 text-blue-600" />
+                                <span className="text-[11px] font-semibold text-slate-700">Links por Colaborador</span>
+                                <span className="text-[10px] bg-blue-50 text-blue-600 border border-blue-200 rounded-full px-1.5 py-0.5 font-medium">
+                                  link individual · nome pré-preenchido
+                                </span>
+                              </div>
+                              {showEmployeeLinks === assessment.id
+                                ? <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
+                                : <ChevronDown className="w-3.5 h-3.5 text-slate-400" />}
+                            </button>
+
+                            {showEmployeeLinks === assessment.id && (
+                              <div className="px-4 pb-4">
+                                {/* Search */}
+                                <div className="relative mb-3">
+                                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                                  <input
+                                    type="text"
+                                    placeholder="Buscar colaborador..."
+                                    value={employeeSearch}
+                                    onChange={(e) => setEmployeeSearch(e.target.value)}
+                                    className="w-full pl-8 pr-3 py-2 text-xs rounded-lg bg-slate-50 border border-slate-200 outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 text-slate-700 placeholder-slate-400"
+                                  />
+                                </div>
+
+                                {employees.length === 0 ? (
+                                  <p className="text-xs text-slate-400 text-center py-4">
+                                    Nenhum colaborador cadastrado.
+                                  </p>
+                                ) : (
+                                  <div className="space-y-1.5 max-h-72 overflow-y-auto pr-1">
+                                    {filteredEmployees(employeeSearch).map((emp) => {
+                                      const hasToken = !!empLinkTokens[emp.id];
+                                      const isCopied = !!empLinksCopied[emp.id];
+                                      const isGenerating = generatingEmpLink === emp.id;
+                                      return (
+                                        <div
+                                          key={emp.id}
+                                          className="flex items-center gap-3 py-2 px-3 rounded-lg bg-slate-50 border border-slate-100 hover:border-slate-200 transition-colors"
+                                        >
+                                          <img
+                                            src={emp.avatarUrl}
+                                            alt={emp.name}
+                                            className="w-7 h-7 rounded-full border border-slate-200 shrink-0 object-cover"
+                                          />
+                                          <div className="flex-1 min-w-0">
+                                            <p className="text-xs font-semibold text-slate-800 truncate">{emp.name}</p>
+                                            <p className="text-[10px] text-slate-500 truncate">{emp.role} · {emp.sector}</p>
+                                          </div>
+                                          {hasToken ? (
+                                            <div className="flex items-center gap-1.5 shrink-0">
+                                              <code className="hidden sm:block text-[10px] text-slate-500 font-mono bg-white border border-slate-200 rounded px-1.5 py-0.5 max-w-[140px] truncate">
+                                                {getEmployeeLink(empLinkTokens[emp.id])}
+                                              </code>
+                                              <button
+                                                onClick={() => handleCopyEmpLink(emp.id)}
+                                                className={`inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-semibold border transition-colors ${
+                                                  isCopied
+                                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                                    : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-100'
+                                                }`}
+                                              >
+                                                {isCopied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                                                {isCopied ? 'Copiado!' : 'Copiar'}
+                                              </button>
+                                            </div>
+                                          ) : (
+                                            <button
+                                              onClick={() => handleGenerateEmployeeLink(assessment.id, emp.id)}
+                                              disabled={isGenerating}
+                                              className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded text-[10px] font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60 transition-colors"
+                                            >
+                                              {isGenerating
+                                                ? <Loader2 className="w-3 h-3 animate-spin" />
+                                                : <Link2 className="w-3 h-3" />}
+                                              {isGenerating ? 'Gerando...' : 'Gerar link'}
+                                            </button>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                    {filteredEmployees(employeeSearch).length === 0 && (
+                                      <p className="text-xs text-slate-400 text-center py-4">
+                                        Nenhum colaborador encontrado.
+                                      </p>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </>
                       )}
 
                       {/* Questions list */}

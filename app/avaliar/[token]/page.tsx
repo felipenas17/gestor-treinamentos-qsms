@@ -17,6 +17,7 @@ interface PublicAssessment {
   procedureCode: string;
   procedureTitle: string;
   procedureFileUrl: string | null;
+  employeePrefilledName: string | null;
   questionsCount: number;
   minScorePercent: number;
   durationMinutes: number;
@@ -75,6 +76,10 @@ export default function ExamPage() {
         const data: PublicAssessment = await res.json();
         setAssessment(data);
         setTimeLeft(data.durationMinutes * 60);
+        // Pré-preenche o nome se o link for vinculado a um colaborador específico
+        if (data.employeePrefilledName) {
+          setEmployeeName(data.employeePrefilledName);
+        }
         setStep('intro');
       })
       .catch(() => setStep('notfound'));
@@ -346,15 +351,23 @@ export default function ExamPage() {
             <div>
               <label className="block text-white/70 text-sm mb-2">
                 Nome completo <span className="text-blue-400">*</span>
+                {assessment.employeePrefilledName && (
+                  <span className="ml-2 text-[10px] text-emerald-400 font-medium">✓ identificado automaticamente</span>
+                )}
               </label>
               <input
                 type="text"
                 value={employeeName}
-                onChange={(e) => setEmployeeName(e.target.value)}
+                onChange={(e) => { if (!assessment.employeePrefilledName) setEmployeeName(e.target.value); }}
+                readOnly={!!assessment.employeePrefilledName}
                 placeholder="Digite seu nome completo"
-                className="w-full px-4 py-3 rounded-xl text-white placeholder-white/30 text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                style={{ background: '#1a1f2e', border: '1px solid rgba(255,255,255,0.12)' }}
-                onKeyDown={(e) => { if (e.key === 'Enter') handleStart(); }}
+                className="w-full px-4 py-3 rounded-xl text-white placeholder-white/30 text-sm outline-none transition-all"
+                style={{
+                  background: assessment.employeePrefilledName ? '#111827' : '#1a1f2e',
+                  border: assessment.employeePrefilledName ? '1px solid rgba(52,211,153,0.3)' : '1px solid rgba(255,255,255,0.12)',
+                  cursor: assessment.employeePrefilledName ? 'default' : 'text',
+                }}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !assessment.employeePrefilledName) handleStart(); }}
               />
             </div>
             <div>

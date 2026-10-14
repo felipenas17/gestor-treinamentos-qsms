@@ -14,7 +14,7 @@ export async function GET(
   // Busca o link pelo token_uuid na tabela assessment_links
   const { data: link, error: linkError } = await supabase
     .from('assessment_links')
-    .select('id, assessment_id, expires_at, is_active, max_uses, uses_count')
+    .select('id, assessment_id, expires_at, is_active, max_uses, uses_count, employee_id')
     .eq('token_uuid', token)
     .maybeSingle();
 
@@ -52,6 +52,17 @@ export async function GET(
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
+  // Busca nome do colaborador vinculado ao link (Opção B)
+  let employeePrefilledName: string | null = null;
+  if (link?.employee_id) {
+    const { data: emp } = await supabase
+      .from('employees')
+      .select('name')
+      .eq('id', link.employee_id)
+      .maybeSingle();
+    employeePrefilledName = emp?.name ?? null;
+  }
+
   // Busca file_url do procedimento associado
   let procedureFileUrl: string | null = null;
   if (data.procedure_code) {
@@ -77,6 +88,7 @@ export async function GET(
     procedureCode: data.procedure_code,
     procedureTitle: data.procedure_title || data.title,
     procedureFileUrl,
+    employeePrefilledName,
     questionsCount: questions.length,
     minScorePercent: data.min_score_percent ?? 80,
     durationMinutes: data.duration_minutes ?? 20,

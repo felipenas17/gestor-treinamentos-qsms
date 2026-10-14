@@ -35,12 +35,13 @@ import {
   fetchTrainingRecords,
   fetchSectorChartData,
   fetchAllAssessments,
+  fetchEmployees,
   updateAssessmentStatus,
   saveAssessmentDraft,
   deleteAssessment,
 } from '@/lib/supabase';
 
-import { Procedure, TrainingRecord, Assessment, RespondentStatus } from '@/types';
+import { Employee, Procedure, TrainingRecord, Assessment, RespondentStatus } from '@/types';
 import { CheckCircle2, Loader2 } from 'lucide-react';
 
 export default function GestorTreinamentosApp() {
@@ -54,6 +55,7 @@ export default function GestorTreinamentosApp() {
   const [procedures, setProcedures] = useState<Procedure[]>([]);
   const [records, setRecords] = useState<TrainingRecord[]>([]);
   const [assessments, setAssessments] = useState<Assessment[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedAssessmentForTaker, setSelectedAssessmentForTaker] = useState<Assessment | null>(null);
   const [respondents, setRespondents] = useState<RespondentStatus[]>([]);
 
@@ -113,12 +115,13 @@ export default function GestorTreinamentosApp() {
     const loadAll = async () => {
       setIsLoading(true);
       try {
-        const [dbMetrics, dbProcedures, dbRecords, dbSector, dbAssessmentList] = await Promise.all([
+        const [dbMetrics, dbProcedures, dbRecords, dbSector, dbAssessmentList, dbEmployees] = await Promise.all([
           fetchDashboardMetrics(),
           fetchProcedures(),
           fetchTrainingRecords(),
           fetchSectorChartData(),
           fetchAllAssessments(),
+          fetchEmployees(),
         ]);
 
         if (dbMetrics) setMetrics(dbMetrics);
@@ -176,6 +179,20 @@ export default function GestorTreinamentosApp() {
               avgDurationMinutes: 0,
             };
           }));
+        }
+        if (dbEmployees) {
+          setEmployees(dbEmployees.map((e: any) => ({
+            id: e.id,
+            name: e.name,
+            role: e.role || '—',
+            sector: e.sector || 'Operacional',
+            avatarUrl: e.avatar_url || '/images/avatar_engineer.svg',
+            admissionDate: e.admission_date ? new Date(e.admission_date).toLocaleDateString('pt-BR') : '—',
+            cpfMasked: e.cpf ? `***.***.${e.cpf.slice(-6, -2)}-${e.cpf.slice(-2)}` : '—',
+            email: e.email || '',
+            phone: e.phone || undefined,
+            status: e.status || 'Ativo',
+          })));
         }
       } catch (err) {
         console.error('Erro ao carregar dados do Supabase:', err);
@@ -338,6 +355,25 @@ export default function GestorTreinamentosApp() {
       showToast('Rascunho descartado. Você pode gerar novamente.');
     } else {
       showToast('Erro ao descartar avaliação.', 'error');
+    }
+  };
+
+  const handleGenerateEmployeeLink = async (assessmentId: string, employeeId: string): Promise<string | null> => {
+    try {
+      const res = await fetch('/api/assessments/generate-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assessmentId, employeeId }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.tokenUuid) {
+        showToast('Erro ao gerar link para o colaborador.', 'error');
+        return null;
+      }
+      return data.tokenUuid as string;
+    } catch {
+      showToast('Erro ao gerar link.', 'error');
+      return null;
     }
   };
 
@@ -512,6 +548,7 @@ export default function GestorTreinamentosApp() {
               procedures={procedures}
               assessments={assessments}
               records={records}
+              employees={employees}
               onApproveAssessment={handleApproveAssessment}
               onArchiveAssessment={handleArchiveAssessment}
               onDeleteAssessment={handleDeleteAssessment}
@@ -520,6 +557,7 @@ export default function GestorTreinamentosApp() {
                 setIsAssessmentTakerOpen(true);
               }}
               onGenerateAssessment={handleGenerateAssessmentForProcedure}
+              onGenerateEmployeeLink={handleGenerateEmployeeLink}
             />
           )}
           {currentTab === 'colaboradores' && <EmployeesScreen />}
