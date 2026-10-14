@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-
-const GEMINI_API_URL =
-  "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
+import { GoogleGenAI } from "@google/genai";
 
 /** Strip markdown code fences Gemini sometimes wraps around JSON */
 function extractJSON(raw: string): string {
@@ -225,11 +223,14 @@ function mockQuestions(promptText: string, procedureCode: string, procedureName:
 
 export async function POST(req: NextRequest) {
   try {
-    const { promptText, procedureCode, procedureName } = await req.json();
+    const { promptText, procedureCode, procedureName, fileUrl } = await req.json();
 
     if (!promptText || typeof promptText !== "string") {
       return NextResponse.json({ error: "Texto base é obrigatório" }, { status: 400 });
     }
+
+    const code = procedureCode || "GERAL";
+    const name = procedureName || procedureCode || "Geral";
 
     const apiKey = process.env.GEMINI_API_KEY;
 
@@ -237,56 +238,72 @@ export async function POST(req: NextRequest) {
     if (!apiKey) {
       console.log("[generate-questions] GEMINI_API_KEY não configurada, usando questões padrão");
       return NextResponse.json({
-        questions: mockQuestions(promptText, procedureCode || "GERAL", procedureName || procedureCode || "Geral"),
+        questions: mockQuestions(promptText, code, name),
         source: "mock",
         geminiError: "GEMINI_API_KEY não configurada — configure a chave em Settings > Environment Variables no Vercel",
       });
     }
 
-    // ── Chamada REST direta à Gemini API ─────────────────────────────────────
-    const body = {
-      system_instruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
-      contents: [{ role: "user", parts: [{ text: buildPrompt(promptText, procedureCode, procedureName) }] }],
-      generationConfig: {
-        temperature: 0.5,
-        responseMimeType: "application/json",
-      },
-    };
+    const ai = new GoogleGenAI({ apiKey });
 
+    // ── Monta as partes do prompt (texto + PDF se disponível) ─────────────
+    type Part = { text: string } | { inlineData: { mimeType: string; data: string } };
+    const parts: Part[] = [];
+    let usingPdf = false;
+
+    if (fileUrl && typeof fileUrl === "string") {
+      try {
+        const fileRes = await fetch(fileUrl, {
+          signal: AbortSignal.timeout(20_000),
+        });
+        if (!fileRes.ok) throw new Error(`HTTP ${fileRes.status} ao buscar ${fileUrl}`);
+        const buffer = await fileRes.arrayBuffer();
+        const base64 = Buffer.from(buffer).toString("base64");
+        const ct = fileRes.headers.get("content-type") || "application/pdf";
+        const mimeType = ct.split(";")[0].trim();
+        parts.push({ inlineData: { mimeType, data: base64 } });
+        usingPdf = true;
+        console.log(`[generate-questions] PDF carregado: ${mimeType} (${buffer.byteLength} bytes)`);
+      } catch (fetchErr) {
+        console.warn("[generate-questions] Falha ao baixar documento, prosseguindo só com texto:", fetchErr);
+      }
+    }
+
+    parts.push({ text: buildPrompt(promptText, code, name) });
+
+    // ── Chamada ao Gemini via SDK ─────────────────────────────────────────
     let rawText: string | undefined;
     let geminiError: string | undefined;
 
     try {
-      const geminiRes = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+      const result = await ai.models.generateContent({
+        model: "gemini-2.0-flash",
+        contents: [{ role: "user", parts }],
+        config: {
+          systemInstruction: SYSTEM_INSTRUCTION,
+          temperature: 0.5,
+          responseMimeType: "application/json",
+        },
       });
 
-      if (!geminiRes.ok) {
-        const errText = await geminiRes.text();
-        geminiError = `HTTP ${geminiRes.status}: ${errText.slice(0, 300)}`;
-        console.error("[generate-questions] Gemini API error:", geminiError);
-      } else {
-        const geminiData = await geminiRes.json();
-        rawText = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text;
+      rawText = result.text ?? undefined;
 
-        if (!rawText) {
-          const finishReason = geminiData?.candidates?.[0]?.finishReason;
-          geminiError = `Resposta vazia (finishReason: ${finishReason ?? "unknown"})`;
-          console.error("[generate-questions]", geminiError);
-        }
+      if (!rawText) {
+        geminiError = "Resposta vazia do Gemini";
+        console.error("[generate-questions]", geminiError);
+      } else {
+        console.log(`[generate-questions] Resposta recebida (${rawText.length} chars, pdf=${usingPdf})`);
       }
-    } catch (fetchErr: unknown) {
-      geminiError = fetchErr instanceof Error ? fetchErr.message : String(fetchErr);
-      console.error("[generate-questions] fetch error:", geminiError);
+    } catch (sdkErr: unknown) {
+      geminiError = sdkErr instanceof Error ? sdkErr.message : String(sdkErr);
+      console.error("[generate-questions] SDK error:", geminiError);
     }
 
     // ── Fallback para mock se Gemini falhou ──────────────────────────────────
     if (geminiError || !rawText) {
-      console.warn("[generate-questions] Usando mock como fallback. Motivo:", geminiError);
+      console.warn("[generate-questions] Usando questões padrão. Motivo:", geminiError);
       return NextResponse.json({
-        questions: mockQuestions(promptText, procedureCode || "GERAL", procedureName || procedureCode || "Geral"),
+        questions: mockQuestions(promptText, code, name),
         source: "mock",
         geminiError,
       });
@@ -299,7 +316,7 @@ export async function POST(req: NextRequest) {
     } catch {
       console.error("[generate-questions] JSON parse error. raw:", rawText.slice(0, 400));
       return NextResponse.json({
-        questions: mockQuestions(promptText, procedureCode || "GERAL", procedureName || procedureCode || "Geral"),
+        questions: mockQuestions(promptText, code, name),
         source: "mock",
         geminiError: "JSON parse error",
       });
@@ -307,20 +324,20 @@ export async function POST(req: NextRequest) {
 
     if (!Array.isArray(parsed?.questions) || parsed.questions.length === 0) {
       return NextResponse.json({
-        questions: mockQuestions(promptText, procedureCode || "GERAL", procedureName || procedureCode || "Geral"),
+        questions: mockQuestions(promptText, code, name),
         source: "mock",
         geminiError: "Array de questões vazio",
       });
     }
 
-    // Força shuffle nas respostas do Gemini — garante aleatoriedade mesmo que o modelo ignore a instrução
+    // Força shuffle nas respostas — garante aleatoriedade mesmo que o modelo ignore a instrução
     const geminiPositions = makeShuffledPositions(parsed.questions.length);
     const shuffledQuestions = (parsed.questions as any[]).map((q, i) =>
       typeof q?.correctOptionIndex === "number"
         ? shuffleCorrectAnswer(q, geminiPositions[i])
         : q
     );
-    return NextResponse.json({ questions: shuffledQuestions, source: "gemini" });
+    return NextResponse.json({ questions: shuffledQuestions, source: "gemini", usingPdf });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[generate-questions] Erro inesperado:", msg);

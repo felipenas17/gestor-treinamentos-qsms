@@ -386,6 +386,7 @@ export default function GestorTreinamentosApp() {
           ].filter(Boolean).join('\n'),
           procedureCode: proc.code,
           procedureName: proc.name,
+          fileUrl: proc.fileUrl ?? null,
         }),
       });
       const qData = await res.json();
