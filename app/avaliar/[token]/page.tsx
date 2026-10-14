@@ -454,7 +454,7 @@ export default function ExamPage() {
           <div className="rounded-xl p-4 mb-5" style={{ background: 'rgba(234,179,8,0.08)', border: '1px solid rgba(234,179,8,0.2)' }}>
             <p className="text-yellow-400 text-xs font-medium mb-1">⚠ Atenção</p>
             <p className="text-white/60 text-xs">
-              Ao clicar em "Li e entendi", você confirma que leu e compreendeu o procedimento e está pronto para a avaliação.
+              Ao clicar em &ldquo;Li e entendi&rdquo;, você confirma que leu e compreendeu o procedimento e está pronto para a avaliação.
             </p>
           </div>
 
