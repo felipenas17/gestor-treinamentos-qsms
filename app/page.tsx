@@ -39,6 +39,7 @@ import {
   updateAssessmentStatus,
   saveAssessmentDraft,
   deleteAssessment,
+  autoGenerateMatrixForProcedure,
 } from '@/lib/supabase';
 
 import { Employee, Procedure, TrainingRecord, Assessment, RespondentStatus } from '@/types';
@@ -326,7 +327,45 @@ export default function GestorTreinamentosApp() {
     const ok = await updateAssessmentStatus(id, 'Ativa');
     if (ok) {
       setAssessments((prev) => prev.map((a) => a.id === id ? { ...a, status: 'Ativa' } : a));
-      showToast('Avaliação aprovada e ativada com sucesso!');
+      showToast('Avaliação aprovada! Vinculando aos colaboradores dos setores...');
+
+      // Busca a avaliação aprovada para encontrar o procedimento e seus setores
+      const assessment = assessments.find((a) => a.id === id);
+      if (assessment) {
+        const proc = procedures.find((p) => p.code === assessment.procedureCode);
+        if (proc) {
+          const sectors = proc.sectors?.length ? proc.sectors : [proc.sector];
+          const { count } = await autoGenerateMatrixForProcedure(proc.id, sectors);
+          if (count > 0) {
+            // Recarrega os registros da matriz para refletir os novos pendentes
+            const updated = await fetchTrainingRecords();
+            if (updated) {
+              setRecords(updated.map((r: any) => ({
+                id: r.id,
+                employeeId: r.employee_id,
+                employeeName: r.employees?.name || '—',
+                employeeRole: r.employees?.role || '—',
+                employeeAvatar: r.employees?.avatar_url || '/images/avatar_engineer.svg',
+                sector: r.employees?.sector || '—',
+                procedureCode: r.procedures?.code || '—',
+                procedureRevision: r.procedures?.revision || undefined,
+                procedureName: r.procedures?.name || '—',
+                completionDate: r.completion_date ? new Date(r.completion_date).toLocaleDateString('pt-BR') : '—',
+                validityDate: r.validity_date ? new Date(r.validity_date).toLocaleDateString('pt-BR') : '—',
+                daysRemaining: r.days_remaining ?? (r.validity_date ? Math.floor((new Date(r.validity_date).getTime() - Date.now()) / 86400000) : 0),
+                status: r.status || 'Pendente',
+                complianceRate: r.compliance_rate ?? 0,
+                instructor: r.instructor,
+                certificateHash: r.certificate_hash || undefined,
+                hours: r.procedures?.hours || 8,
+              })));
+            }
+            showToast(`✅ Avaliação ativa! ${count} colaborador(es) de "${sectors.join(', ')}" vinculado(s) automaticamente.`);
+          } else {
+            showToast('Avaliação ativa! Todos os colaboradores do setor já estão na matriz.');
+          }
+        }
+      }
     } else {
       showToast('Erro ao aprovar avaliação.', 'error');
     }

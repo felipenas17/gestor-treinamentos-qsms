@@ -354,3 +354,60 @@ export async function deleteAssessment(id: string) {
   if (error) { console.error('deleteAssessment:', error); return false; }
   return true;
 }
+
+// ─── Auto-Matriz: ao ativar prova, cria registros pendentes para colaboradores ─
+// Inverso de autoGenerateMatrixForEmployee: dado um procedimento + setores,
+// garante que todos os colaboradores desses setores tenham um registro na trainings.
+export async function autoGenerateMatrixForProcedure(
+  procedureId: string,
+  sectors: string[]
+): Promise<{ count: number }> {
+  if (!supabase || !procedureId || sectors.length === 0) return { count: 0 };
+
+  // 1. Busca todos os colaboradores dos setores afetados
+  const { data: empData, error: empError } = await supabase
+    .from('employees')
+    .select('id')
+    .in('sector', sectors);
+
+  if (empError || !empData || empData.length === 0) {
+    console.warn('autoGenerateMatrixForProcedure: sem colaboradores nos setores', sectors, empError);
+    return { count: 0 };
+  }
+
+  const employeeIds = empData.map((e: any) => e.id as string);
+
+  // 2. Verifica quais já têm registro para este procedimento (evita duplicatas)
+  const { data: existing } = await supabase
+    .from('trainings')
+    .select('employee_id')
+    .eq('procedure_id', procedureId)
+    .in('employee_id', employeeIds);
+
+  const existingSet = new Set((existing || []).map((t: any) => t.employee_id as string));
+  const missing = employeeIds.filter((eid) => !existingSet.has(eid));
+
+  if (missing.length === 0) return { count: 0 };
+
+  // 3. Insere registros pendentes
+  const records = missing.map((employee_id) => ({
+    employee_id,
+    procedure_id: procedureId,
+    status: 'Pendente',
+    completion_date: null,
+    validity_date: null,
+    compliance_rate: 0,
+  }));
+
+  const { data: inserted, error: insertError } = await supabase
+    .from('trainings')
+    .insert(records)
+    .select('id');
+
+  if (insertError) {
+    console.error('autoGenerateMatrixForProcedure insert error:', insertError);
+    return { count: 0 };
+  }
+
+  return { count: inserted?.length ?? 0 };
+}
