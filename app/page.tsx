@@ -266,15 +266,6 @@ export default function GestorTreinamentosApp() {
   }, [reloadLiveData]);
 
   // ─── Handlers ────────────────────────────────────────────────────────────
-  const handleScheduleExam = (rec: TrainingRecord) => {
-    setIsAssessmentTakerOpen(true);
-    showToast(`Avaliação aberta para ${rec.employeeName} — token UUID gerado.`);
-  };
-
-  const handleNotifyEmployee = (rec: TrainingRecord) => {
-    setNotifyRecord(rec);
-  };
-
   const handleImportCert = (rec: TrainingRecord) => {
     setRecords((prev) =>
       prev.map((r) =>
@@ -516,8 +507,6 @@ export default function GestorTreinamentosApp() {
               projectionData={projectionData}
               criticalTrainings={records.filter((r) => r.status !== 'Certificado' || r.daysRemaining <= 90)}
               onOpenNewPlanModal={() => setIsNewPlanModalOpen(true)}
-              onScheduleExam={handleScheduleExam}
-              onNotifyEmployee={handleNotifyEmployee}
               onImportCert={handleImportCert}
             />
           )}
@@ -554,8 +543,6 @@ export default function GestorTreinamentosApp() {
             <MatrixScreen
               records={records}
               onRegisterEmployee={() => setCurrentTab('colaboradores')}
-              onScheduleExam={handleScheduleExam}
-              onNotifyEmployee={handleNotifyEmployee}
             />
           )}
         </main>

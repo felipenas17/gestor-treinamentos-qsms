@@ -14,15 +14,11 @@ import { TrainingRecord, ComplianceStatus, Sector } from '@/types';
 interface MatrixScreenProps {
   records: TrainingRecord[];
   onRegisterEmployee: () => void;
-  onScheduleExam: (record: TrainingRecord) => void;
-  onNotifyEmployee: (record: TrainingRecord) => void;
 }
 
 export function MatrixScreen({
   records,
   onRegisterEmployee,
-  onScheduleExam,
-  onNotifyEmployee,
 }: MatrixScreenProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSector, setSelectedSector] = useState<string>('Todos');
@@ -333,23 +329,6 @@ export function MatrixScreen({
                       </span>
                     </td>
 
-                    {/* Ação: Agendar Prova | Notificar */}
-                    <td className="py-3 px-4 text-right whitespace-nowrap">
-                      <div className="inline-flex items-center gap-1.5 justify-end">
-                        <button
-                          onClick={() => onScheduleExam(rec)}
-                          className="px-2.5 py-1 text-[11px] font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded border border-blue-200 transition-colors"
-                        >
-                          Agendar Prova
-                        </button>
-                        <button
-                          onClick={() => onNotifyEmployee(rec)}
-                          className="px-2.5 py-1 text-[11px] font-semibold text-amber-800 bg-amber-50 hover:bg-amber-100 rounded border border-amber-200 transition-colors"
-                        >
-                          Notificar
-                        </button>
-                      </div>
-                    </td>
                   </tr>
                 );
               })}

@@ -32,8 +32,6 @@ interface DashboardScreenProps {
   projectionData: ChartProjectionMetric[];
   criticalTrainings: TrainingRecord[];
   onOpenNewPlanModal: () => void;
-  onScheduleExam: (record: TrainingRecord) => void;
-  onNotifyEmployee: (record: TrainingRecord) => void;
   onImportCert: (record: TrainingRecord) => void;
 }
 
@@ -43,8 +41,6 @@ export function DashboardScreen({
   projectionData,
   criticalTrainings,
   onOpenNewPlanModal,
-  onScheduleExam,
-  onNotifyEmployee,
   onImportCert,
 }: DashboardScreenProps) {
   // AI assistant chat bubble state
@@ -441,22 +437,10 @@ export function DashboardScreen({
                     <td className="py-3 px-4 text-right">
                       <div className="inline-flex items-center gap-1.5 justify-end">
                         <button
-                          onClick={() => onScheduleExam(rec)}
-                          className="px-2 py-1 text-[11px] font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded border border-blue-200 transition-colors whitespace-nowrap"
-                        >
-                          Agendar Prova
-                        </button>
-                        <button
                           onClick={() => onImportCert(rec)}
                           className="px-2 py-1 text-[11px] font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded border border-slate-300 transition-colors whitespace-nowrap"
                         >
                           Importar Cert.
-                        </button>
-                        <button
-                          onClick={() => onNotifyEmployee(rec)}
-                          className="px-2 py-1 text-[11px] font-medium text-amber-800 bg-amber-50 hover:bg-amber-100 rounded border border-amber-200 transition-colors whitespace-nowrap"
-                        >
-                          Notificar
                         </button>
                       </div>
                     </td>
