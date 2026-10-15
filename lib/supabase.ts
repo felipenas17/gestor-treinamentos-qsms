@@ -438,3 +438,64 @@ export async function autoGenerateMatrixForProcedure(
 
   return { count: inserted?.length ?? 0 };
 }
+
+// ─── Normative Certifications ────────────────────────────────────────────────
+
+export interface NormativeCertRow {
+  id: string;
+  employee_name: string;
+  employee_cpf: string | null;
+  sector: string;
+  training_name: string;
+  training_code: string | null;
+  completion_date: string;
+  validity_date: string;
+  days_remaining: number;
+  hours: number;
+  provider: string | null;
+  status: string;
+  certificate_hash: string | null;
+  certificate_file_url: string | null;
+  created_at: string;
+}
+
+export async function fetchNormativeCerts(): Promise<NormativeCertRow[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from('normative_certs')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) { console.error('fetchNormativeCerts:', error); return []; }
+  return (data ?? []) as NormativeCertRow[];
+}
+
+export async function saveNormativeCert(
+  cert: Omit<NormativeCertRow, 'created_at'>,
+  file?: File,
+): Promise<string | null> {
+  if (!supabase) return null;
+
+  let fileUrl = cert.certificate_file_url;
+
+  // Upload certificate file to Supabase Storage if provided
+  if (file) {
+    const ext = file.name.split('.').pop() || 'pdf';
+    const path = `certs/${cert.id}.${ext}`;
+    const { error: uploadError } = await supabase.storage
+      .from('normative-certificates')
+      .upload(path, file, { upsert: true });
+    if (!uploadError) {
+      const { data: urlData } = supabase.storage
+        .from('normative-certificates')
+        .getPublicUrl(path);
+      fileUrl = urlData?.publicUrl ?? fileUrl;
+    } else {
+      console.warn('saveNormativeCert upload warning:', uploadError.message);
+    }
+  }
+
+  const row: Omit<NormativeCertRow, 'created_at'> = { ...cert, certificate_file_url: fileUrl };
+  const { error } = await supabase.from('normative_certs').upsert(row);
+  if (error) { console.error('saveNormativeCert:', error); return null; }
+  return fileUrl;
+}

@@ -41,6 +41,9 @@ import {
   deleteAssessment,
   autoGenerateMatrixForProcedure,
   syncMatrixForAllActiveProcedures,
+  fetchNormativeCerts,
+  saveNormativeCert,
+  type NormativeCertRow,
 } from '@/lib/supabase';
 
 import { Employee, Procedure, TrainingRecord, Assessment, RespondentStatus } from '@/types';
@@ -62,7 +65,7 @@ export default function GestorTreinamentosApp() {
   const [selectedAssessmentForTaker, setSelectedAssessmentForTaker] = useState<Assessment | null>(null);
   const [respondents, setRespondents] = useState<RespondentStatus[]>([]);
 
-  // Normative certifications (stored locally + persisted in localStorage)
+  // Normative certifications (Supabase-persisted; localStorage as offline fallback)
   const [normativeCerts, setNormativeCerts] = useState<CertificateRecord[]>(() => {
     if (typeof window === 'undefined') return [];
     try {
@@ -71,13 +74,60 @@ export default function GestorTreinamentosApp() {
     } catch { return []; }
   });
 
-  const handleSaveNormativeCert = useCallback((cert: CertificateRecord) => {
+  // Helper: map DB row → CertificateRecord
+  const mapNormativeRow = useCallback((row: NormativeCertRow): CertificateRecord => ({
+    id: row.id,
+    employeeName: row.employee_name,
+    employeeCpf: row.employee_cpf ?? '',
+    sector: row.sector,
+    trainingName: row.training_name,
+    trainingCode: row.training_code ?? '',
+    completionDate: row.completion_date,
+    validityDate: row.validity_date,
+    daysRemaining: row.days_remaining,
+    hours: row.hours,
+    type: 'normativo',
+    provider: row.provider ?? undefined,
+    status: row.status as CertificateRecord['status'],
+    certificateHash: row.certificate_hash ?? `CERT-${row.id}`,
+    certificateFileUrl: row.certificate_file_url ?? undefined,
+  }), []);
+
+  const handleSaveNormativeCert = useCallback(async (cert: CertificateRecord, file?: File) => {
+    // Optimistic local update
     setNormativeCerts((prev) => {
       const next = [cert, ...prev];
       try { localStorage.setItem('tiger-normative-certs', JSON.stringify(next)); } catch { /* noop */ }
       return next;
     });
-  }, []);
+    // Persist to Supabase
+    if (isSupabaseConfigured) {
+      const permanentUrl = await saveNormativeCert({
+        id: cert.id,
+        employee_name: cert.employeeName,
+        employee_cpf: cert.employeeCpf ?? null,
+        sector: cert.sector,
+        training_name: cert.trainingName,
+        training_code: cert.trainingCode ?? null,
+        completion_date: cert.completionDate,
+        validity_date: cert.validityDate,
+        days_remaining: cert.daysRemaining,
+        hours: cert.hours,
+        provider: cert.provider ?? null,
+        status: cert.status,
+        certificate_hash: cert.certificateHash,
+        certificate_file_url: cert.certificateFileUrl ?? null,
+      }, file);
+      // If file was uploaded, update the cert with the permanent Supabase Storage URL
+      if (permanentUrl && permanentUrl !== cert.certificateFileUrl) {
+        setNormativeCerts((prev) => {
+          const next = prev.map((c) => c.id === cert.id ? { ...c, certificateFileUrl: permanentUrl } : c);
+          try { localStorage.setItem('tiger-normative-certs', JSON.stringify(next)); } catch { /* noop */ }
+          return next;
+        });
+      }
+    }
+  }, [mapNormativeRow]);
 
   // Modal states
   const [isImagesModalOpen, setIsImagesModalOpen] = useState(false);
@@ -255,6 +305,15 @@ export default function GestorTreinamentosApp() {
             status: e.status || 'Ativo',
           })));
         }
+
+        // Load normative certs from Supabase (primary source of truth)
+        const dbNormative = await fetchNormativeCerts();
+        if (dbNormative.length > 0) {
+          const mapped = dbNormative.map(mapNormativeRow);
+          setNormativeCerts(mapped);
+          // Keep localStorage in sync as offline fallback
+          try { localStorage.setItem('tiger-normative-certs', JSON.stringify(mapped)); } catch { /* noop */ }
+        }
       } catch (err) {
         console.error('Erro ao carregar dados do Supabase:', err);
         showToast('Usando dados locais — verifique conexão com Supabase.', 'error');
@@ -264,7 +323,7 @@ export default function GestorTreinamentosApp() {
     };
 
     loadAll();
-  }, [showToast, mapProcedures]);
+  }, [showToast, mapProcedures, mapNormativeRow]);
 
   // ─── Realtime: atualiza trainings/metrics quando qualquer linha mudar ────
   const reloadLiveData = useCallback(async () => {

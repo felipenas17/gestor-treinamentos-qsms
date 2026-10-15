@@ -103,7 +103,7 @@ const SECTORS = [
   'Tecnologia','Meio Ambiente','RH','Segurança Patrimonial',
 ] as const;
 
-function RegisterModal({ onClose, onSave }: { onClose:()=>void; onSave:(c:CertificateRecord)=>void }) {
+function RegisterModal({ onClose, onSave }: { onClose:()=>void; onSave:(c:CertificateRecord, file?:File)=>void }) {
   const [employeeName,setEmployeeName]=useState('');
   const [employeeCpf,setEmployeeCpf]=useState('');
   const [sector,setSector]=useState<string>('QSMS');
@@ -140,7 +140,7 @@ function RegisterModal({ onClose, onSave }: { onClose:()=>void; onSave:(c:Certif
       status:days<0?'Vencido':days<=60?'Reciclar':'Certificado',
       certificateHash:`CERT-${new Date().getFullYear()}-BR-${Math.floor(1000+Math.random()*9000)}`,
       certificateFileUrl:fileUrl,
-    });
+    }, certFile ?? undefined);
     onClose();
   };
 
@@ -237,7 +237,7 @@ export function CertificatesScreen({
 }: {
   records?: TrainingRecord[];
   normativeCerts?: CertificateRecord[];
-  onSaveNormativeCert?: (c: CertificateRecord) => void;
+  onSaveNormativeCert?: (c: CertificateRecord, file?: File) => void;
 }) {
   const [tab,setTab]=useState<'internos'|'normativos'>('internos');
   const [search,setSearch]=useState('');
@@ -382,7 +382,7 @@ export function CertificatesScreen({
       </div>
       {preview&&<CertificatePreview cert={preview} onClose={()=>setPreview(null)}/>}
       {signTarget&&<SignatureModal employeeName={signTarget.employeeName} trainingName={signTarget.trainingName} certificateHash={signTarget.certificateHash} onConfirm={(sig)=>{setSignatures(p=>({...p,[signTarget.id]:sig}));setSignTarget(null);}} onClose={()=>setSignTarget(null)}/>}
-      {showReg&&<RegisterModal onClose={()=>setShowReg(false)} onSave={c=>{ setCerts(p=>[c,...p]); onSaveNormativeCert?.(c); }}/>}
+      {showReg&&<RegisterModal onClose={()=>setShowReg(false)} onSave={(c,file)=>{ setCerts(p=>[c,...p]); onSaveNormativeCert?.(c,file); }}/>}
     </div>
   );
 }
