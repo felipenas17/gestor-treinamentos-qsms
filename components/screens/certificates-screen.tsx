@@ -369,12 +369,16 @@ export function CertificatesScreen({
                     <button onClick={()=>setSignTarget(c)} title="Assinar" className="p-1.5 rounded-lg border border-slate-200 hover:bg-emerald-50 hover:border-emerald-300 text-slate-500 hover:text-emerald-600"><Check className="w-3.5 h-3.5"/></button>
                     <button onClick={()=>setPreview(c)} className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-500"><Printer className="w-3.5 h-3.5"/></button>
                   </>}
-                  {c.type==='normativo'&&c.certificateFileUrl&&(
-                    <a href={c.certificateFileUrl} target="_blank" rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-teal-50 text-teal-700 border border-teal-200 hover:bg-teal-100 transition-colors">
-                      <ExternalLink className="w-3 h-3"/>Ver certificado
-                    </a>
-                  )}
+                  {c.type==='normativo'&&<>
+                    <button onClick={()=>setPreview(c)} title="Visualizar detalhes" className="p-1.5 rounded-lg border border-slate-200 hover:bg-blue-50 hover:border-blue-300 text-slate-500 hover:text-blue-600"><Eye className="w-3.5 h-3.5"/></button>
+                    <button onClick={()=>setPreview(c)} title="Imprimir" className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-500"><Printer className="w-3.5 h-3.5"/></button>
+                    {c.certificateFileUrl&&(
+                      <a href={c.certificateFileUrl} target="_blank" rel="noopener noreferrer" title="Ver arquivo"
+                        className="p-1.5 rounded-lg border border-teal-200 bg-teal-50 hover:bg-teal-100 text-teal-600">
+                        <ExternalLink className="w-3.5 h-3.5"/>
+                      </a>
+                    )}
+                  </>}
                 </div></td>
               </tr>
             ))}
