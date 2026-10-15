@@ -195,6 +195,27 @@ export default function GestorTreinamentosApp() {
     }
   }, [showToast, mapNormativeRow]);
 
+  const handleAttachNormativeCert = useCallback(async (id: string, file: File) => {
+    if (!isSupabaseConfigured) { showToast('Supabase não configurado', 'error'); return; }
+    const { createClient } = await import('@supabase/supabase-js');
+    const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+    const ext = file.name.split('.').pop() || 'pdf';
+    const path = `certs/${id}.${ext}`;
+    const { error: upErr } = await sb.storage.from('normative-certificates').upload(path, file, { upsert: true });
+    if (upErr) { showToast('Erro ao enviar arquivo: ' + upErr.message, 'error'); return; }
+    const { data: urlData } = sb.storage.from('normative-certificates').getPublicUrl(path);
+    const fileUrl = urlData?.publicUrl;
+    if (!fileUrl) { showToast('Erro ao obter URL do arquivo', 'error'); return; }
+    const { error: updErr } = await sb.from('normative_certs').update({ certificate_file_url: fileUrl }).eq('id', id);
+    if (updErr) { showToast('Erro ao atualizar registro: ' + updErr.message, 'error'); return; }
+    setNormativeCerts((prev) => {
+      const next = prev.map((c) => c.id === id ? { ...c, certificateFileUrl: fileUrl } : c);
+      try { localStorage.setItem('tiger-normative-certs', JSON.stringify(next)); } catch { /* noop */ }
+      return next;
+    });
+    showToast('Arquivo anexado com sucesso ✓', 'success');
+  }, [showToast]);
+
   // ─── Carrega dados reais do Supabase (se configurado) ────────────────────
   const mapProcedures = useCallback((raw: any[]) => {
     return raw.map((p: any) => {
@@ -767,6 +788,7 @@ export default function GestorTreinamentosApp() {
               records={records}
               normativeCerts={normativeCerts}
               onSaveNormativeCert={handleSaveNormativeCert}
+              onAttachNormativeCert={handleAttachNormativeCert}
             />
           )}
           {currentTab === 'matriz' && (

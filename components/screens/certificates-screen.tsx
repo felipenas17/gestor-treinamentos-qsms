@@ -235,12 +235,16 @@ export function CertificatesScreen({
   records = [],
   normativeCerts: initialNormativeCerts,
   onSaveNormativeCert,
+  onAttachNormativeCert,
 }: {
   records?: TrainingRecord[];
   normativeCerts?: CertificateRecord[];
   onSaveNormativeCert?: (c: CertificateRecord, file?: File) => void;
+  onAttachNormativeCert?: (id: string, file: File) => void;
 }) {
   const [tab,setTab]=useState<'internos'|'normativos'>('internos');
+  const attachInputRef = useRef<HTMLInputElement|null>(null);
+  const [attachTargetId, setAttachTargetId] = useState<string|null>(null);
   const [search,setSearch]=useState('');
   const [preview,setPreview]=useState<CertificateRecord|null>(null);
   const [showReg,setShowReg]=useState(false);
@@ -372,12 +376,11 @@ export function CertificatesScreen({
                   {c.type==='normativo'&&<>
                     {c.certificateFileUrl
                       ? <a href={c.certificateFileUrl} target="_blank" rel="noopener noreferrer" title="Ver PDF do certificado" className="p-1.5 rounded-lg border border-slate-200 hover:bg-blue-50 hover:border-blue-300 text-slate-500 hover:text-blue-600"><Eye className="w-3.5 h-3.5"/></a>
-                      : <button disabled title="Nenhum arquivo anexado" className="p-1.5 rounded-lg border border-slate-200 text-slate-300 cursor-not-allowed"><Eye className="w-3.5 h-3.5"/></button>
+                      : <button onClick={()=>{setAttachTargetId(c.id);attachInputRef.current?.click();}} title="Anexar PDF" className="p-1.5 rounded-lg border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-600"><Paperclip className="w-3.5 h-3.5"/></button>
                     }
-                    {c.certificateFileUrl
-                      ? <a href={c.certificateFileUrl} target="_blank" rel="noopener noreferrer" title="Imprimir PDF" className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-500"><Printer className="w-3.5 h-3.5"/></a>
-                      : <button disabled title="Nenhum arquivo para imprimir" className="p-1.5 rounded-lg border border-slate-200 text-slate-300 cursor-not-allowed"><Printer className="w-3.5 h-3.5"/></button>
-                    }
+                    {c.certificateFileUrl&&(
+                      <a href={c.certificateFileUrl} target="_blank" rel="noopener noreferrer" title="Imprimir PDF" className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-500"><Printer className="w-3.5 h-3.5"/></a>
+                    )}
                     {c.certificateFileUrl&&(
                       <a href={c.certificateFileUrl} target="_blank" rel="noopener noreferrer" title="Ver arquivo"
                         className="p-1.5 rounded-lg border border-teal-200 bg-teal-50 hover:bg-teal-100 text-teal-600">
@@ -394,6 +397,11 @@ export function CertificatesScreen({
       {preview&&<CertificatePreview cert={preview} onClose={()=>setPreview(null)}/>}
       {signTarget&&<SignatureModal employeeName={signTarget.employeeName} trainingName={signTarget.trainingName} certificateHash={signTarget.certificateHash} onConfirm={(sig)=>{setSignatures(p=>({...p,[signTarget.id]:sig}));setSignTarget(null);}} onClose={()=>setSignTarget(null)}/>}
       {showReg&&<RegisterModal onClose={()=>setShowReg(false)} onSave={(c,file)=>{ setCerts(p=>[c,...p]); onSaveNormativeCert?.(c,file); }}/>}
+      <input ref={attachInputRef} type="file" accept=".pdf,image/*" className="hidden" onChange={(e)=>{
+        const file=e.target.files?.[0];
+        if(file&&attachTargetId&&onAttachNormativeCert){onAttachNormativeCert(attachTargetId,file);}
+        e.target.value='';setAttachTargetId(null);
+      }}/>
     </div>
   );
 }
