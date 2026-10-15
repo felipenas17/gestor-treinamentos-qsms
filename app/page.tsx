@@ -796,6 +796,7 @@ export default function GestorTreinamentosApp() {
               records={records}
               assessments={assessments}
               onRegisterEmployee={() => setCurrentTab('colaboradores')}
+              employees={employees}
               onSendLink={handleGenerateEmployeeLink}
               onRegisterTraining={(rec) => {
                 setPrefillTrainingRecord(rec);

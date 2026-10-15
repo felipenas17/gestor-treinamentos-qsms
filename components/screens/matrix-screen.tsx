@@ -13,11 +13,12 @@ import {
   Loader2,
   FilePenLine,
 } from 'lucide-react';
-import { TrainingRecord, ComplianceStatus, Assessment } from '@/types';
+import { TrainingRecord, ComplianceStatus, Assessment, Employee } from '@/types';
 
 interface MatrixScreenProps {
   records: TrainingRecord[];
   assessments: Assessment[];
+  employees?: Employee[];
   onRegisterEmployee: () => void;
   onSendLink: (assessmentId: string, employeeId: string) => Promise<string | null>;
   onRegisterTraining: (rec: TrainingRecord) => void;
@@ -26,6 +27,7 @@ interface MatrixScreenProps {
 export function MatrixScreen({
   records,
   assessments,
+  employees = [],
   onRegisterEmployee,
   onSendLink,
   onRegisterTraining,
@@ -362,7 +364,10 @@ export function MatrixScreen({
                               const msg = encodeURIComponent(
                                 `Olá, ${rec.employeeName}! 👷\n\nVocê tem uma avaliação pendente referente ao procedimento *${rec.procedureCode} – ${rec.procedureName}*.\n\nAcesse pelo link abaixo para responder:\n${url}`
                               );
-                              window.open(`https://wa.me/?text=${msg}`, '_blank');
+                              const emp = employees.find(e => e.id === rec.employeeId);
+                              const phone = emp?.phone ? emp.phone.replace(/\D/g, '') : '';
+                              const waUrl = phone ? `https://wa.me/${phone}?text=${msg}` : `https://wa.me/?text=${msg}`;
+                              window.open(waUrl, '_blank');
                               setLinkCopied(rec.id);
                               setTimeout(() => setLinkCopied(null), 2500);
                             }
