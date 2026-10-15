@@ -193,7 +193,7 @@ export default function GestorTreinamentosApp() {
         });
       }
     }
-  }, [showToast, mapNormativeRow]);
+  }, [showToast]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleAttachNormativeCert = useCallback(async (id: string, file: File) => {
     if (!isSupabaseConfigured) { showToast('Supabase não configurado', 'error'); return; }

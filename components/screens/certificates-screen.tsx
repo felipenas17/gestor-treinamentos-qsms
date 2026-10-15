@@ -252,6 +252,7 @@ export function CertificatesScreen({
   const [signatures,setSignatures]=useState<Record<string,string>>({});
   const [certs,setCerts]=useState<CertificateRecord[]>(initialNormativeCerts ?? []); // normativo only
   // Sync when parent updates (e.g. after attach)
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(()=>{ if(initialNormativeCerts) setCerts(initialNormativeCerts); },[initialNormativeCerts]);
   // Map de procedure_code → { cpf, signature } buscado das respostas
   const [responsesMap,setResponsesMap]=useState<Record<string,{cpf:string;signature:string}>>({});
