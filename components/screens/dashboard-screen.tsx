@@ -218,7 +218,7 @@ export function DashboardScreen({
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-sm font-bold text-slate-900">
-                Falhas & Certificação por Setor
+                Certificados & Reciclagem por Setor
               </h3>
               <p className="text-xs text-slate-500">
                 Operacional, Brascabo, RDO, QSMS, Suprimentos, Transbordo
@@ -231,7 +231,7 @@ export function DashboardScreen({
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="w-3 h-3 rounded bg-red-500" />
-                <span className="text-slate-600">Falhas / Reciclagens</span>
+                <span className="text-slate-600">Reciclagens</span>
               </div>
             </div>
           </div>
@@ -248,7 +248,7 @@ export function DashboardScreen({
                     <div className="flex items-center gap-2 font-mono text-[11px] text-slate-500">
                       <span className="text-blue-700 font-semibold">{item.certificados} cert.</span>
                       <span>·</span>
-                      <span className="text-red-600 font-semibold">{item.falhas} falhas</span>
+                      <span className="text-red-600 font-semibold">{item.falhas} reciclagens</span>
                     </div>
                   </div>
                   <div className="h-4 bg-slate-100 rounded-md overflow-hidden flex gap-0.5 p-0.5">

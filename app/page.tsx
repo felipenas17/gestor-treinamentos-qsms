@@ -24,7 +24,6 @@ import { CertificatesScreen } from '@/components/screens/certificates-screen';
 import {
   INITIAL_METRICS,
   SECTOR_CHART_DATA,
-  PROJECTION_CHART_DATA,
 } from '@/lib/mock-data';
 
 import {
@@ -46,7 +45,7 @@ import {
   type NormativeCertRow,
 } from '@/lib/supabase';
 
-import { Employee, Procedure, TrainingRecord, Assessment, RespondentStatus } from '@/types';
+import { Employee, Procedure, TrainingRecord, Assessment, RespondentStatus, ChartProjectionMetric } from '@/types';
 import { CertificateRecord } from '@/components/screens/certificates-screen';
 import { CheckCircle2, Loader2 } from 'lucide-react';
 
@@ -57,7 +56,6 @@ export default function GestorTreinamentosApp() {
   // Core reactive data states (inicia com mock, substitui com Supabase quando disponível)
   const [metrics, setMetrics] = useState(INITIAL_METRICS);
   const [sectorData, setSectorData] = useState(SECTOR_CHART_DATA);
-  const [projectionData, setProjectionData] = useState(PROJECTION_CHART_DATA);
   const [procedures, setProcedures] = useState<Procedure[]>([]);
   const [records, setRecords] = useState<TrainingRecord[]>([]);
   const [assessments, setAssessments] = useState<Assessment[]>([]);
@@ -120,6 +118,50 @@ export default function GestorTreinamentosApp() {
       expiredDocuments: metrics.expiredDocuments + expired,
     };
   }, [metrics, normativeCerts]);
+
+  // ─── Projection chart: compute from real records + normative certs ─────────
+  const projectionData = useMemo<ChartProjectionMetric[]>(() => {
+    const ptMonths = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    const today = new Date();
+
+    // Parse both "DD/MM/YYYY" (TrainingRecord) and "YYYY-MM-DD" (CertificateRecord from DB)
+    function parseDate(s: string): Date | null {
+      if (!s || s === '—') return null;
+      if (/^\d{4}-\d{2}-\d{2}/.test(s)) return new Date(s);
+      const p = s.split('/');
+      if (p.length === 3) return new Date(+p[2], +p[1] - 1, +p[0]);
+      return null;
+    }
+
+    return Array.from({ length: 6 }, (_, i) => {
+      const d = new Date(today.getFullYear(), today.getMonth() + i, 1);
+      const y = d.getFullYear();
+      const m = d.getMonth();
+
+      let vencimentos = 0;
+      let reciclagens = 0;
+
+      for (const rec of records) {
+        const vd = parseDate(rec.validityDate);
+        if (!vd) continue;
+        if (vd.getFullYear() === y && vd.getMonth() === m) {
+          vencimentos++;
+          if (rec.status === 'Reciclar' || rec.status === 'Vencido') reciclagens++;
+        }
+      }
+
+      for (const cert of normativeCerts) {
+        const vd = parseDate(cert.validityDate);
+        if (!vd) continue;
+        if (vd.getFullYear() === y && vd.getMonth() === m) {
+          vencimentos++;
+          if (cert.status === 'Reciclar' || cert.status === 'Vencido') reciclagens++;
+        }
+      }
+
+      return { month: ptMonths[m], reciclagens, vencimentos };
+    });
+  }, [records, normativeCerts]);
 
   // Convert normative certs to TrainingRecord shape for the critical table
   const normativeAsTraining = useMemo<TrainingRecord[]>(() =>
