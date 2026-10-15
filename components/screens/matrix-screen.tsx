@@ -365,7 +365,9 @@ export function MatrixScreen({
                                 `Olá, ${rec.employeeName}! 👷\n\nVocê tem uma avaliação pendente referente ao procedimento *${rec.procedureCode} – ${rec.procedureName}*.\n\nAcesse pelo link abaixo para responder:\n${url}`
                               );
                               const emp = employees.find(e => e.id === rec.employeeId);
-                              const phone = emp?.phone ? emp.phone.replace(/\D/g, '') : '';
+                              const rawPhone = emp?.phone ? emp.phone.replace(/\D/g, '') : '';
+                              // Add Brazil country code (55) if number is local (10-11 digits)
+                              const phone = rawPhone.length >= 10 && rawPhone.length <= 11 ? `55${rawPhone}` : rawPhone;
                               const waUrl = phone ? `https://wa.me/${phone}?text=${msg}` : `https://wa.me/?text=${msg}`;
                               window.open(waUrl, '_blank');
                               setLinkCopied(rec.id);
