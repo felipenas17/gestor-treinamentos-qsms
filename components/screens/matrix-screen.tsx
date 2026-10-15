@@ -8,22 +8,34 @@ import {
   CheckCircle2,
   Clock,
   AlertTriangle,
+  Link2,
+  ClipboardCheck,
+  Loader2,
+  FilePenLine,
 } from 'lucide-react';
-import { TrainingRecord, ComplianceStatus, Sector } from '@/types';
+import { TrainingRecord, ComplianceStatus, Assessment } from '@/types';
 
 interface MatrixScreenProps {
   records: TrainingRecord[];
+  assessments: Assessment[];
   onRegisterEmployee: () => void;
+  onSendLink: (assessmentId: string, employeeId: string) => Promise<string | null>;
+  onRegisterTraining: (rec: TrainingRecord) => void;
 }
 
 export function MatrixScreen({
   records,
+  assessments,
   onRegisterEmployee,
+  onSendLink,
+  onRegisterTraining,
 }: MatrixScreenProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSector, setSelectedSector] = useState<string>('Todos');
   const [selectedRole, setSelectedRole] = useState<string>('Todos');
   const [selectedStatus, setSelectedStatus] = useState<string>('Todos');
+  const [linkGenerating, setLinkGenerating] = useState<string | null>(null); // rec.id
+  const [linkCopied, setLinkCopied] = useState<string | null>(null); // rec.id
 
   // Filter options
   const sectors = useMemo(() => {
@@ -327,6 +339,52 @@ export function MatrixScreen({
                       >
                         {rec.status}
                       </span>
+                    </td>
+
+                    {/* Ação */}
+                    <td className="py-3 px-4 text-right whitespace-nowrap">
+                      {rec.status === 'Pendente' && (
+                        <button
+                          disabled={linkGenerating === rec.id}
+                          onClick={async () => {
+                            const assessment = assessments.find(
+                              (a) => a.procedureCode === rec.procedureCode && a.status === 'Ativa'
+                            );
+                            if (!assessment) {
+                              alert('Nenhuma avaliação ativa para este procedimento.');
+                              return;
+                            }
+                            setLinkGenerating(rec.id);
+                            const token = await onSendLink(assessment.id, rec.employeeId);
+                            setLinkGenerating(null);
+                            if (token) {
+                              const url = `${window.location.origin}/avaliar/${token}`;
+                              await navigator.clipboard.writeText(url);
+                              setLinkCopied(rec.id);
+                              setTimeout(() => setLinkCopied(null), 2500);
+                            }
+                          }}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 disabled:opacity-60 transition-colors"
+                        >
+                          {linkGenerating === rec.id ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : linkCopied === rec.id ? (
+                            <ClipboardCheck className="w-3 h-3 text-emerald-600" />
+                          ) : (
+                            <Link2 className="w-3 h-3" />
+                          )}
+                          {linkCopied === rec.id ? 'Copiado!' : 'Enviar Link'}
+                        </button>
+                      )}
+                      {(rec.status === 'Reciclar' || rec.status === 'Vencido') && (
+                        <button
+                          onClick={() => onRegisterTraining(rec)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors"
+                        >
+                          <FilePenLine className="w-3 h-3" />
+                          Registrar
+                        </button>
+                      )}
                     </td>
 
                   </tr>

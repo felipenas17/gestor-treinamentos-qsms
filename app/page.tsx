@@ -68,6 +68,7 @@ export default function GestorTreinamentosApp() {
   const [isNewProcedureModalOpen, setIsNewProcedureModalOpen] = useState(false);
   const [isAssessmentTakerOpen, setIsAssessmentTakerOpen] = useState(false);
   const [isRegisterTrainingOpen, setIsRegisterTrainingOpen] = useState(false);
+  const [prefillTrainingRecord, setPrefillTrainingRecord] = useState<TrainingRecord | null>(null);
   const [notifyRecord, setNotifyRecord] = useState<TrainingRecord | null>(null);
   const [isImportDocOpen, setIsImportDocOpen] = useState(false);
   const [selectedProcedureDetails, setSelectedProcedureDetails] = useState<Procedure | null>(null);
@@ -640,7 +641,13 @@ export default function GestorTreinamentosApp() {
           {currentTab === 'matriz' && (
             <MatrixScreen
               records={records}
+              assessments={assessments}
               onRegisterEmployee={() => setCurrentTab('colaboradores')}
+              onSendLink={handleGenerateEmployeeLink}
+              onRegisterTraining={(rec) => {
+                setPrefillTrainingRecord(rec);
+                setIsRegisterTrainingOpen(true);
+              }}
             />
           )}
         </main>
@@ -666,7 +673,15 @@ export default function GestorTreinamentosApp() {
         onClose={() => setSelectedExamProcedure(null)}
         onGoToAssessments={() => setCurrentTab('provas')}
       />
-      <RegisterTrainingModal isOpen={isRegisterTrainingOpen} onClose={() => setIsRegisterTrainingOpen(false)} procedures={procedures} onSaveRecord={handleSaveTrainingRecord} />
+      <RegisterTrainingModal
+        key={prefillTrainingRecord?.id ?? 'default'}
+        isOpen={isRegisterTrainingOpen}
+        onClose={() => { setIsRegisterTrainingOpen(false); setPrefillTrainingRecord(null); }}
+        procedures={procedures}
+        onSaveRecord={handleSaveTrainingRecord}
+        initialEmployeeName={prefillTrainingRecord?.employeeName}
+        initialProcedureCode={prefillTrainingRecord?.procedureCode}
+      />
       <NotifyModal isOpen={notifyRecord !== null} onClose={() => setNotifyRecord(null)} record={notifyRecord} assessments={assessments} />
       {/* <ImportDocumentModal isOpen={isImportDocOpen} onClose={() => setIsImportDocOpen(false)} onProcedureImported={handleProcedureImported} /> */}
     </div>

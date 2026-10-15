@@ -9,6 +9,8 @@ interface RegisterTrainingModalProps {
   onClose: () => void;
   procedures: Procedure[];
   onSaveRecord: (record: TrainingRecord) => void;
+  initialEmployeeName?: string;
+  initialProcedureCode?: string;
 }
 
 export function RegisterTrainingModal({
@@ -16,13 +18,15 @@ export function RegisterTrainingModal({
   onClose,
   procedures,
   onSaveRecord,
+  initialEmployeeName,
+  initialProcedureCode,
 }: RegisterTrainingModalProps) {
-  const [employeeName, setEmployeeName] = useState('');
+  const [employeeName, setEmployeeName] = useState(initialEmployeeName || '');
   const [employeeRole, setEmployeeRole] = useState('Marinheiro de Convés');
   const [sector, setSector] = useState<Sector>('Operações Offshore');
-  const [procedureCode, setProcedureCode] = useState(procedures[0]?.code || 'POP-OP-014');
-  const [completionDate, setCompletionDate] = useState('2026-10-06');
-  const [instructor, setInstructor] = useState('Eng. Roberto Vasconcelos');
+  const [procedureCode, setProcedureCode] = useState(initialProcedureCode || procedures[0]?.code || 'POP-OP-014');
+  const [completionDate, setCompletionDate] = useState(new Date().toISOString().split('T')[0]);
+  const [instructor, setInstructor] = useState('');
 
   if (!isOpen) return null;
 
