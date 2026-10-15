@@ -131,7 +131,8 @@ function RegisterModal({ onClose, onSave }: { onClose:()=>void; onSave:(c:Certif
     const v=new Date(d);
     v.setMonth(v.getMonth()+(parseInt(validityMonths)||24));
     const days=Math.floor((v.getTime()-Date.now())/86400000);
-    const fileUrl=certFile?URL.createObjectURL(certFile):undefined;
+    // Never store a blob: URL — it expires immediately in other tabs/sessions.
+    // The permanent URL is set after Supabase Storage upload completes.
     onSave({
       id:`c-${Date.now()}`,employeeName,employeeCpf,sector,trainingName,trainingCode,
       provider,completionDate:d.toLocaleDateString('pt-BR'),
@@ -139,7 +140,7 @@ function RegisterModal({ onClose, onSave }: { onClose:()=>void; onSave:(c:Certif
       hours:parseInt(hours)||8,type:'normativo',
       status:days<0?'Vencido':days<=60?'Reciclar':'Certificado',
       certificateHash:`CERT-${new Date().getFullYear()}-BR-${Math.floor(1000+Math.random()*9000)}`,
-      certificateFileUrl:fileUrl,
+      certificateFileUrl:undefined,
     }, certFile ?? undefined);
     onClose();
   };
