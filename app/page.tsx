@@ -93,42 +93,6 @@ export default function GestorTreinamentosApp() {
     certificateFileUrl: row.certificate_file_url ?? undefined,
   }), []);
 
-  const handleSaveNormativeCert = useCallback(async (cert: CertificateRecord, file?: File) => {
-    // Optimistic local update
-    setNormativeCerts((prev) => {
-      const next = [cert, ...prev];
-      try { localStorage.setItem('tiger-normative-certs', JSON.stringify(next)); } catch { /* noop */ }
-      return next;
-    });
-    // Persist to Supabase
-    if (isSupabaseConfigured) {
-      const permanentUrl = await saveNormativeCert({
-        id: cert.id,
-        employee_name: cert.employeeName,
-        employee_cpf: cert.employeeCpf ?? null,
-        sector: cert.sector,
-        training_name: cert.trainingName,
-        training_code: cert.trainingCode ?? null,
-        completion_date: cert.completionDate,
-        validity_date: cert.validityDate,
-        days_remaining: cert.daysRemaining,
-        hours: cert.hours,
-        provider: cert.provider ?? null,
-        status: cert.status,
-        certificate_hash: cert.certificateHash,
-        certificate_file_url: cert.certificateFileUrl ?? null,
-      }, file);
-      // If file was uploaded, update the cert with the permanent Supabase Storage URL
-      if (permanentUrl && permanentUrl !== cert.certificateFileUrl) {
-        setNormativeCerts((prev) => {
-          const next = prev.map((c) => c.id === cert.id ? { ...c, certificateFileUrl: permanentUrl } : c);
-          try { localStorage.setItem('tiger-normative-certs', JSON.stringify(next)); } catch { /* noop */ }
-          return next;
-        });
-      }
-    }
-  }, [mapNormativeRow]);
-
   // Modal states
   const [isImagesModalOpen, setIsImagesModalOpen] = useState(false);
   const [isSchemaModalOpen, setIsSchemaModalOpen] = useState(false);
@@ -186,6 +150,50 @@ export default function GestorTreinamentosApp() {
     setToastType(type);
     setTimeout(() => setToastMessage(null), 4000);
   }, []);
+
+  const handleSaveNormativeCert = useCallback(async (cert: CertificateRecord, file?: File) => {
+    // Optimistic local update
+    setNormativeCerts((prev) => {
+      const next = [cert, ...prev];
+      try { localStorage.setItem('tiger-normative-certs', JSON.stringify(next)); } catch { /* noop */ }
+      return next;
+    });
+    // Persist to Supabase
+    if (isSupabaseConfigured) {
+      const result = await saveNormativeCert({
+        id: cert.id,
+        employee_name: cert.employeeName,
+        employee_cpf: cert.employeeCpf ?? null,
+        sector: cert.sector,
+        training_name: cert.trainingName,
+        training_code: cert.trainingCode ?? null,
+        completion_date: cert.completionDate,
+        validity_date: cert.validityDate,
+        days_remaining: cert.daysRemaining,
+        hours: cert.hours,
+        provider: cert.provider ?? null,
+        status: cert.status,
+        certificate_hash: cert.certificateHash,
+        certificate_file_url: cert.certificateFileUrl ?? null,
+      }, file);
+
+      if (result === false) {
+        showToast('⚠️ Erro ao salvar no Supabase. Verifique se a tabela normative_certs foi criada.', 'error');
+        return;
+      }
+
+      showToast('Certificado normativo salvo ✓', 'success');
+
+      // If file was uploaded, update the cert with the permanent Supabase Storage URL
+      if (result && result !== cert.certificateFileUrl) {
+        setNormativeCerts((prev) => {
+          const next = prev.map((c) => c.id === cert.id ? { ...c, certificateFileUrl: result } : c);
+          try { localStorage.setItem('tiger-normative-certs', JSON.stringify(next)); } catch { /* noop */ }
+          return next;
+        });
+      }
+    }
+  }, [showToast, mapNormativeRow]);
 
   // ─── Carrega dados reais do Supabase (se configurado) ────────────────────
   const mapProcedures = useCallback((raw: any[]) => {

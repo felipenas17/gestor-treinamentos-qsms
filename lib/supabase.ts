@@ -469,11 +469,12 @@ export async function fetchNormativeCerts(): Promise<NormativeCertRow[]> {
   return (data ?? []) as NormativeCertRow[];
 }
 
+/** Returns the permanent file URL on success (null when no file), or false on failure. */
 export async function saveNormativeCert(
   cert: Omit<NormativeCertRow, 'created_at'>,
   file?: File,
-): Promise<string | null> {
-  if (!supabase) return null;
+): Promise<string | null | false> {
+  if (!supabase) return false;
 
   let fileUrl = cert.certificate_file_url;
 
@@ -496,6 +497,6 @@ export async function saveNormativeCert(
 
   const row: Omit<NormativeCertRow, 'created_at'> = { ...cert, certificate_file_url: fileUrl };
   const { error } = await supabase.from('normative_certs').upsert(row);
-  if (error) { console.error('saveNormativeCert:', error); return null; }
-  return fileUrl;
+  if (error) { console.error('saveNormativeCert error:', error); return false; }
+  return fileUrl; // null when no file — caller distinguishes success (null) from failure (false)
 }
