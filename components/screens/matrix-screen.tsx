@@ -359,7 +359,10 @@ export function MatrixScreen({
                             setLinkGenerating(null);
                             if (token) {
                               const url = `${window.location.origin}/avaliar/${token}`;
-                              await navigator.clipboard.writeText(url);
+                              const msg = encodeURIComponent(
+                                `Olá, ${rec.employeeName}! 👷\n\nVocê tem uma avaliação pendente referente ao procedimento *${rec.procedureCode} – ${rec.procedureName}*.\n\nAcesse pelo link abaixo para responder:\n${url}`
+                              );
+                              window.open(`https://wa.me/?text=${msg}`, '_blank');
                               setLinkCopied(rec.id);
                               setTimeout(() => setLinkCopied(null), 2500);
                             }
