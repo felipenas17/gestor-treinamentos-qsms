@@ -370,8 +370,14 @@ export function CertificatesScreen({
                     <button onClick={()=>setPreview(c)} className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-500"><Printer className="w-3.5 h-3.5"/></button>
                   </>}
                   {c.type==='normativo'&&<>
-                    <button onClick={()=>setPreview(c)} title="Visualizar detalhes" className="p-1.5 rounded-lg border border-slate-200 hover:bg-blue-50 hover:border-blue-300 text-slate-500 hover:text-blue-600"><Eye className="w-3.5 h-3.5"/></button>
-                    <button onClick={()=>setPreview(c)} title="Imprimir" className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-500"><Printer className="w-3.5 h-3.5"/></button>
+                    {c.certificateFileUrl
+                      ? <a href={c.certificateFileUrl} target="_blank" rel="noopener noreferrer" title="Ver PDF do certificado" className="p-1.5 rounded-lg border border-slate-200 hover:bg-blue-50 hover:border-blue-300 text-slate-500 hover:text-blue-600"><Eye className="w-3.5 h-3.5"/></a>
+                      : <button disabled title="Nenhum arquivo anexado" className="p-1.5 rounded-lg border border-slate-200 text-slate-300 cursor-not-allowed"><Eye className="w-3.5 h-3.5"/></button>
+                    }
+                    {c.certificateFileUrl
+                      ? <a href={c.certificateFileUrl} target="_blank" rel="noopener noreferrer" title="Imprimir PDF" className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-500"><Printer className="w-3.5 h-3.5"/></a>
+                      : <button disabled title="Nenhum arquivo para imprimir" className="p-1.5 rounded-lg border border-slate-200 text-slate-300 cursor-not-allowed"><Printer className="w-3.5 h-3.5"/></button>
+                    }
                     {c.certificateFileUrl&&(
                       <a href={c.certificateFileUrl} target="_blank" rel="noopener noreferrer" title="Ver arquivo"
                         className="p-1.5 rounded-lg border border-teal-200 bg-teal-50 hover:bg-teal-100 text-teal-600">
