@@ -6,7 +6,7 @@ import { Check, Search, Plus, Eye, Printer, CheckCircle2, Clock, AlertTriangle, 
 import { TrainingRecord } from '@/types';
 import { supabase } from '@/lib/supabase';
 
-interface CertificateRecord {
+export interface CertificateRecord {
   id: string; employeeName: string; employeeCpf: string; employeeSignature?: string; sector: string;
   trainingName: string; trainingCode: string; procedureRevision?: string; completionDate: string;
   validityDate: string; daysRemaining: number; hours: number; score?: number;
@@ -230,14 +230,22 @@ function RegisterModal({ onClose, onSave }: { onClose:()=>void; onSave:(c:Certif
   );
 }
 
-export function CertificatesScreen({ records = [] }: { records?: TrainingRecord[] }) {
+export function CertificatesScreen({
+  records = [],
+  normativeCerts: initialNormativeCerts,
+  onSaveNormativeCert,
+}: {
+  records?: TrainingRecord[];
+  normativeCerts?: CertificateRecord[];
+  onSaveNormativeCert?: (c: CertificateRecord) => void;
+}) {
   const [tab,setTab]=useState<'internos'|'normativos'>('internos');
   const [search,setSearch]=useState('');
   const [preview,setPreview]=useState<CertificateRecord|null>(null);
   const [showReg,setShowReg]=useState(false);
   const [signTarget,setSignTarget]=useState<CertificateRecord|null>(null);
   const [signatures,setSignatures]=useState<Record<string,string>>({});
-  const [certs,setCerts]=useState<CertificateRecord[]>([]); // normativo only
+  const [certs,setCerts]=useState<CertificateRecord[]>(initialNormativeCerts ?? []); // normativo only
   // Map de procedure_code → { cpf, signature } buscado das respostas
   const [responsesMap,setResponsesMap]=useState<Record<string,{cpf:string;signature:string}>>({});
 
@@ -374,7 +382,7 @@ export function CertificatesScreen({ records = [] }: { records?: TrainingRecord[
       </div>
       {preview&&<CertificatePreview cert={preview} onClose={()=>setPreview(null)}/>}
       {signTarget&&<SignatureModal employeeName={signTarget.employeeName} trainingName={signTarget.trainingName} certificateHash={signTarget.certificateHash} onConfirm={(sig)=>{setSignatures(p=>({...p,[signTarget.id]:sig}));setSignTarget(null);}} onClose={()=>setSignTarget(null)}/>}
-      {showReg&&<RegisterModal onClose={()=>setShowReg(false)} onSave={c=>setCerts(p=>[c,...p])}/>}
+      {showReg&&<RegisterModal onClose={()=>setShowReg(false)} onSave={c=>{ setCerts(p=>[c,...p]); onSaveNormativeCert?.(c); }}/>}
     </div>
   );
 }

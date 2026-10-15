@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Sidebar } from '@/components/sidebar';
 import { Header } from '@/components/header';
 import { DashboardScreen } from '@/components/screens/dashboard-screen';
@@ -44,6 +44,7 @@ import {
 } from '@/lib/supabase';
 
 import { Employee, Procedure, TrainingRecord, Assessment, RespondentStatus } from '@/types';
+import { CertificateRecord } from '@/components/screens/certificates-screen';
 import { CheckCircle2, Loader2 } from 'lucide-react';
 
 export default function GestorTreinamentosApp() {
@@ -61,6 +62,23 @@ export default function GestorTreinamentosApp() {
   const [selectedAssessmentForTaker, setSelectedAssessmentForTaker] = useState<Assessment | null>(null);
   const [respondents, setRespondents] = useState<RespondentStatus[]>([]);
 
+  // Normative certifications (stored locally + persisted in localStorage)
+  const [normativeCerts, setNormativeCerts] = useState<CertificateRecord[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const stored = localStorage.getItem('tiger-normative-certs');
+      return stored ? (JSON.parse(stored) as CertificateRecord[]) : [];
+    } catch { return []; }
+  });
+
+  const handleSaveNormativeCert = useCallback((cert: CertificateRecord) => {
+    setNormativeCerts((prev) => {
+      const next = [cert, ...prev];
+      try { localStorage.setItem('tiger-normative-certs', JSON.stringify(next)); } catch { /* noop */ }
+      return next;
+    });
+  }, []);
+
   // Modal states
   const [isImagesModalOpen, setIsImagesModalOpen] = useState(false);
   const [isSchemaModalOpen, setIsSchemaModalOpen] = useState(false);
@@ -75,6 +93,43 @@ export default function GestorTreinamentosApp() {
   const [selectedExamProcedure, setSelectedExamProcedure] = useState<Procedure | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [toastType, setToastType] = useState<'success' | 'error'>('success');
+
+  // ─── Merge normative certs into dashboard data ───────────────────────────
+  const adjustedMetrics = useMemo(() => {
+    const active = normativeCerts.filter((c) => c.status === 'Certificado').length;
+    const expiring = normativeCerts.filter((c) => c.daysRemaining >= 0 && c.daysRemaining <= 60).length;
+    const expired = normativeCerts.filter((c) => c.status === 'Vencido').length;
+    return {
+      ...metrics,
+      activeCertifications: metrics.activeCertifications + active,
+      expiringIn60Days: metrics.expiringIn60Days + expiring,
+      expiredDocuments: metrics.expiredDocuments + expired,
+    };
+  }, [metrics, normativeCerts]);
+
+  // Convert normative certs to TrainingRecord shape for the critical table
+  const normativeAsTraining = useMemo<TrainingRecord[]>(() =>
+    normativeCerts
+      .filter((c) => c.status !== 'Certificado' || c.daysRemaining <= 90)
+      .map((c) => ({
+        id: c.id,
+        employeeId: c.id,
+        employeeName: c.employeeName,
+        employeeRole: c.provider || 'Externo',
+        employeeAvatar: '/images/avatar_operator.jpg',
+        sector: c.sector as any,
+        procedureCode: c.trainingCode,
+        procedureName: c.trainingName,
+        completionDate: c.completionDate,
+        validityDate: c.validityDate,
+        daysRemaining: c.daysRemaining,
+        complianceRate: 100,
+        status: c.status,
+        instructor: c.provider || 'Externo',
+        certificateHash: c.certificateHash,
+      })),
+    [normativeCerts],
+  );
 
   const showToast = useCallback((msg: string, type: 'success' | 'error' = 'success') => {
     setToastMessage(msg);
@@ -567,10 +622,13 @@ export default function GestorTreinamentosApp() {
         <main className="flex-1 pb-12">
           {currentTab === 'dashboard' && (
             <DashboardScreen
-              metrics={metrics}
+              metrics={adjustedMetrics}
               sectorData={sectorData}
               projectionData={projectionData}
-              criticalTrainings={records.filter((r) => r.status !== 'Certificado' || r.daysRemaining <= 90)}
+              criticalTrainings={[
+                ...records.filter((r) => r.status !== 'Certificado' || r.daysRemaining <= 90),
+                ...normativeAsTraining,
+              ]}
               onOpenNewPlanModal={() => setIsNewPlanModalOpen(true)}
               onImportCert={handleImportCert}
             />
@@ -637,7 +695,13 @@ export default function GestorTreinamentosApp() {
             />
           )}
           {currentTab === 'colaboradores' && <EmployeesScreen />}
-          {currentTab === 'certificados' && <CertificatesScreen records={records} />}
+          {currentTab === 'certificados' && (
+            <CertificatesScreen
+              records={records}
+              normativeCerts={normativeCerts}
+              onSaveNormativeCert={handleSaveNormativeCert}
+            />
+          )}
           {currentTab === 'matriz' && (
             <MatrixScreen
               records={records}
