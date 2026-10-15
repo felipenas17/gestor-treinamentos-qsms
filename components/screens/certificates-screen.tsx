@@ -251,6 +251,8 @@ export function CertificatesScreen({
   const [signTarget,setSignTarget]=useState<CertificateRecord|null>(null);
   const [signatures,setSignatures]=useState<Record<string,string>>({});
   const [certs,setCerts]=useState<CertificateRecord[]>(initialNormativeCerts ?? []); // normativo only
+  // Sync when parent updates (e.g. after attach)
+  useEffect(()=>{ if(initialNormativeCerts) setCerts(initialNormativeCerts); },[initialNormativeCerts]);
   // Map de procedure_code → { cpf, signature } buscado das respostas
   const [responsesMap,setResponsesMap]=useState<Record<string,{cpf:string;signature:string}>>({});
 
