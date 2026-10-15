@@ -176,12 +176,17 @@ export async function POST(req: NextRequest) {
             .eq('procedure_id', proc.id)
             .eq('employee_id', link.employee_id);
         } else {
-          // Reprovado: registra tentativa e score para disparar Realtime no dashboard
+          // Reprovado: registra tentativa, score e define validity_date = completion_date
+          // O trigger calcula status a partir de validity_date:
+          //   validity_date <= CURRENT_DATE + 60 dias → 'Reciclar'
+          // Ao definir validity_date == completion_date (hoje), o trigger produz 'Reciclar'
+          // sem recalcular validity_date (que só é recalculada quando é NULL).
           await supabase
             .from('trainings')
             .update({
               compliance_rate: score,
               completion_date: completionDate,
+              validity_date: completionDate, // mesmo dia → trigger → 'Reciclar'
             })
             .eq('procedure_id', proc.id)
             .eq('employee_id', link.employee_id);
