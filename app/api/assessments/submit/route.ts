@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
 
   const { data: link } = await supabase
     .from('assessment_links')
-    .select('id, assessment_id, expires_at, is_active, max_uses, uses_count')
+    .select('id, assessment_id, expires_at, is_active, max_uses, uses_count, employee_id')
     .eq('token_uuid', token)
     .maybeSingle();
 
@@ -157,7 +157,8 @@ export async function POST(req: NextRequest) {
         .eq('code', data.procedure_code)
         .maybeSingle();
 
-      if (proc) {
+      if (proc && link?.employee_id) {
+        // CRITICAL: always filter by employee_id to prevent overwriting other employees' records
         const today = new Date();
         const completionDate = today.toISOString().split('T')[0];
 
@@ -172,7 +173,8 @@ export async function POST(req: NextRequest) {
               validity_date: validityDate.toISOString().split('T')[0],
               compliance_rate: score,
             })
-            .eq('procedure_id', proc.id);
+            .eq('procedure_id', proc.id)
+            .eq('employee_id', link.employee_id);
         } else {
           // Reprovado: registra tentativa e score para disparar Realtime no dashboard
           await supabase
@@ -181,7 +183,8 @@ export async function POST(req: NextRequest) {
               compliance_rate: score,
               completion_date: completionDate,
             })
-            .eq('procedure_id', proc.id);
+            .eq('procedure_id', proc.id)
+            .eq('employee_id', link.employee_id);
         }
       }
     } catch (updateErr) {

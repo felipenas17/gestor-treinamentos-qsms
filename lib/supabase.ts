@@ -100,7 +100,7 @@ export async function generateAssessmentLink(assessmentId: string, employeeId?: 
       assessment_id: assessmentId,
       employee_id: employeeId || null,
       expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-      max_uses: 2,
+      max_uses: 1,
     })
     .select('token_uuid')
     .single();
