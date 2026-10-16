@@ -616,3 +616,43 @@ export async function saveNormativeCert(
   if (error) { console.error('saveNormativeCert error:', error); return false; }
   return fileUrl; // null when no file — caller distinguishes success (null) from failure (false)
 }
+
+// ─── Controle Documental Institucional ──────────────────────────────────────
+
+export async function fetchDocuments() {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from('doc_control')
+    .select('*')
+    .order('code', { ascending: true });
+  if (error) { console.error('fetchDocuments:', error); return null; }
+  return data;
+}
+
+export async function saveDocument(data: {
+  code: string;
+  name: string;
+  docType: string;
+  issuingBody?: string;
+  issueDate?: string;
+  expiryDate?: string;
+  renewalMonths?: number;
+  responsible?: string;
+  fileUrl?: string;
+  notes?: string;
+}) {
+  if (!supabase) return { error: 'Supabase não configurado' };
+  const { error } = await supabase.from('doc_control').insert({
+    code: data.code,
+    name: data.name,
+    doc_type: data.docType,
+    issuing_body: data.issuingBody || null,
+    issue_date: data.issueDate || null,
+    expiry_date: data.expiryDate || null,
+    renewal_months: data.renewalMonths ?? 12,
+    responsible: data.responsible || null,
+    file_url: data.fileUrl || null,
+    notes: data.notes || null,
+  });
+  return { error: error?.message ?? null };
+}

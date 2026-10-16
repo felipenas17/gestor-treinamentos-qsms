@@ -17,6 +17,22 @@ export type Sector =
 export type ComplianceStatus = 'Certificado' | 'Reciclar' | 'Vencido' | 'Pendente';
 export type ProcedureStatus = 'Ativo' | 'Em Revisão' | 'Arquivado';
 export type DocRevisionStatus = 'Vigente' | 'Para Revisão' | 'Vencido' | 'Indefinido';
+export type DocStatus = 'Vigente' | 'Para Renovar' | 'Vencido' | 'Indefinido';
+
+export interface DocControl {
+  id: string;
+  code: string;
+  name: string;
+  docType: string;
+  issuingBody?: string | null;
+  issueDate?: string | null;
+  expiryDate?: string | null;
+  renewalMonths?: number;
+  docStatus?: DocStatus;
+  responsible?: string | null;
+  fileUrl?: string | null;
+  notes?: string | null;
+}
 
 export interface Procedure {
   id: string;

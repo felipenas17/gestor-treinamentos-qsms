@@ -10,6 +10,7 @@ import {
   Award,
   GraduationCap,
   FolderOpen,
+  Shield,
   ChevronDown,
   ChevronRight,
 } from 'lucide-react';
@@ -50,7 +51,8 @@ const MODULES: Module[] = [
     label: 'Documentação & Controle',
     icon: FolderOpen,
     items: [
-      { id: 'procedimentos', label: 'Procedimentos & POPs', sublabel: 'Revisões e Vigência',   icon: FileText        },
+      { id: 'procedimentos',    label: 'Procedimentos & POPs',  sublabel: 'Revisões e Vigência',      icon: FileText },
+      { id: 'doc-controle',     label: 'Controle Documental',   sublabel: 'Licenças e Autorizações',  icon: Shield   },
     ],
   },
 ];
