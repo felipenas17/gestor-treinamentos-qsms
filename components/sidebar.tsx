@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   LayoutDashboard,
   FileText,
@@ -8,52 +8,89 @@ import {
   Users,
   Anchor,
   Award,
+  GraduationCap,
+  FolderOpen,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
+
+interface NavItem {
+  id: string;
+  label: string;
+  sublabel: string;
+  icon: React.ElementType;
+}
+
+interface Module {
+  id: string;
+  label: string;
+  icon: React.ElementType;
+  items: NavItem[];
+}
 
 interface SidebarProps {
   currentTab: string;
   onSelectTab: (tab: string) => void;
 }
 
-export function Sidebar({
-  currentTab,
-  onSelectTab,
-}: SidebarProps) {
-  const navItems = [
-    {
-      id: 'dashboard',
-      label: 'Dashboard',
-      sublabel: 'Painel Geral',
-      icon: LayoutDashboard,
-    },
-    {
-      id: 'procedimentos',
-      label: 'Procedimentos & POPs',
-      sublabel: 'Biblioteca Oficial',
-      icon: FileText,
-    },
-    {
-      id: 'provas',
-      label: 'Gestão de Provas & Links',
-      sublabel: 'Avaliações de Eficácia',
-      icon: CheckSquare,
-    },
-    {
-      id: 'certificados',
-      label: 'Certificados',
-      sublabel: 'Internos e Normativos',
-      icon: Award,
-    },
-    {
-      id: 'matriz',
-      label: 'Matriz & Colaboradores',
-      sublabel: 'Conformidade de Equipes',
-      icon: Users,
-    },
-  ];
+const MODULES: Module[] = [
+  {
+    id: 'treinamento',
+    label: 'Treinamento',
+    icon: GraduationCap,
+    items: [
+      { id: 'dashboard',     label: 'Dashboard',            sublabel: 'Painel Geral',           icon: LayoutDashboard },
+      { id: 'provas',        label: 'Provas & Links',       sublabel: 'Avaliações de Eficácia', icon: CheckSquare     },
+      { id: 'certificados',  label: 'Certificados',         sublabel: 'Internos e Normativos',  icon: Award           },
+      { id: 'matriz',        label: 'Matriz & Colaboradores', sublabel: 'Conformidade de Equipes', icon: Users         },
+    ],
+  },
+  {
+    id: 'documentacao',
+    label: 'Documentação & Controle',
+    icon: FolderOpen,
+    items: [
+      { id: 'procedimentos', label: 'Procedimentos & POPs', sublabel: 'Revisões e Vigência',   icon: FileText        },
+    ],
+  },
+];
+
+export function Sidebar({ currentTab, onSelectTab }: SidebarProps) {
+  const activeModuleId = useMemo(() => {
+    for (const mod of MODULES) {
+      if (mod.items.some(item => item.id === currentTab)) return mod.id;
+    }
+    return MODULES[0].id;
+  }, [currentTab]);
+
+  const [openModules, setOpenModules] = useState<Set<string>>(
+    () => new Set([activeModuleId])
+  );
+
+  const toggleModule = (moduleId: string) => {
+    setOpenModules(prev => {
+      const next = new Set(prev);
+      if (next.has(moduleId)) {
+        next.delete(moduleId);
+      } else {
+        next.add(moduleId);
+      }
+      return next;
+    });
+  };
+
+  const handleSelectTab = (tabId: string, moduleId: string) => {
+    setOpenModules(prev => {
+      const next = new Set(prev);
+      next.add(moduleId);
+      return next;
+    });
+    onSelectTab(tabId);
+  };
 
   return (
     <aside className="w-72 bg-[#0c1222] border-r border-slate-800 text-slate-300 flex flex-col shrink-0 min-h-screen select-none">
+
       {/* Brand Header */}
       <div className="p-5 border-b border-slate-800/80 bg-[#090e1a]">
         <div className="flex items-center gap-3">
@@ -70,48 +107,77 @@ export function Sidebar({
               </span>
             </div>
             <p className="text-xs text-slate-400 truncate">
-              Treinamentos Offshore
+              Tiger Rentank — Offshore
             </p>
           </div>
         </div>
-
       </div>
 
-      {/* Main Navigation */}
-      <div className="flex-1 px-3 py-4 space-y-1.5 overflow-y-auto">
-        <div className="px-3 pb-2 text-[11px] font-semibold text-slate-300 uppercase tracking-wider">
-          Módulos Principais
-        </div>
+      {/* Modules Navigation */}
+      <div className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+        {MODULES.map((mod) => {
+          const ModIcon = mod.icon;
+          const isOpen = openModules.has(mod.id);
+          const hasActive = mod.items.some(item => item.id === currentTab);
 
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = currentTab === item.id;
           return (
-            <button
-              key={item.id}
-              onClick={() => onSelectTab(item.id)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all text-left group ${
-                isActive
-                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
-                  : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
-              }`}
-            >
-              <Icon
-                className={`w-5 h-5 shrink-0 transition-colors ${
-                  isActive ? 'text-white' : 'text-slate-400 group-hover:text-blue-400'
+            <div key={mod.id}>
+              {/* Module Header */}
+              <button
+                onClick={() => toggleModule(mod.id)}
+                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-left mb-0.5 group ${
+                  hasActive
+                    ? 'text-blue-300 bg-blue-950/60'
+                    : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/40'
                 }`}
-              />
-              <div className="flex-1 truncate">
-                <div className="truncate leading-tight font-medium">{item.label}</div>
-                <div className={`text-[11px] truncate ${isActive ? 'text-blue-100' : 'text-slate-400'}`}>
-                  {item.sublabel}
+              >
+                <ModIcon className={`w-3.5 h-3.5 shrink-0 ${hasActive ? 'text-blue-400' : 'text-slate-600 group-hover:text-slate-400'}`} />
+                <span className="flex-1 truncate text-[11px] font-semibold uppercase tracking-widest">
+                  {mod.label}
+                </span>
+                {isOpen
+                  ? <ChevronDown className="w-3 h-3 shrink-0 text-slate-600" />
+                  : <ChevronRight className="w-3 h-3 shrink-0 text-slate-600" />
+                }
+              </button>
+
+              {/* Module Items */}
+              {isOpen && (
+                <div className="ml-2 pl-3 border-l border-slate-800/70 space-y-0.5 mb-2">
+                  {mod.items.map((item) => {
+                    const Icon = item.icon;
+                    const isActive = currentTab === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => handleSelectTab(item.id, mod.id)}
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all text-left group ${
+                          isActive
+                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
+                            : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+                        }`}
+                      >
+                        <Icon
+                          className={`w-4 h-4 shrink-0 transition-colors ${
+                            isActive ? 'text-white' : 'text-slate-400 group-hover:text-blue-400'
+                          }`}
+                        />
+                        <div className="flex-1 truncate">
+                          <div className="truncate leading-tight font-medium">{item.label}</div>
+                          <div className={`text-[11px] truncate ${isActive ? 'text-blue-100' : 'text-slate-500'}`}>
+                            {item.sublabel}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
-              </div>
-            </button>
+              )}
+            </div>
           );
         })}
-
       </div>
+
     </aside>
   );
 }
