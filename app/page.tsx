@@ -741,16 +741,12 @@ export default function GestorTreinamentosApp() {
       <Sidebar
         currentTab={currentTab}
         onSelectTab={setCurrentTab}
-        onOpenSchemaModal={() => setIsSchemaModalOpen(true)}
-        onOpenImagesModal={() => setIsImagesModalOpen(true)}
-        isSupabaseConnected={isSupabaseConfigured}
       />
 
       <div className="flex-1 flex flex-col min-w-0 min-h-screen overflow-x-hidden">
         <Header
           currentTab={currentTab}
-          onOpenSchemaModal={() => setIsSchemaModalOpen(true)}
-          onOpenImagesModal={() => setIsImagesModalOpen(true)}
+          isSupabaseConnected={isSupabaseConfigured}
         />
 
         {isLoading && (

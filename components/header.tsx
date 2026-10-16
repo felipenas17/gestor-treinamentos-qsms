@@ -1,26 +1,17 @@
 'use client';
 
 import React from 'react';
-import { 
-  Bell, 
-  Search, 
-  ExternalLink, 
-  Database, 
-  Image as ImageIcon,
-  CheckCircle2,
-  AlertTriangle
-} from 'lucide-react';
 
 interface HeaderProps {
   currentTab: string;
-  onOpenSchemaModal: () => void;
-  onOpenImagesModal: () => void;
+  onOpenSchemaModal?: () => void;
+  onOpenImagesModal?: () => void;
+  isSupabaseConnected?: boolean;
 }
 
 export function Header({
   currentTab,
-  onOpenSchemaModal,
-  onOpenImagesModal,
+  isSupabaseConnected = false,
 }: HeaderProps) {
   const getTabTitle = () => {
     switch (currentTab) {
@@ -64,12 +55,32 @@ export function Header({
         </h1>
       </div>
 
-      {/* Zone 2: Informational / System markers — oculto até modal estar ativo */}
-      <div className="hidden" />
+      {/* Zone 3: Status + Perfil */}
+      <div className="flex items-center gap-3 shrink-0">
+        {/* Supabase status */}
+        <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-100 border border-slate-200">
+          <span className={`w-2 h-2 rounded-full shrink-0 ${isSupabaseConnected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+          <span className="text-[11px] font-medium text-slate-600">
+            {isSupabaseConnected ? 'Supabase conectado' : 'Offline'}
+          </span>
+        </div>
 
-      {/* Zone 3: Primary and Secondary Actions */}
-      <div className="flex items-center gap-2.5 shrink-0">
-        {/* Botões Links Imagens e Esquema SQL — ocultos até modal estar ativo */}
+        {/* Perfil */}
+        <div className="flex items-center gap-2.5 pl-2 border-l border-slate-200">
+          <div className="w-8 h-8 rounded-full overflow-hidden bg-slate-200 border border-slate-300 shrink-0">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/images/avatar_engineer.jpg"
+              alt="Luiz Felipe"
+              className="w-full h-full object-cover"
+              onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+            />
+          </div>
+          <div className="hidden md:block min-w-0">
+            <p className="text-xs font-semibold text-slate-800 truncate leading-tight">Luiz Felipe</p>
+            <p className="text-[11px] text-slate-500 truncate leading-tight">Assistente QSMS</p>
+          </div>
+        </div>
       </div>
     </header>
   );

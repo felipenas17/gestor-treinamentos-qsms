@@ -6,8 +6,6 @@ import {
   FileText,
   CheckSquare,
   Users,
-  Database,
-  Image as ImageIcon,
   Anchor,
   Award,
 } from 'lucide-react';
@@ -15,17 +13,11 @@ import {
 interface SidebarProps {
   currentTab: string;
   onSelectTab: (tab: string) => void;
-  onOpenSchemaModal: () => void;
-  onOpenImagesModal: () => void;
-  isSupabaseConnected: boolean;
 }
 
 export function Sidebar({
   currentTab,
   onSelectTab,
-  onOpenSchemaModal,
-  onOpenImagesModal,
-  isSupabaseConnected,
 }: SidebarProps) {
   const navItems = [
     {
@@ -119,73 +111,6 @@ export function Sidebar({
           );
         })}
 
-        {/* Quick Tools Section */}
-        <div className="pt-6 px-3 pb-2 text-[11px] font-semibold text-slate-300 uppercase tracking-wider">
-          Recursos & Integrações
-        </div>
-
-        <button
-          onClick={onOpenImagesModal}
-          className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800/60 transition-colors"
-        >
-          <div className="flex items-center gap-2.5">
-            <ImageIcon className="w-4 h-4 text-purple-400" />
-            <span>Links Diretos de Imagens</span>
-          </div>
-          <span className="text-[10px] text-purple-300 font-mono bg-purple-950/60 border border-purple-800/40 px-1.5 py-0.5 rounded">
-            HTML
-          </span>
-        </button>
-
-        <button
-          onClick={onOpenSchemaModal}
-          className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800/60 transition-colors"
-        >
-          <div className="flex items-center gap-2.5">
-            <Database className="w-4 h-4 text-emerald-400" />
-            <span>Banco Supabase & DDL</span>
-          </div>
-          <span className="text-[10px] text-emerald-300 font-mono bg-emerald-950/60 border border-emerald-800/40 px-1.5 py-0.5 rounded">
-            RLS SQL
-          </span>
-        </button>
-      </div>
-
-      {/* Database Status Indicator & Profile Footer */}
-      <div className="p-4 border-t border-slate-800 bg-[#090e1a]/90 space-y-3">
-        <div className="p-2.5 rounded-lg bg-slate-900 border border-slate-800">
-          <div className="flex items-center justify-between text-xs">
-            <div className="flex items-center gap-1.5">
-              <span className={`w-2 h-2 rounded-full ${isSupabaseConnected ? 'bg-emerald-400 animate-ping' : 'bg-emerald-400'}`} />
-              <span className="font-medium text-slate-300">
-                {isSupabaseConnected ? 'Supabase Nuvem' : 'Armazenamento Reativo'}
-              </span>
-            </div>
-            <span className="text-[10px] font-mono text-slate-400">UUID Seguro</span>
-          </div>
-          <p className="text-[11px] text-slate-400 mt-1 line-clamp-1">
-            {isSupabaseConnected ? 'Sincronização em tempo real ativa' : 'Simulação de DDL & RLS com tokens UUID'}
-          </p>
-        </div>
-
-        {/* Current user */}
-        <div className="flex items-center gap-3 pt-1">
-          <div className="w-9 h-9 rounded-full overflow-hidden bg-slate-700 border border-slate-600 relative shrink-0">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img 
-              src="/images/avatar_engineer.jpg" 
-              alt="Eng. Roberto Silva"
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                (e.target as HTMLElement).style.display = 'none';
-              }}
-            />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-xs font-semibold text-white truncate">Eng. Carlos Silva</p>
-            <p className="text-[11px] text-slate-400 truncate">Coord. QSMS Offshore</p>
-          </div>
-        </div>
       </div>
     </aside>
   );
