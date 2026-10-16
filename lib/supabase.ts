@@ -629,6 +629,34 @@ export async function fetchDocuments() {
   return data;
 }
 
+export async function updateProcedure(
+  id: string,
+  data: {
+    name?: string;
+    revision?: string;
+    status?: string;
+    criticality?: string;
+    docType?: string;
+    docLastRevisionDate?: string | null;
+    docRevisionMonths?: number;
+    docResponsible?: string | null;
+  }
+) {
+  if (!supabase) return { error: 'Supabase não configurado' };
+  const patch: Record<string, any> = {};
+  if (data.name !== undefined)               patch.name = data.name;
+  if (data.revision !== undefined)           patch.revision = data.revision;
+  if (data.status !== undefined)             patch.status = data.status;
+  if (data.criticality !== undefined)        patch.criticality = data.criticality;
+  if (data.docType !== undefined)            patch.doc_type = data.docType;
+  if (data.docLastRevisionDate !== undefined) patch.doc_last_revision_date = data.docLastRevisionDate || null;
+  if (data.docRevisionMonths !== undefined)  patch.doc_revision_months = data.docRevisionMonths;
+  if (data.docResponsible !== undefined)     patch.doc_responsible = data.docResponsible || null;
+
+  const { error } = await supabase.from('procedures').update(patch).eq('id', id);
+  return { error: error?.message ?? null };
+}
+
 export async function saveDocument(data: {
   code: string;
   name: string;

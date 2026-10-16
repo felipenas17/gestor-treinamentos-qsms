@@ -48,6 +48,7 @@ import {
   saveComplianceSnapshot,
   fetchDocuments,
   saveDocument,
+  updateProcedure,
   type NormativeCertRow,
 } from '@/lib/supabase';
 
@@ -736,6 +737,22 @@ export default function GestorTreinamentosApp() {
     }
   };
 
+  const handleProcedureUpdated = useCallback(async (id: string, data: {
+    name?: string; revision?: string; status?: string; criticality?: string;
+    docType?: string; docLastRevisionDate?: string | null;
+    docRevisionMonths?: number; docResponsible?: string | null;
+  }) => {
+    const result = await updateProcedure(id, data);
+    if (result.error) {
+      showToast('Erro ao atualizar procedimento: ' + result.error, 'error');
+      return;
+    }
+    showToast('Procedimento atualizado ✓');
+    // Reload procedures from DB so trigger-computed fields refresh
+    const dbProcs = await fetchProcedures();
+    if (dbProcs) setProcedures(mapProcedures(dbProcs));
+  }, [showToast]);
+
   const handleSaveDocument = useCallback(async (data: {
     code: string; name: string; docType: string; issuingBody?: string;
     issueDate?: string; expiryDate?: string; renewalMonths?: number;
@@ -827,6 +844,7 @@ export default function GestorTreinamentosApp() {
               onImportDocument={() => setIsImportDocOpen(true)}
               onManageExam={(p) => setSelectedExamProcedure(p)}
               onProcedureCreated={loadProceduresFromDB}
+              onEditProcedure={handleProcedureUpdated}
             />
           )}
           {currentTab === 'provas' && (

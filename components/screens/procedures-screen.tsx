@@ -1,5 +1,6 @@
 'use client';
 import { NewProcedureModal } from '@/components/modals/new-procedure-modal';
+import { EditProcedureModal } from '@/components/modals/edit-procedure-modal';
 import { saveProcedure, saveAssessmentDraft } from '@/lib/supabase';
 
 import React, { useState, useMemo } from 'react';
@@ -16,6 +17,7 @@ import {
   CheckCircle2,
   Clock,
   HelpCircle as HelpCircleIcon,
+  Pencil,
 } from 'lucide-react';
 import { Procedure, ProcedureStatus, DocRevisionStatus } from '@/types';
 
@@ -26,6 +28,7 @@ interface ProceduresScreenProps {
   onImportDocument: () => void;
   onManageExam?: (procedure: Procedure) => void;
   onProcedureCreated?: () => void;
+  onEditProcedure?: (id: string, data: any) => Promise<void>;
 }
 
 export function ProceduresScreen({
@@ -35,8 +38,10 @@ export function ProceduresScreen({
   onImportDocument,
   onManageExam,
   onProcedureCreated,
+  onEditProcedure,
 }: ProceduresScreenProps) {
   const [showNewProc, setShowNewProc] = useState(false);
+  const [editingProcedure, setEditingProcedure] = useState<Procedure | null>(null);
 
   const handleProcSaved = async (data: any) => {
     const result = await saveProcedure(data);
@@ -349,6 +354,7 @@ export function ProceduresScreen({
                   <th className="py-3 px-4 text-center">Status</th>
                   <th className="py-3 px-4 text-center">PDF</th>
                   <th className="py-3 px-4 text-center">Questões</th>
+                  <th className="py-3 px-4 text-center">Editar</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 text-slate-700">
@@ -423,6 +429,16 @@ export function ProceduresScreen({
                       >
                         <HelpCircle className="w-3.5 h-3.5"/>
                         {proc.questionsCount}
+                      </button>
+                    </td>
+                    <td className="py-3 px-4 text-center" onClick={e => e.stopPropagation()}>
+                      <button
+                        onClick={() => setEditingProcedure(proc)}
+                        title="Editar procedimento"
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-slate-50 text-slate-600 font-semibold text-[11px] border border-slate-200 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition-colors cursor-pointer"
+                      >
+                        <Pencil className="w-3.5 h-3.5"/>
+                        Editar
                       </button>
                     </td>
                   </tr>
@@ -503,6 +519,15 @@ export function ProceduresScreen({
         <NewProcedureModal
           onSaved={handleProcSaved}
           onClose={() => setShowNewProc(false)}
+        />
+      )}
+      {editingProcedure && (
+        <EditProcedureModal
+          procedure={editingProcedure}
+          onSaved={async (id, data) => {
+            await onEditProcedure?.(id, data);
+          }}
+          onClose={() => setEditingProcedure(null)}
         />
       )}
     </div>
