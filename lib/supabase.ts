@@ -752,3 +752,48 @@ export async function saveDocument(data: {
   });
   return { error: error?.message ?? null };
 }
+
+// ─── Obrigações Legais ───────────────────────────────────────────────────────
+
+export async function fetchLegalObligations() {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from('legal_obligations')
+    .select('*')
+    .order('next_due_date', { ascending: true, nullsFirst: false });
+  if (error) { console.error('fetchLegalObligations:', error); return null; }
+  return data;
+}
+
+export async function saveLegalObligation(data: {
+  title: string;
+  description?: string;
+  frequency: string;
+  responsible?: string;
+  lastDoneDate?: string;
+  base?: string;
+  docControlId?: string;
+  notes?: string;
+}) {
+  if (!supabase) return { error: 'Supabase não configurado' };
+  const { error } = await supabase.from('legal_obligations').insert({
+    title: data.title,
+    description: data.description || null,
+    frequency: data.frequency,
+    responsible: data.responsible || null,
+    last_done_date: data.lastDoneDate || null,
+    base: data.base || null,
+    doc_control_id: data.docControlId || null,
+    notes: data.notes || null,
+  });
+  return { error: error?.message ?? null };
+}
+
+export async function updateLegalObligationDone(id: string, lastDoneDate: string) {
+  if (!supabase) return { error: 'Supabase não configurado' };
+  const { error } = await supabase
+    .from('legal_obligations')
+    .update({ last_done_date: lastDoneDate })
+    .eq('id', id);
+  return { error: error?.message ?? null };
+}

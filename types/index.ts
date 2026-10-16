@@ -151,3 +151,21 @@ export interface ChartProjectionMetric {
   reciclagens: number;
   vencimentos: number;
 }
+
+export type ObligationStatus = 'Vigente' | 'Próximo' | 'Vencido' | 'Indefinido';
+
+export interface LegalObligation {
+  id: string;
+  title: string;
+  description?: string | null;
+  frequency: string;
+  responsible?: string | null;
+  lastDoneDate?: string | null;
+  nextDueDate?: string | null;
+  status: ObligationStatus;
+  base?: string | null;
+  docControlId?: string | null;
+  docControlCode?: string | null;
+  notes?: string | null;
+  createdAt: string;
+}

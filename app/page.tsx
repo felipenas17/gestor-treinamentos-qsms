@@ -21,6 +21,7 @@ import { TrainingHistoryModal } from '@/components/modals/training-history-modal
 import { EmployeesScreen } from '@/components/screens/employees-screen';
 import { CertificatesScreen } from '@/components/screens/certificates-screen';
 import { DocControlScreen } from '@/components/screens/doc-control-screen';
+import { LegalObligationsScreen } from '@/components/screens/legal-obligations-screen';
 // import { ImportDocumentModal } from '@/components/modals/import-document-modal'; // modal não ativo
 
 import {
@@ -48,12 +49,15 @@ import {
   saveComplianceSnapshot,
   fetchDocuments,
   saveDocument,
+  fetchLegalObligations,
+  saveLegalObligation,
+  updateLegalObligationDone,
   updateProcedure,
   saveRevisionHistory,
   type NormativeCertRow,
 } from '@/lib/supabase';
 
-import { Employee, Procedure, TrainingRecord, Assessment, RespondentStatus, ChartProjectionMetric, DocControl } from '@/types';
+import { Employee, Procedure, TrainingRecord, Assessment, RespondentStatus, ChartProjectionMetric, DocControl, LegalObligation } from '@/types';
 import { CertificateRecord } from '@/components/screens/certificates-screen';
 import { CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 
@@ -71,6 +75,7 @@ export default function GestorTreinamentosApp() {
   const [selectedAssessmentForTaker, setSelectedAssessmentForTaker] = useState<Assessment | null>(null);
   const [respondents, setRespondents] = useState<RespondentStatus[]>([]);
   const [documents, setDocuments] = useState<DocControl[]>([]);
+  const [obligations, setObligations] = useState<LegalObligation[]>([]);
 
   // Normative certifications (Supabase-persisted; localStorage as offline fallback)
   const [normativeCerts, setNormativeCerts] = useState<CertificateRecord[]>(() => {
@@ -319,6 +324,23 @@ export default function GestorTreinamentosApp() {
     })),
   []);
 
+  const mapObligations = useCallback((raw: any[]): LegalObligation[] =>
+    raw.map((o: any) => ({
+      id: o.id,
+      title: o.title,
+      description: o.description || null,
+      frequency: o.frequency,
+      responsible: o.responsible || null,
+      lastDoneDate: o.last_done_date || null,
+      nextDueDate: o.next_due_date || null,
+      status: (o.obligation_status || 'Indefinido') as LegalObligation['status'],
+      base: o.base || null,
+      docControlId: o.doc_control_id || null,
+      notes: o.notes || null,
+      createdAt: o.created_at,
+    })),
+  []);
+
   const loadProceduresFromDB = useCallback(async () => {
     const dbProcedures = await fetchProcedures();
     if (dbProcedures) setProcedures(mapProcedures(dbProcedures));
@@ -433,6 +455,10 @@ export default function GestorTreinamentosApp() {
         const dbDocuments = await fetchDocuments();
         if (dbDocuments) setDocuments(mapDocuments(dbDocuments));
 
+        // Load legal obligations
+        const dbObligations = await fetchLegalObligations();
+        if (dbObligations) setObligations(mapObligations(dbObligations));
+
         // Load normative certs from Supabase (primary source of truth)
         const dbNormative = await fetchNormativeCerts();
         if (dbNormative.length > 0) {
@@ -450,7 +476,7 @@ export default function GestorTreinamentosApp() {
     };
 
     loadAll();
-  }, [showToast, mapProcedures, mapNormativeRow, mapDocuments]);
+  }, [showToast, mapProcedures, mapNormativeRow, mapDocuments, mapObligations]);
 
   // ─── Realtime: atualiza trainings/metrics quando qualquer linha mudar ────
   const reloadLiveData = useCallback(async () => {
@@ -783,6 +809,32 @@ export default function GestorTreinamentosApp() {
     if (dbDocs) setDocuments(mapDocuments(dbDocs));
   }, [showToast, mapDocuments]);
 
+  const handleSaveObligation = useCallback(async (data: {
+    title: string; description?: string; frequency: string;
+    responsible?: string; lastDoneDate?: string;
+    base?: string; docControlId?: string; notes?: string;
+  }) => {
+    const result = await saveLegalObligation(data);
+    if (result.error) {
+      showToast('Erro ao salvar obrigação: ' + result.error, 'error');
+      return;
+    }
+    showToast(`Obrigação "${data.title}" cadastrada ✓`);
+    const dbObs = await fetchLegalObligations();
+    if (dbObs) setObligations(mapObligations(dbObs));
+  }, [showToast, mapObligations]);
+
+  const handleObligationDone = useCallback(async (id: string, date: string) => {
+    const result = await updateLegalObligationDone(id, date);
+    if (result.error) {
+      showToast('Erro ao registrar realização: ' + result.error, 'error');
+      return;
+    }
+    showToast('Realização registrada ✓');
+    const dbObs = await fetchLegalObligations();
+    if (dbObs) setObligations(mapObligations(dbObs));
+  }, [showToast, mapObligations]);
+
   const handleExportData = (format: 'csv' | 'json' | 'print') => {
     if (format === 'csv') {
       const headers = 'Colaborador,Cargo,Setor,Procedimento,DataConclusao,Validade,DiasRestantes,Conformidade,Status\n';
@@ -916,6 +968,14 @@ export default function GestorTreinamentosApp() {
             <DocControlScreen
               documents={documents}
               onDocumentSaved={handleSaveDocument}
+            />
+          )}
+          {currentTab === 'obrigacoes-legais' && (
+            <LegalObligationsScreen
+              obligations={obligations}
+              documents={documents}
+              onObligationSaved={handleSaveObligation}
+              onObligationDone={handleObligationDone}
             />
           )}
           {currentTab === 'colaboradores' && <EmployeesScreen />}
