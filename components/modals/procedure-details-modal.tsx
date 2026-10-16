@@ -25,7 +25,6 @@ export function ProcedureDetailsModal({
 
   useEffect(() => {
     if (!procedure) return;
-    setHistory([]);
     fetchRevisionHistory(procedure.id).then(setHistory);
   }, [procedure?.id]);
 
@@ -124,7 +123,7 @@ export function ProcedureDetailsModal({
             {history.length === 0 ? (
               <div className="px-3 py-4 rounded-lg bg-slate-50 border border-slate-200 text-center">
                 <p className="text-xs text-slate-400">Nenhuma revisão registrada ainda.</p>
-                <p className="text-[11px] text-slate-400 mt-0.5">Use "Editar" e preencha a data de última revisão para iniciar o histórico.</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">Use &quot;Editar&quot; e preencha a data de última revisão para iniciar o histórico.</p>
               </div>
             ) : (
               <div className="space-y-2">
