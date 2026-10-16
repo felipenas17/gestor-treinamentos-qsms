@@ -797,3 +797,72 @@ export async function updateLegalObligationDone(id: string, lastDoneDate: string
     .eq('id', id);
   return { error: error?.message ?? null };
 }
+
+// ─── Realizações de Obrigações (histórico) ───────────────────────────────────
+
+export async function fetchObligationRealizations(obligationId: string) {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from('obligation_realizations')
+    .select('*')
+    .eq('obligation_id', obligationId)
+    .order('done_date', { ascending: false });
+  if (error) { console.error('fetchObligationRealizations:', error); return []; }
+  return data ?? [];
+}
+
+export async function addObligationRealization(data: {
+  obligationId: string;
+  doneDate: string;
+  notes?: string;
+  executionStatus?: string;
+  file?: File | null;
+}) {
+  if (!supabase) return { error: 'Supabase não configurado' };
+
+  let fileUrl: string | null = null;
+  let fileName: string | null = null;
+
+  if (data.file) {
+    const ext = data.file.name.split('.').pop() || 'pdf';
+    const path = `obligation-reports/${data.obligationId}/${Date.now()}.${ext}`;
+    const { error: uploadError } = await supabase.storage
+      .from('procedure-docs')
+      .upload(path, data.file, { upsert: false, contentType: data.file.type || 'application/pdf' });
+    if (!uploadError) {
+      const { data: urlData } = supabase.storage.from('procedure-docs').getPublicUrl(path);
+      fileUrl = urlData.publicUrl;
+      fileName = data.file.name;
+    } else {
+      console.warn('addObligationRealization: upload falhou', uploadError);
+    }
+  }
+
+  const { error: insErr } = await supabase.from('obligation_realizations').insert({
+    obligation_id: data.obligationId,
+    done_date: data.doneDate,
+    notes: data.notes || null,
+    file_url: fileUrl,
+    file_name: fileName,
+  });
+  if (insErr) return { error: insErr.message };
+
+  if (data.executionStatus) {
+    const { error: statusErr } = await supabase
+      .from('legal_obligations')
+      .update({ execution_status: data.executionStatus })
+      .eq('id', data.obligationId);
+    if (statusErr) console.warn('addObligationRealization: status update falhou', statusErr);
+  }
+
+  return { error: null };
+}
+
+export async function updateObligationExecutionStatus(id: string, status: string) {
+  if (!supabase) return { error: 'Supabase não configurado' };
+  const { error } = await supabase
+    .from('legal_obligations')
+    .update({ execution_status: status })
+    .eq('id', id);
+  return { error: error?.message ?? null };
+}

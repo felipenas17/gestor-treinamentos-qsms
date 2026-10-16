@@ -153,6 +153,7 @@ export interface ChartProjectionMetric {
 }
 
 export type ObligationStatus = 'Vigente' | 'Próximo' | 'Vencido' | 'Indefinido';
+export type ExecutionStatus = 'Pendente' | 'Em andamento' | 'Parcial' | 'Concluído';
 
 export interface LegalObligation {
   id: string;
@@ -163,9 +164,20 @@ export interface LegalObligation {
   lastDoneDate?: string | null;
   nextDueDate?: string | null;
   status: ObligationStatus;
+  executionStatus: ExecutionStatus;
   base?: string | null;
   docControlId?: string | null;
   docControlCode?: string | null;
   notes?: string | null;
+  createdAt: string;
+}
+
+export interface ObligationRealization {
+  id: string;
+  obligationId: string;
+  doneDate: string;
+  notes?: string | null;
+  fileUrl?: string | null;
+  fileName?: string | null;
   createdAt: string;
 }

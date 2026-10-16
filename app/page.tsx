@@ -51,13 +51,14 @@ import {
   saveDocument,
   fetchLegalObligations,
   saveLegalObligation,
-  updateLegalObligationDone,
+  addObligationRealization,
+  fetchObligationRealizations,
   updateProcedure,
   saveRevisionHistory,
   type NormativeCertRow,
 } from '@/lib/supabase';
 
-import { Employee, Procedure, TrainingRecord, Assessment, RespondentStatus, ChartProjectionMetric, DocControl, LegalObligation } from '@/types';
+import { Employee, Procedure, TrainingRecord, Assessment, RespondentStatus, ChartProjectionMetric, DocControl, LegalObligation, ExecutionStatus, ObligationRealization } from '@/types';
 import { CertificateRecord } from '@/components/screens/certificates-screen';
 import { CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 
@@ -334,6 +335,7 @@ export default function GestorTreinamentosApp() {
       lastDoneDate: o.last_done_date || null,
       nextDueDate: o.next_due_date || null,
       status: (o.obligation_status || 'Indefinido') as LegalObligation['status'],
+      executionStatus: (o.execution_status || 'Pendente') as ExecutionStatus,
       base: o.base || null,
       docControlId: o.doc_control_id || null,
       notes: o.notes || null,
@@ -824,8 +826,14 @@ export default function GestorTreinamentosApp() {
     if (dbObs) setObligations(mapObligations(dbObs));
   }, [showToast, mapObligations]);
 
-  const handleObligationDone = useCallback(async (id: string, date: string) => {
-    const result = await updateLegalObligationDone(id, date);
+  const handleAddRealization = useCallback(async (data: {
+    obligationId: string;
+    doneDate: string;
+    notes?: string;
+    executionStatus: string;
+    file?: File | null;
+  }) => {
+    const result = await addObligationRealization(data);
     if (result.error) {
       showToast('Erro ao registrar realização: ' + result.error, 'error');
       return;
@@ -834,6 +842,19 @@ export default function GestorTreinamentosApp() {
     const dbObs = await fetchLegalObligations();
     if (dbObs) setObligations(mapObligations(dbObs));
   }, [showToast, mapObligations]);
+
+  const handleLoadRealizations = useCallback(async (obligationId: string): Promise<ObligationRealization[]> => {
+    const raw = await fetchObligationRealizations(obligationId);
+    return raw.map((r: any) => ({
+      id: r.id,
+      obligationId: r.obligation_id,
+      doneDate: r.done_date,
+      notes: r.notes || null,
+      fileUrl: r.file_url || null,
+      fileName: r.file_name || null,
+      createdAt: r.created_at,
+    }));
+  }, []);
 
   const handleExportData = (format: 'csv' | 'json' | 'print') => {
     if (format === 'csv') {
@@ -975,7 +996,8 @@ export default function GestorTreinamentosApp() {
               obligations={obligations}
               documents={documents}
               onObligationSaved={handleSaveObligation}
-              onObligationDone={handleObligationDone}
+              onAddRealization={handleAddRealization}
+              onLoadRealizations={handleLoadRealizations}
             />
           )}
           {currentTab === 'colaboradores' && <EmployeesScreen />}
