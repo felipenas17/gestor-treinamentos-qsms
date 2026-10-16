@@ -302,7 +302,7 @@ function HistoryModal({ obligation, onLoad, onClose }: HistoryModalProps) {
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <History className="w-10 h-10 text-slate-200 mb-3" />
               <p className="text-sm font-semibold text-slate-400">Nenhuma realização registrada</p>
-              <p className="text-xs text-slate-300 mt-1">Use o botão "Registrar" para iniciar o histórico.</p>
+              <p className="text-xs text-slate-300 mt-1">Use o botão &quot;Registrar&quot; para iniciar o histórico.</p>
             </div>
           ) : (
             <div className="space-y-3">
