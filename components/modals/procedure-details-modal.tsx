@@ -1,8 +1,9 @@
 'use client';
 
-import React from 'react';
-import { X, FileText, CheckCircle2, AlertTriangle, ShieldCheck, HelpCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, HelpCircle, History, Clock } from 'lucide-react';
 import { Procedure } from '@/types';
+import { fetchRevisionHistory, type RevisionHistoryEntry } from '@/lib/supabase';
 
 interface ProcedureDetailsModalProps {
   procedure: Procedure | null;
@@ -10,11 +11,24 @@ interface ProcedureDetailsModalProps {
   onStartAssessment?: (procedure: Procedure) => void;
 }
 
+function fmtDate(iso?: string | null) {
+  if (!iso) return '—';
+  return new Date(iso + 'T00:00:00').toLocaleDateString('pt-BR');
+}
+
 export function ProcedureDetailsModal({
   procedure,
   onClose,
   onStartAssessment,
 }: ProcedureDetailsModalProps) {
+  const [history, setHistory] = useState<RevisionHistoryEntry[]>([]);
+
+  useEffect(() => {
+    if (!procedure) return;
+    setHistory([]);
+    fetchRevisionHistory(procedure.id).then(setHistory);
+  }, [procedure?.id]);
+
   if (!procedure) return null;
 
   return (
@@ -95,6 +109,65 @@ export function ProcedureDetailsModal({
               </p>
             </div>
           )}
+
+          {/* Histórico de Revisões */}
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <History className="w-3.5 h-3.5 text-slate-500" />
+              <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                Histórico de Revisões
+              </h3>
+              <span className="text-[10px] font-semibold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
+                {history.length}
+              </span>
+            </div>
+            {history.length === 0 ? (
+              <div className="px-3 py-4 rounded-lg bg-slate-50 border border-slate-200 text-center">
+                <p className="text-xs text-slate-400">Nenhuma revisão registrada ainda.</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">Use "Editar" e preencha a data de última revisão para iniciar o histórico.</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {history.map((h, i) => (
+                  <div key={h.id} className={`flex gap-3 p-3 rounded-lg border text-xs ${i === 0 ? 'border-blue-200 bg-blue-50/40' : 'border-slate-200 bg-slate-50'}`}>
+                    <div className="shrink-0 flex flex-col items-center gap-1 pt-0.5">
+                      <div className={`w-2 h-2 rounded-full ${i === 0 ? 'bg-blue-500' : 'bg-slate-300'}`} />
+                      {i < history.length - 1 && <div className="w-px flex-1 bg-slate-200" />}
+                    </div>
+                    <div className="flex-1 min-w-0 space-y-0.5">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {h.revision && (
+                          <span className="font-mono font-bold text-[11px] text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded">
+                            {h.revision}
+                          </span>
+                        )}
+                        {h.revision_date && (
+                          <span className="inline-flex items-center gap-1 text-[11px] text-slate-600 font-medium">
+                            <Clock className="w-3 h-3 text-slate-400" />
+                            {fmtDate(h.revision_date)}
+                          </span>
+                        )}
+                        {i === 0 && (
+                          <span className="text-[10px] font-semibold text-blue-600 bg-blue-100 px-1.5 py-0.5 rounded-full">
+                            Atual
+                          </span>
+                        )}
+                      </div>
+                      {h.responsible && (
+                        <p className="text-[11px] text-slate-500">Responsável: <span className="font-semibold text-slate-700">{h.responsible}</span></p>
+                      )}
+                      {h.notes && (
+                        <p className="text-[11px] text-slate-600 italic leading-relaxed">{h.notes}</p>
+                      )}
+                      <p className="text-[10px] text-slate-400">
+                        Registrado em {new Date(h.created_at).toLocaleDateString('pt-BR')} às {new Date(h.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
           {/* Banco de questões preview */}
           <div className="p-4 rounded-xl border border-blue-200 bg-blue-50/50 space-y-2">

@@ -49,6 +49,7 @@ import {
   fetchDocuments,
   saveDocument,
   updateProcedure,
+  saveRevisionHistory,
   type NormativeCertRow,
 } from '@/lib/supabase';
 
@@ -741,11 +742,23 @@ export default function GestorTreinamentosApp() {
     name?: string; revision?: string; status?: string; criticality?: string;
     docType?: string; docLastRevisionDate?: string | null;
     docRevisionMonths?: number; docResponsible?: string | null;
+    revisionNotes?: string; procedureCode?: string;
   }) => {
     const result = await updateProcedure(id, data);
     if (result.error) {
       showToast('Erro ao atualizar procedimento: ' + result.error, 'error');
       return;
+    }
+    // Registra histórico de revisão quando há data de última revisão
+    if (data.docLastRevisionDate && data.procedureCode) {
+      await saveRevisionHistory({
+        procedureId: id,
+        procedureCode: data.procedureCode,
+        revision: data.revision,
+        revisionDate: data.docLastRevisionDate,
+        responsible: data.docResponsible,
+        notes: data.revisionNotes,
+      });
     }
     showToast('Procedimento atualizado ✓');
     // Reload procedures from DB so trigger-computed fields refresh

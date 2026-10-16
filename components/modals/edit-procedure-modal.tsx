@@ -32,11 +32,25 @@ interface FormData {
   docLastRevisionDate: string;
   docRevisionMonths: string;
   docResponsible: string;
+  revisionNotes: string;
+}
+
+export interface EditProcedurePayload {
+  name: string;
+  revision: string;
+  status: ProcedureStatus;
+  criticality: 'Alta' | 'Média' | 'Baixa';
+  docType: string;
+  docLastRevisionDate: string;
+  docRevisionMonths: number;
+  docResponsible: string;
+  revisionNotes: string;
+  procedureCode: string;
 }
 
 interface EditProcedureModalProps {
   procedure: Procedure;
-  onSaved: (id: string, data: Omit<FormData, 'docRevisionMonths'> & { docRevisionMonths: number }) => Promise<void>;
+  onSaved: (id: string, data: EditProcedurePayload) => Promise<void>;
   onClose: () => void;
 }
 
@@ -50,6 +64,7 @@ export function EditProcedureModal({ procedure, onSaved, onClose }: EditProcedur
     docLastRevisionDate: procedure.docLastRevisionDate ?? '',
     docRevisionMonths: String(procedure.docRevisionMonths ?? 36),
     docResponsible: procedure.docResponsible ?? '',
+    revisionNotes: '',
   });
   const [saving, setSaving] = useState(false);
 
@@ -71,6 +86,7 @@ export function EditProcedureModal({ procedure, onSaved, onClose }: EditProcedur
     await onSaved(procedure.id, {
       ...form,
       docRevisionMonths: Number(form.docRevisionMonths),
+      procedureCode: procedure.code,
     });
     setSaving(false);
     onClose();
@@ -206,6 +222,20 @@ export function EditProcedureModal({ procedure, onSaved, onClose }: EditProcedur
                 onChange={e => set('docResponsible', e.target.value)}
                 placeholder="Ex: Felipe Nascimento"
                 className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Notas desta revisão
+                <span className="ml-1 text-slate-400 font-normal">(opcional — ficará no histórico)</span>
+              </label>
+              <textarea
+                rows={2}
+                value={form.revisionNotes}
+                onChange={e => set('revisionNotes', e.target.value)}
+                placeholder="Ex: Atualizado conforme nova NR-10, incluída seção 4.3 sobre EPI…"
+                className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
               />
             </div>
           </section>

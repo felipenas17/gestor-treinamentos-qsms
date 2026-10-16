@@ -657,6 +657,51 @@ export async function updateProcedure(
   return { error: error?.message ?? null };
 }
 
+// ─── Histórico de Revisões de Procedimentos ─────────────────────────────────
+
+export interface RevisionHistoryEntry {
+  id: string;
+  procedure_id: string;
+  procedure_code: string;
+  revision: string | null;
+  revision_date: string | null;
+  responsible: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export async function saveRevisionHistory(data: {
+  procedureId: string;
+  procedureCode: string;
+  revision?: string;
+  revisionDate?: string | null;
+  responsible?: string | null;
+  notes?: string;
+}) {
+  if (!supabase) return false;
+  const { error } = await supabase.from('procedure_revision_history').insert({
+    procedure_id: data.procedureId,
+    procedure_code: data.procedureCode,
+    revision: data.revision || null,
+    revision_date: data.revisionDate || null,
+    responsible: data.responsible || null,
+    notes: data.notes || null,
+  });
+  if (error) { console.error('saveRevisionHistory:', error); return false; }
+  return true;
+}
+
+export async function fetchRevisionHistory(procedureId: string): Promise<RevisionHistoryEntry[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from('procedure_revision_history')
+    .select('*')
+    .eq('procedure_id', procedureId)
+    .order('created_at', { ascending: false });
+  if (error) { console.error('fetchRevisionHistory:', error); return []; }
+  return (data ?? []) as RevisionHistoryEntry[];
+}
+
 export async function saveDocument(data: {
   code: string;
   name: string;
