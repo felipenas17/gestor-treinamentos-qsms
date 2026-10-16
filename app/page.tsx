@@ -53,12 +53,14 @@ import {
   saveLegalObligation,
   addObligationRealization,
   fetchObligationRealizations,
+  fetchDocControlRenewals,
+  addDocControlRenewal,
   updateProcedure,
   saveRevisionHistory,
   type NormativeCertRow,
 } from '@/lib/supabase';
 
-import { Employee, Procedure, TrainingRecord, Assessment, RespondentStatus, ChartProjectionMetric, DocControl, LegalObligation, ExecutionStatus, ObligationRealization } from '@/types';
+import { Employee, Procedure, TrainingRecord, Assessment, RespondentStatus, ChartProjectionMetric, DocControl, LegalObligation, ExecutionStatus, ObligationRealization, DocControlRenewal, RenewalStatus } from '@/types';
 import { CertificateRecord } from '@/components/screens/certificates-screen';
 import { CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 
@@ -318,6 +320,7 @@ export default function GestorTreinamentosApp() {
       expiryDate: d.expiry_date || null,
       renewalMonths: d.renewal_months ?? 12,
       docStatus: d.doc_status || 'Indefinido',
+      renewalStatus: (d.renewal_status || 'Não iniciado') as RenewalStatus,
       responsible: d.responsible || null,
       fileUrl: d.file_url || null,
       notes: d.notes || null,
@@ -856,6 +859,37 @@ export default function GestorTreinamentosApp() {
     }));
   }, []);
 
+  const handleAddDocRenewal = useCallback(async (data: {
+    docControlId: string;
+    eventDate: string;
+    notes?: string;
+    renewalStatus: string;
+    file?: File | null;
+  }) => {
+    const result = await addDocControlRenewal(data);
+    if (result.error) {
+      showToast('Erro ao registrar renovação: ' + result.error, 'error');
+      return;
+    }
+    showToast('Renovação registrada ✓');
+    const dbDocs = await fetchDocuments();
+    if (dbDocs) setDocuments(mapDocuments(dbDocs));
+  }, [showToast, mapDocuments]);
+
+  const handleLoadDocRenewals = useCallback(async (docControlId: string): Promise<DocControlRenewal[]> => {
+    const raw = await fetchDocControlRenewals(docControlId);
+    return raw.map((r: any) => ({
+      id: r.id,
+      docControlId: r.doc_control_id,
+      eventDate: r.event_date,
+      notes: r.notes || null,
+      fileUrl: r.file_url || null,
+      fileName: r.file_name || null,
+      renewalStatus: (r.renewal_status || 'Em processo') as RenewalStatus,
+      createdAt: r.created_at,
+    }));
+  }, []);
+
   const handleExportData = (format: 'csv' | 'json' | 'print') => {
     if (format === 'csv') {
       const headers = 'Colaborador,Cargo,Setor,Procedimento,DataConclusao,Validade,DiasRestantes,Conformidade,Status\n';
@@ -989,6 +1023,8 @@ export default function GestorTreinamentosApp() {
             <DocControlScreen
               documents={documents}
               onDocumentSaved={handleSaveDocument}
+              onAddRenewal={handleAddDocRenewal}
+              onLoadRenewals={handleLoadDocRenewals}
             />
           )}
           {currentTab === 'obrigacoes-legais' && (

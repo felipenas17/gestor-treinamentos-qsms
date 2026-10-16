@@ -866,3 +866,63 @@ export async function updateObligationExecutionStatus(id: string, status: string
     .eq('id', id);
   return { error: error?.message ?? null };
 }
+
+// ─── Histórico de Renovações — Controle Documental ──────────────────────────
+
+export async function fetchDocControlRenewals(docControlId: string) {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from('doc_control_renewals')
+    .select('*')
+    .eq('doc_control_id', docControlId)
+    .order('event_date', { ascending: false });
+  if (error) { console.error('fetchDocControlRenewals:', error); return []; }
+  return data ?? [];
+}
+
+export async function addDocControlRenewal(data: {
+  docControlId: string;
+  eventDate: string;
+  notes?: string;
+  renewalStatus: string;
+  file?: File | null;
+}) {
+  if (!supabase) return { error: 'Supabase não configurado' };
+
+  let fileUrl: string | null = null;
+  let fileName: string | null = null;
+
+  if (data.file) {
+    const ext = data.file.name.split('.').pop() || 'pdf';
+    const path = `doc-renewal-reports/${data.docControlId}/${Date.now()}.${ext}`;
+    const { error: uploadError } = await supabase.storage
+      .from('procedure-docs')
+      .upload(path, data.file, { upsert: false, contentType: data.file.type || 'application/pdf' });
+    if (!uploadError) {
+      const { data: urlData } = supabase.storage.from('procedure-docs').getPublicUrl(path);
+      fileUrl = urlData.publicUrl;
+      fileName = data.file.name;
+    } else {
+      console.warn('addDocControlRenewal: upload falhou', uploadError);
+    }
+  }
+
+  const { error: insErr } = await supabase.from('doc_control_renewals').insert({
+    doc_control_id: data.docControlId,
+    event_date: data.eventDate,
+    notes: data.notes || null,
+    file_url: fileUrl,
+    file_name: fileName,
+    renewal_status: data.renewalStatus,
+  });
+  if (insErr) return { error: insErr.message };
+
+  // Atualiza renewal_status na tabela pai
+  const { error: statusErr } = await supabase
+    .from('doc_control')
+    .update({ renewal_status: data.renewalStatus })
+    .eq('id', data.docControlId);
+  if (statusErr) console.warn('addDocControlRenewal: status update falhou', statusErr);
+
+  return { error: null };
+}

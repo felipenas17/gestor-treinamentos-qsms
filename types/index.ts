@@ -18,6 +18,7 @@ export type ComplianceStatus = 'Certificado' | 'Reciclar' | 'Vencido' | 'Pendent
 export type ProcedureStatus = 'Ativo' | 'Em Revisão' | 'Arquivado';
 export type DocRevisionStatus = 'Vigente' | 'Para Revisão' | 'Vencido' | 'Indefinido';
 export type DocStatus = 'Vigente' | 'Para Renovar' | 'Vencido' | 'Indefinido';
+export type RenewalStatus = 'Não iniciado' | 'Em processo' | 'Aguardando aprovação' | 'Concluído';
 
 export interface DocControl {
   id: string;
@@ -29,10 +30,22 @@ export interface DocControl {
   expiryDate?: string | null;
   renewalMonths?: number;
   docStatus?: DocStatus;
+  renewalStatus: RenewalStatus;
   responsible?: string | null;
   fileUrl?: string | null;
   notes?: string | null;
   base?: string | null;
+}
+
+export interface DocControlRenewal {
+  id: string;
+  docControlId: string;
+  eventDate: string;
+  notes?: string | null;
+  fileUrl?: string | null;
+  fileName?: string | null;
+  renewalStatus: RenewalStatus;
+  createdAt: string;
 }
 
 export interface Procedure {
