@@ -16,6 +16,7 @@ export type Sector =
 
 export type ComplianceStatus = 'Certificado' | 'Reciclar' | 'Vencido' | 'Pendente';
 export type ProcedureStatus = 'Ativo' | 'Em Revisão' | 'Arquivado';
+export type DocRevisionStatus = 'Vigente' | 'Para Revisão' | 'Vencido' | 'Indefinido';
 
 export interface Procedure {
   id: string;
@@ -34,6 +35,13 @@ export interface Procedure {
   validityMonths: number;
   fileUrl?: string;
   sectors?: string[];
+  // Controle documental
+  docType?: string;
+  docLastRevisionDate?: string | null;
+  docRevisionMonths?: number;
+  docNextRevisionDate?: string | null;
+  docRevisionStatus?: DocRevisionStatus;
+  docResponsible?: string | null;
 }
 
 export interface Employee {

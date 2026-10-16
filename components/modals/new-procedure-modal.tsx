@@ -1,14 +1,30 @@
 'use client';
 import React, { useState, useRef, useCallback } from 'react';
-import { X, FileText, Check, Upload, Loader2, Sparkles, Paperclip } from 'lucide-react';
+import { X, FileText, Check, Upload, Loader2, Sparkles, Paperclip, ClipboardList } from 'lucide-react';
 
 const SETORES = ['Operacional','Brascabo','Operacional RDO','Transbordo MC','CS','QSMS','Suprimentos','Terceiros'];
+
+const DOC_TYPES = [
+  'Procedimento',
+  'POP (Proc. Operacional Padrão)',
+  'Instrução de Trabalho',
+  'Licença / Autorização',
+  'Certificado de Empresa',
+  'Manual',
+  'Plano',
+  'Outro',
+];
 
 export interface ProcedureFormData {
   code: string; revision: string; name: string; description: string;
   hours: string; validityMonths: string;
   criticality: 'Alta' | 'Média' | 'Baixa'; sectors: string[];
   file?: File;
+  // Controle documental
+  docType: string;
+  docLastRevisionDate: string;
+  docRevisionMonths: string;
+  docResponsible: string;
 }
 
 interface NewProcedureModalProps {
@@ -19,7 +35,8 @@ interface NewProcedureModalProps {
 export function NewProcedureModal({ onSaved, onClose }: NewProcedureModalProps) {
   const [f, setF] = useState<ProcedureFormData>({
     code: '', revision: 'R00', name: '', description: '', hours: '',
-    validityMonths: '12', criticality: 'Média', sectors: []
+    validityMonths: '12', criticality: 'Média', sectors: [],
+    docType: 'Procedimento', docLastRevisionDate: '', docRevisionMonths: '36', docResponsible: '',
   });
   const [dragging, setDragging] = useState(false);
   const [extracting, setExtracting] = useState(false);
@@ -223,6 +240,63 @@ export function NewProcedureModal({ onSaved, onClose }: NewProcedureModalProps) 
                 ))}
               </div>
             </div>
+          </div>
+
+          {/* ── Controle de Revisão Documental ── */}
+          <div className="pt-1">
+            <div className="flex items-center gap-2 mb-3">
+              <ClipboardList className="w-3.5 h-3.5 text-blue-500"/>
+              <span className="text-xs font-semibold text-slate-700 uppercase tracking-wide">Controle de Revisão Documental</span>
+            </div>
+
+            {/* Tipo + Ciclo */}
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-slate-600">Tipo de documento</label>
+                <select value={f.docType} onChange={e => set('docType', e.target.value)}
+                  className="h-9 px-3 border border-slate-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-400">
+                  {DOC_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-slate-600">Ciclo de revisão</label>
+                <select value={f.docRevisionMonths} onChange={e => set('docRevisionMonths', e.target.value)}
+                  className="h-9 px-3 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-400">
+                  <option value="12">12 meses</option>
+                  <option value="24">24 meses</option>
+                  <option value="36">36 meses</option>
+                  <option value="48">48 meses</option>
+                  <option value="60">60 meses</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Última revisão + Responsável */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-slate-600">Última revisão do doc.</label>
+                <input type="date" value={f.docLastRevisionDate} onChange={e => set('docLastRevisionDate', e.target.value)}
+                  className="h-9 px-3 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"/>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-slate-600">Responsável pela revisão</label>
+                <input value={f.docResponsible} onChange={e => set('docResponsible', e.target.value)}
+                  placeholder="Ex: Luiz Felipe"
+                  className="h-9 px-3 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"/>
+              </div>
+            </div>
+
+            {f.docLastRevisionDate && (
+              <p className="mt-2 text-[11px] text-blue-600 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+                Próxima revisão será calculada automaticamente: {
+                  (() => {
+                    const d = new Date(f.docLastRevisionDate + 'T00:00:00');
+                    d.setMonth(d.getMonth() + parseInt(f.docRevisionMonths || '36'));
+                    return d.toLocaleDateString('pt-BR');
+                  })()
+                }
+              </p>
+            )}
           </div>
 
           {/* Sectors */}

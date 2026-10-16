@@ -248,6 +248,11 @@ export async function saveProcedure(data: {
   hours: string; validityMonths: string;
   criticality: string; sectors: string[];
   file?: File;
+  // Controle documental
+  docType?: string;
+  docLastRevisionDate?: string;
+  docRevisionMonths?: number;
+  docResponsible?: string;
 }) {
   if (!supabase) return { error: 'not configured' };
 
@@ -281,7 +286,12 @@ export async function saveProcedure(data: {
       validity_months: parseInt(data.validityMonths),
       criticality: data.criticality,
       file_url: fileUrl,
-      status: 'Ativo'
+      status: 'Ativo',
+      // Controle documental
+      doc_type: data.docType || 'Procedimento',
+      doc_last_revision_date: data.docLastRevisionDate || null,
+      doc_revision_months: data.docRevisionMonths ?? 36,
+      doc_responsible: data.docResponsible || null,
     })
     .select('id').single();
   if (error || !proc) return { error };

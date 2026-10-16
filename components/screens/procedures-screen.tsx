@@ -12,8 +12,12 @@ import {
   HelpCircle,
   ExternalLink,
   PlusCircle,
+  AlertTriangle,
+  CheckCircle2,
+  Clock,
+  HelpCircle as HelpCircleIcon,
 } from 'lucide-react';
-import { Procedure, ProcedureStatus } from '@/types';
+import { Procedure, ProcedureStatus, DocRevisionStatus } from '@/types';
 
 interface ProceduresScreenProps {
   procedures: Procedure[];
@@ -72,6 +76,7 @@ export function ProceduresScreen({
   const [selectedSector, setSelectedSector] = useState<string>('Todos');
   const [selectedRole, setSelectedRole] = useState<string>('Todos');
   const [selectedStatus, setSelectedStatus] = useState<string>('Todos');
+  const [selectedDocStatus, setSelectedDocStatus] = useState<string>('Todos');
   const [selectedOrder, setSelectedOrder] = useState<'Completo' | 'Maior Conformidade' | 'Menor Conformidade'>('Completo');
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
 
@@ -86,6 +91,14 @@ export function ProceduresScreen({
     return ['Todos', ...list];
   }, [procedures]);
 
+  // Contadores de status documental para o painel de resumo
+  const docStatusCounts = useMemo(() => ({
+    vencido:     procedures.filter(p => p.docRevisionStatus === 'Vencido').length,
+    paraRevisao: procedures.filter(p => p.docRevisionStatus === 'Para Revisão').length,
+    vigente:     procedures.filter(p => p.docRevisionStatus === 'Vigente').length,
+    indefinido:  procedures.filter(p => !p.docRevisionStatus || p.docRevisionStatus === 'Indefinido').length,
+  }), [procedures]);
+
   // Filtered procedures
   const filtered = useMemo(() => {
     return procedures
@@ -93,13 +106,17 @@ export function ProceduresScreen({
         const matchesSearch =
           p.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
           p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          p.application.toLowerCase().includes(searchTerm.toLowerCase());
+          (p.application ?? '').toLowerCase().includes(searchTerm.toLowerCase());
 
         const matchesSector = selectedSector === 'Todos' || (p.sectors ?? [p.sector]).includes(selectedSector);
         const matchesRole = selectedRole === 'Todos' || p.associatedRole === selectedRole;
         const matchesStatus = selectedStatus === 'Todos' || p.status === selectedStatus;
+        const matchesDocStatus = selectedDocStatus === 'Todos'
+          || (selectedDocStatus === 'Indefinido'
+              ? !p.docRevisionStatus || p.docRevisionStatus === 'Indefinido'
+              : p.docRevisionStatus === selectedDocStatus);
 
-        return matchesSearch && matchesSector && matchesRole && matchesStatus;
+        return matchesSearch && matchesSector && matchesRole && matchesStatus && matchesDocStatus;
       })
       .sort((a, b) => {
         if (selectedOrder === 'Maior Conformidade') return b.complianceRate - a.complianceRate;
@@ -110,15 +127,26 @@ export function ProceduresScreen({
 
   const getStatusBadge = (status: ProcedureStatus) => {
     switch (status) {
-      case 'Ativo':
-        return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-      case 'Em Revisão':
-        return 'bg-amber-50 text-amber-700 border-amber-200';
-      case 'Arquivado':
-        return 'bg-slate-100 text-slate-600 border-slate-300';
-      default:
-        return 'bg-slate-50 text-slate-700 border-slate-200';
+      case 'Ativo':      return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+      case 'Em Revisão': return 'bg-amber-50 text-amber-700 border-amber-200';
+      case 'Arquivado':  return 'bg-slate-100 text-slate-600 border-slate-300';
+      default:           return 'bg-slate-50 text-slate-700 border-slate-200';
     }
+  };
+
+  const getDocRevisionBadge = (s?: DocRevisionStatus | null) => {
+    switch (s) {
+      case 'Vigente':      return { cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: CheckCircle2 };
+      case 'Para Revisão': return { cls: 'bg-amber-50 text-amber-700 border-amber-200',   icon: Clock };
+      case 'Vencido':      return { cls: 'bg-red-50 text-red-700 border-red-200',          icon: AlertTriangle };
+      default:             return { cls: 'bg-slate-100 text-slate-500 border-slate-200',   icon: HelpCircleIcon };
+    }
+  };
+
+  const fmtDate = (d?: string | null) => {
+    if (!d) return '—';
+    const dt = new Date(d + 'T00:00:00');
+    return dt.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
   };
 
   return (
@@ -146,7 +174,25 @@ export function ProceduresScreen({
         </div>
       </div>
 
-      {/* Info Banner — oculto até modal estar ativo */}
+      {/* Painel de resumo — status documental */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: 'Vencidos',      value: docStatusCounts.vencido,     color: 'border-red-200 bg-red-50',    text: 'text-red-700',     filter: 'Vencido'      },
+          { label: 'Para Revisão',  value: docStatusCounts.paraRevisao, color: 'border-amber-200 bg-amber-50',text: 'text-amber-700',   filter: 'Para Revisão' },
+          { label: 'Vigentes',      value: docStatusCounts.vigente,     color: 'border-emerald-200 bg-emerald-50', text: 'text-emerald-700', filter: 'Vigente' },
+          { label: 'Não definido',  value: docStatusCounts.indefinido,  color: 'border-slate-200 bg-slate-50', text: 'text-slate-500',  filter: 'Indefinido'   },
+        ].map(card => (
+          <button key={card.filter}
+            onClick={() => setSelectedDocStatus(prev => prev === card.filter ? 'Todos' : card.filter)}
+            className={`flex flex-col items-start p-3 rounded-xl border-2 transition-all text-left ${card.color} ${
+              selectedDocStatus === card.filter ? 'ring-2 ring-blue-400 ring-offset-1' : 'hover:brightness-95'
+            }`}
+          >
+            <span className={`text-2xl font-bold ${card.text}`}>{card.value}</span>
+            <span className={`text-xs font-medium ${card.text} opacity-80`}>{card.label}</span>
+          </button>
+        ))}
+      </div>
 
       {/* Filters Row */}
       <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-sm space-y-3">
@@ -222,6 +268,22 @@ export function ProceduresScreen({
               </select>
             </div>
 
+            {/* Status Documental */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-slate-500 font-medium">Doc.:</span>
+              <select
+                value={selectedDocStatus}
+                onChange={(e) => setSelectedDocStatus(e.target.value)}
+                className="px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="Todos">Todos</option>
+                <option value="Vigente">Vigente</option>
+                <option value="Para Revisão">Para Revisão</option>
+                <option value="Vencido">Vencido</option>
+                <option value="Indefinido">Indefinido</option>
+              </select>
+            </div>
+
             {/* Lista/Grid toggle */}
             <div className="flex items-center border border-slate-300 rounded-lg overflow-hidden bg-slate-50 p-0.5 ml-auto sm:ml-0">
               <button
@@ -279,9 +341,11 @@ export function ProceduresScreen({
                   <th className="py-3 px-4">Código</th>
                   <th className="py-3 px-4 text-center">Rev.</th>
                   <th className="py-3 px-4">Nome do Procedimento</th>
-                  <th className="py-3 px-4">Setores</th>
+                  <th className="py-3 px-4">Tipo Doc.</th>
+                  <th className="py-3 px-4 text-center">Status Doc.</th>
+                  <th className="py-3 px-4 text-center">Próx. Revisão</th>
+                  <th className="py-3 px-4">Responsável</th>
                   <th className="py-3 px-4 text-center">Criticidade</th>
-                  <th className="py-3 px-4 text-center">Validade</th>
                   <th className="py-3 px-4 text-center">Status</th>
                   <th className="py-3 px-4 text-center">PDF</th>
                   <th className="py-3 px-4 text-center">Questões</th>
@@ -302,15 +366,34 @@ export function ProceduresScreen({
                         {proc.revision ?? 'R00'}
                       </span>
                     </td>
-                    <td className="py-3 px-4 font-semibold text-slate-900 max-w-[220px] truncate">
+                    <td className="py-3 px-4 font-semibold text-slate-900 max-w-[200px] truncate">
                       {proc.name}
                     </td>
-                    <td className="py-3 px-4 text-slate-500 max-w-[180px]">
-                      {proc.sectors && proc.sectors.length > 0
-                        ? proc.sectors.map(s => (
-                          <span key={s} className="inline-block mr-1 mb-0.5 px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px] font-medium">{s}</span>
-                        ))
-                        : <span className="text-slate-300">—</span>}
+                    {/* Tipo de documento */}
+                    <td className="py-3 px-4 text-slate-500 whitespace-nowrap">
+                      <span className="text-[10px] font-medium text-slate-600">
+                        {proc.docType ?? 'Procedimento'}
+                      </span>
+                    </td>
+                    {/* Status documental */}
+                    <td className="py-3 px-4 text-center">
+                      {(() => {
+                        const { cls, icon: Icon } = getDocRevisionBadge(proc.docRevisionStatus);
+                        return (
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${cls}`}>
+                            <Icon className="w-3 h-3" />
+                            {proc.docRevisionStatus ?? 'Indefinido'}
+                          </span>
+                        );
+                      })()}
+                    </td>
+                    {/* Próxima revisão */}
+                    <td className="py-3 px-4 text-center font-mono text-[11px] text-slate-500 whitespace-nowrap">
+                      {fmtDate(proc.docNextRevisionDate)}
+                    </td>
+                    {/* Responsável */}
+                    <td className="py-3 px-4 text-[11px] text-slate-500 max-w-[120px] truncate">
+                      {proc.docResponsible ?? <span className="text-slate-300">—</span>}
                     </td>
                     <td className="py-3 px-4 text-center">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${
@@ -318,9 +401,6 @@ export function ProceduresScreen({
                         : proc.criticality === 'Média' ? 'bg-amber-50 text-amber-700 border-amber-200'
                         : 'bg-emerald-50 text-emerald-700 border-emerald-200'
                       }`}>{proc.criticality}</span>
-                    </td>
-                    <td className="py-3 px-4 text-center font-mono text-slate-600">
-                      {proc.validityMonths}m
                     </td>
                     <td className="py-3 px-4 text-center">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${getStatusBadge(proc.status)}`}>
@@ -370,6 +450,23 @@ export function ProceduresScreen({
                 {proc.description && <p className="text-xs text-slate-500 line-clamp-2">{proc.description}</p>}
               </div>
               <div className="space-y-2 pt-2 border-t border-slate-100 text-xs">
+                {/* Status documental */}
+                {(() => {
+                  const { cls, icon: Icon } = getDocRevisionBadge(proc.docRevisionStatus);
+                  return (
+                    <div className="flex items-center justify-between">
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${cls}`}>
+                        <Icon className="w-3 h-3" />
+                        {proc.docRevisionStatus ?? 'Indefinido'}
+                      </span>
+                      {proc.docNextRevisionDate && (
+                        <span className="text-[10px] font-mono text-slate-400">
+                          Próx. {fmtDate(proc.docNextRevisionDate)}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })()}
                 {proc.sectors && proc.sectors.length > 0 && (
                   <div className="flex flex-wrap gap-1">
                     {proc.sectors.map(s => (
@@ -383,7 +480,7 @@ export function ProceduresScreen({
                     : proc.criticality === 'Média' ? 'bg-amber-50 text-amber-700 border-amber-200'
                     : 'bg-emerald-50 text-emerald-700 border-emerald-200'
                   }`}>{proc.criticality}</span>
-                  <span className="text-[11px] font-mono text-slate-400">{proc.validityMonths} meses</span>
+                  <span className="text-[11px] font-mono text-slate-400">{proc.validityMonths}m validade</span>
                 </div>
                 <div className="flex items-center justify-between pt-1">
                   {proc.fileUrl
