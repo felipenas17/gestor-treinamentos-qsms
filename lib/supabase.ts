@@ -714,6 +714,7 @@ export async function saveDocument(data: {
   fileUrl?: string;
   notes?: string;
   file?: File | null;
+  base?: string;
 }) {
   if (!supabase) return { error: 'Supabase não configurado' };
 
@@ -747,6 +748,7 @@ export async function saveDocument(data: {
     responsible: data.responsible || null,
     file_url: fileUrl,
     notes: data.notes || null,
+    base: data.base || null,
   });
   return { error: error?.message ?? null };
 }

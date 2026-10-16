@@ -3,6 +3,13 @@
 import React, { useRef, useState } from 'react';
 import { X, Shield, Paperclip, FileText } from 'lucide-react';
 
+const BASES = [
+  'Base Macaé',
+  'Base Rio das Ostras',
+  'Base Duque de Caxias',
+  'Base Bahia',
+];
+
 const DOC_TYPES = [
   'Licença Polícia Federal',
   'Licença Exército (SIGMA)',
@@ -35,6 +42,7 @@ interface FormData {
   responsible: string;
   notes: string;
   file: File | null;
+  base: string;
 }
 
 interface NewDocModalProps {
@@ -54,6 +62,7 @@ export function NewDocModal({ onSaved, onClose }: NewDocModalProps) {
     responsible: '',
     notes: '',
     file: null,
+    base: '',
   });
   const [saving, setSaving] = useState(false);
   const [dragOver, setDragOver] = useState(false);
@@ -141,15 +150,28 @@ export function NewDocModal({ onSaved, onClose }: NewDocModalProps) {
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Órgão Emissor</label>
-              <input
-                type="text"
-                placeholder="Ex: Polícia Federal — SR/RJ"
-                value={form.issuingBody}
-                onChange={e => set('issuingBody', e.target.value)}
-                className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Órgão Emissor</label>
+                <input
+                  type="text"
+                  placeholder="Ex: Polícia Federal — SR/RJ"
+                  value={form.issuingBody}
+                  onChange={e => set('issuingBody', e.target.value)}
+                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Base</label>
+                <select
+                  value={form.base}
+                  onChange={e => set('base', e.target.value)}
+                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                >
+                  <option value="">— Selecionar base —</option>
+                  {BASES.map(b => <option key={b} value={b}>{b}</option>)}
+                </select>
+              </div>
             </div>
           </section>
 

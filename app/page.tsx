@@ -315,6 +315,7 @@ export default function GestorTreinamentosApp() {
       responsible: d.responsible || null,
       fileUrl: d.file_url || null,
       notes: d.notes || null,
+      base: d.base || null,
     })),
   []);
 
@@ -769,7 +770,7 @@ export default function GestorTreinamentosApp() {
   const handleSaveDocument = useCallback(async (data: {
     code: string; name: string; docType: string; issuingBody?: string;
     issueDate?: string; expiryDate?: string; renewalMonths?: number;
-    responsible?: string; notes?: string; file?: File | null;
+    responsible?: string; notes?: string; file?: File | null; base?: string;
   }) => {
     const result = await saveDocument(data);
     if (result.error) {

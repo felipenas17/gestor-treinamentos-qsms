@@ -32,6 +32,7 @@ export interface DocControl {
   responsible?: string | null;
   fileUrl?: string | null;
   notes?: string | null;
+  base?: string | null;
 }
 
 export interface Procedure {
