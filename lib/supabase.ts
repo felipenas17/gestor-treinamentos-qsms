@@ -713,8 +713,29 @@ export async function saveDocument(data: {
   responsible?: string;
   fileUrl?: string;
   notes?: string;
+  file?: File | null;
 }) {
   if (!supabase) return { error: 'Supabase não configurado' };
+
+  // Upload do arquivo para o Storage
+  let fileUrl = data.fileUrl ?? null;
+  if (data.file) {
+    const ext = data.file.name.split('.').pop() || 'pdf';
+    const safeName = data.code.replace(/[^a-zA-Z0-9-]/g, '_');
+    const path = `institutional-docs/${safeName}.${ext}`;
+    const { error: uploadError } = await supabase.storage
+      .from('procedure-docs')
+      .upload(path, data.file, { upsert: true, contentType: data.file.type || 'application/pdf' });
+    if (!uploadError) {
+      const { data: urlData } = supabase.storage
+        .from('procedure-docs')
+        .getPublicUrl(path);
+      fileUrl = urlData.publicUrl;
+    } else {
+      console.warn('saveDocument: upload falhou, documento será salvo sem arquivo', uploadError);
+    }
+  }
+
   const { error } = await supabase.from('doc_control').insert({
     code: data.code,
     name: data.name,
@@ -724,7 +745,7 @@ export async function saveDocument(data: {
     expiry_date: data.expiryDate || null,
     renewal_months: data.renewalMonths ?? 12,
     responsible: data.responsible || null,
-    file_url: data.fileUrl || null,
+    file_url: fileUrl,
     notes: data.notes || null,
   });
   return { error: error?.message ?? null };

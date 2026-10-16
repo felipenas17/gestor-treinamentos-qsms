@@ -81,7 +81,7 @@ interface DocControlScreenProps {
   onDocumentSaved: (data: {
     code: string; name: string; docType: string; issuingBody?: string;
     issueDate?: string; expiryDate?: string; renewalMonths?: number;
-    responsible?: string; notes?: string;
+    responsible?: string; notes?: string; file?: File | null;
   }) => Promise<void>;
 }
 
@@ -139,6 +139,7 @@ export function DocControlScreen({ documents, onDocumentSaved }: DocControlScree
       renewalMonths: form.renewalMonths ? Number(form.renewalMonths) : 12,
       responsible: form.responsible || undefined,
       notes: form.notes || undefined,
+      file: form.file ?? undefined,
     });
   };
 

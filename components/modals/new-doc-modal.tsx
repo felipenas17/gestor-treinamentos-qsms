@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
-import { X, Shield } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { X, Shield, Paperclip, FileText } from 'lucide-react';
 
 const DOC_TYPES = [
   'Licença Polícia Federal',
@@ -34,6 +34,7 @@ interface FormData {
   renewalMonths: string;
   responsible: string;
   notes: string;
+  file: File | null;
 }
 
 interface NewDocModalProps {
@@ -52,11 +53,16 @@ export function NewDocModal({ onSaved, onClose }: NewDocModalProps) {
     renewalMonths: '12',
     responsible: '',
     notes: '',
+    file: null,
   });
   const [saving, setSaving] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const set = (field: keyof FormData, value: string) =>
+  const set = (field: keyof Omit<FormData, 'file'>, value: string) =>
     setForm(prev => ({ ...prev, [field]: value }));
+
+  const handleFile = (f: File | null) => setForm(prev => ({ ...prev, file: f }));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -217,6 +223,50 @@ export function NewDocModal({ onSaved, onClose }: NewDocModalProps) {
                 className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
               />
             </div>
+          </section>
+
+          {/* Arquivo do Documento */}
+          <section className="space-y-3">
+            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Arquivo do Documento</h3>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+              className="hidden"
+              onChange={e => handleFile(e.target.files?.[0] ?? null)}
+            />
+            {form.file ? (
+              <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-blue-200 bg-blue-50">
+                <FileText className="w-4 h-4 text-blue-600 shrink-0" />
+                <span className="text-xs text-blue-700 font-medium truncate flex-1">{form.file.name}</span>
+                <button
+                  type="button"
+                  onClick={() => handleFile(null)}
+                  className="text-slate-400 hover:text-red-500 transition-colors"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={e => {
+                  e.preventDefault();
+                  setDragOver(false);
+                  handleFile(e.dataTransfer.files?.[0] ?? null);
+                }}
+                className={`w-full flex flex-col items-center gap-2 py-4 rounded-lg border-2 border-dashed transition-colors cursor-pointer ${
+                  dragOver ? 'border-blue-400 bg-blue-50' : 'border-slate-200 hover:border-blue-300 hover:bg-slate-50'
+                }`}
+              >
+                <Paperclip className="w-4 h-4 text-slate-400" />
+                <span className="text-xs text-slate-500">Clique ou arraste o arquivo aqui</span>
+                <span className="text-[10px] text-slate-400">PDF, Word, JPG, PNG</span>
+              </button>
+            )}
           </section>
 
           {/* Actions */}

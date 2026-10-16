@@ -769,7 +769,7 @@ export default function GestorTreinamentosApp() {
   const handleSaveDocument = useCallback(async (data: {
     code: string; name: string; docType: string; issuingBody?: string;
     issueDate?: string; expiryDate?: string; renewalMonths?: number;
-    responsible?: string; notes?: string;
+    responsible?: string; notes?: string; file?: File | null;
   }) => {
     const result = await saveDocument(data);
     if (result.error) {
