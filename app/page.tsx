@@ -20,6 +20,7 @@ import { NotifyModal } from '@/components/modals/notify-modal';
 import { TrainingHistoryModal } from '@/components/modals/training-history-modal';
 import { EmployeesScreen } from '@/components/screens/employees-screen';
 import { CertificatesScreen } from '@/components/screens/certificates-screen';
+import { DocControlScreen } from '@/components/screens/doc-control-screen';
 // import { ImportDocumentModal } from '@/components/modals/import-document-modal'; // modal não ativo
 
 import {
@@ -45,10 +46,12 @@ import {
   saveNormativeCert,
   fetchComplianceHistory,
   saveComplianceSnapshot,
+  fetchDocuments,
+  saveDocument,
   type NormativeCertRow,
 } from '@/lib/supabase';
 
-import { Employee, Procedure, TrainingRecord, Assessment, RespondentStatus, ChartProjectionMetric } from '@/types';
+import { Employee, Procedure, TrainingRecord, Assessment, RespondentStatus, ChartProjectionMetric, DocControl } from '@/types';
 import { CertificateRecord } from '@/components/screens/certificates-screen';
 import { CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 
@@ -65,6 +68,7 @@ export default function GestorTreinamentosApp() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedAssessmentForTaker, setSelectedAssessmentForTaker] = useState<Assessment | null>(null);
   const [respondents, setRespondents] = useState<RespondentStatus[]>([]);
+  const [documents, setDocuments] = useState<DocControl[]>([]);
 
   // Normative certifications (Supabase-persisted; localStorage as offline fallback)
   const [normativeCerts, setNormativeCerts] = useState<CertificateRecord[]>(() => {
@@ -284,9 +288,33 @@ export default function GestorTreinamentosApp() {
         description: p.description,
         validityMonths: p.validity_months || 12,
         fileUrl: p.file_url || undefined,
+        // Controle documental
+        docType: p.doc_type || undefined,
+        docLastRevisionDate: p.doc_last_revision_date || null,
+        docRevisionMonths: p.doc_revision_months || undefined,
+        docNextRevisionDate: p.doc_next_revision_date || null,
+        docRevisionStatus: p.doc_revision_status || undefined,
+        docResponsible: p.doc_responsible || null,
       };
     });
   }, []);
+
+  const mapDocuments = useCallback((raw: any[]): DocControl[] =>
+    raw.map((d: any) => ({
+      id: d.id,
+      code: d.code,
+      name: d.name,
+      docType: d.doc_type,
+      issuingBody: d.issuing_body || null,
+      issueDate: d.issue_date || null,
+      expiryDate: d.expiry_date || null,
+      renewalMonths: d.renewal_months ?? 12,
+      docStatus: d.doc_status || 'Indefinido',
+      responsible: d.responsible || null,
+      fileUrl: d.file_url || null,
+      notes: d.notes || null,
+    })),
+  []);
 
   const loadProceduresFromDB = useCallback(async () => {
     const dbProcedures = await fetchProcedures();
@@ -398,6 +426,10 @@ export default function GestorTreinamentosApp() {
           })));
         }
 
+        // Load doc_control documents
+        const dbDocuments = await fetchDocuments();
+        if (dbDocuments) setDocuments(mapDocuments(dbDocuments));
+
         // Load normative certs from Supabase (primary source of truth)
         const dbNormative = await fetchNormativeCerts();
         if (dbNormative.length > 0) {
@@ -415,7 +447,7 @@ export default function GestorTreinamentosApp() {
     };
 
     loadAll();
-  }, [showToast, mapProcedures, mapNormativeRow]);
+  }, [showToast, mapProcedures, mapNormativeRow, mapDocuments]);
 
   // ─── Realtime: atualiza trainings/metrics quando qualquer linha mudar ────
   const reloadLiveData = useCallback(async () => {
@@ -704,6 +736,22 @@ export default function GestorTreinamentosApp() {
     }
   };
 
+  const handleSaveDocument = useCallback(async (data: {
+    code: string; name: string; docType: string; issuingBody?: string;
+    issueDate?: string; expiryDate?: string; renewalMonths?: number;
+    responsible?: string; notes?: string;
+  }) => {
+    const result = await saveDocument(data);
+    if (result.error) {
+      showToast('Erro ao salvar documento: ' + result.error, 'error');
+      return;
+    }
+    showToast(`Documento ${data.code} cadastrado ✓`);
+    // Reload from DB to get trigger-computed status
+    const dbDocs = await fetchDocuments();
+    if (dbDocs) setDocuments(mapDocuments(dbDocs));
+  }, [showToast, mapDocuments]);
+
   const handleExportData = (format: 'csv' | 'json' | 'print') => {
     if (format === 'csv') {
       const headers = 'Colaborador,Cargo,Setor,Procedimento,DataConclusao,Validade,DiasRestantes,Conformidade,Status\n';
@@ -830,6 +878,12 @@ export default function GestorTreinamentosApp() {
                   showToast('Matriz já está sincronizada.');
                 }
               }}
+            />
+          )}
+          {currentTab === 'doc-controle' && (
+            <DocControlScreen
+              documents={documents}
+              onDocumentSaved={handleSaveDocument}
             />
           )}
           {currentTab === 'colaboradores' && <EmployeesScreen />}
