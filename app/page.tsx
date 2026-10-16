@@ -42,12 +42,14 @@ import {
   syncMatrixForAllActiveProcedures,
   fetchNormativeCerts,
   saveNormativeCert,
+  fetchComplianceHistory,
+  saveComplianceSnapshot,
   type NormativeCertRow,
 } from '@/lib/supabase';
 
 import { Employee, Procedure, TrainingRecord, Assessment, RespondentStatus, ChartProjectionMetric } from '@/types';
 import { CertificateRecord } from '@/components/screens/certificates-screen';
-import { CheckCircle2, Loader2 } from 'lucide-react';
+import { CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 
 export default function GestorTreinamentosApp() {
   const [currentTab, setCurrentTab] = useState('dashboard');
@@ -105,6 +107,7 @@ export default function GestorTreinamentosApp() {
   const [selectedExamProcedure, setSelectedExamProcedure] = useState<Procedure | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [toastType, setToastType] = useState<'success' | 'error'>('success');
+  const [complianceDelta, setComplianceDelta] = useState<number | null>(null);
 
   // ─── Merge normative certs into dashboard data ───────────────────────────
   const adjustedMetrics = useMemo(() => {
@@ -303,7 +306,23 @@ export default function GestorTreinamentosApp() {
           fetchEmployees(),
         ]);
 
-        if (dbMetrics) setMetrics(dbMetrics);
+        if (dbMetrics) {
+          setMetrics(dbMetrics);
+          // Persiste snapshot diário para cálculo real do delta
+          saveComplianceSnapshot({
+            general_compliance: dbMetrics.generalCompliance,
+            active_certifications: dbMetrics.activeCertifications,
+            expiring_in_60_days: dbMetrics.expiringIn60Days,
+            expired_documents: dbMetrics.expiredDocuments,
+            pending_count: 0,
+          }).catch(() => { /* não-crítico */ });
+          // Calcula delta vs. 30 dias atrás
+          fetchComplianceHistory().then(({ today: todayVal, thirtyDaysAgo }) => {
+            if (todayVal !== null && thirtyDaysAgo !== null) {
+              setComplianceDelta(parseFloat((todayVal - thirtyDaysAgo).toFixed(1)));
+            }
+          }).catch(() => { /* não-crítico */ });
+        }
         if (dbSector && dbSector.length > 0) setSectorData(dbSector);
 
         if (dbProcedures) {
@@ -485,33 +504,19 @@ export default function GestorTreinamentosApp() {
     showToast(`Procedimento ${importedProc.code} importado com ${importedProc.questionsCount} questões!`);
   };
 
-  const handleSaveTrainingRecord = (newRec: TrainingRecord) => {
-    setRecords((prev) => [newRec, ...prev]);
-    showToast(`Certificação de ${newRec.employeeName} registrada!`);
-  };
+  const handleSaveTrainingRecord = useCallback(async () => {
+    showToast('Certificação registrada com sucesso!');
+    await reloadLiveData();
+  }, [showToast, reloadLiveData]);
 
-  const handleAssessmentCompleted = (score: number, passed: boolean) => {
+  const handleAssessmentCompleted = useCallback((score: number, passed: boolean) => {
     if (passed) {
       showToast(`Aprovado com ${score}%! Certificado emitido.`);
-      setRespondents((prev) => [
-        {
-          id: `resp-${Date.now()}`,
-          employeeId: 'emp-sim',
-          name: 'Colaborador (Simulação)',
-          role: 'Operador',
-          sector: 'Operações Offshore',
-          scorePercent: score,
-          status: 'Entregue',
-          submissionDate: new Date().toLocaleDateString('pt-BR'),
-          dueDate: new Date(Date.now() + 14 * 86400000).toLocaleDateString('pt-BR'),
-          attemptsUsed: 1,
-        },
-        ...prev,
-      ]);
+      reloadLiveData();
     } else {
       showToast(`Nota ${score}% — abaixo do mínimo de ${selectedAssessmentForTaker?.minScorePercent ?? 80}%. Reteste disponível.`, 'error');
     }
-  };
+  }, [showToast, reloadLiveData, selectedAssessmentForTaker]);
 
   const handleApproveAssessment = async (id: string) => {
     const ok = await updateAssessmentStatus(id, 'Ativa');
@@ -761,6 +766,7 @@ export default function GestorTreinamentosApp() {
               ]}
               onOpenNewPlanModal={() => setIsNewPlanModalOpen(true)}
               onImportCert={handleImportCert}
+              complianceDelta={complianceDelta}
             />
           )}
           {currentTab === 'procedimentos' && (
@@ -852,7 +858,9 @@ export default function GestorTreinamentosApp() {
       {/* Toast */}
       {toastMessage && (
         <div className={`fixed bottom-5 right-5 z-50 flex items-center gap-2.5 px-4 py-3 text-white text-xs font-medium rounded-xl shadow-xl border animate-slide-up ${toastType === 'error' ? 'bg-red-900 border-red-700' : 'bg-slate-900 border-slate-700'}`}>
-          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          {toastType === 'error'
+            ? <XCircle className="w-4 h-4 text-red-400 shrink-0" />
+            : <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />}
           <span>{toastMessage}</span>
         </div>
       )}
@@ -874,7 +882,7 @@ export default function GestorTreinamentosApp() {
         isOpen={isRegisterTrainingOpen}
         onClose={() => { setIsRegisterTrainingOpen(false); setPrefillTrainingRecord(null); }}
         procedures={procedures}
-        onSaveRecord={handleSaveTrainingRecord}
+        onSaved={handleSaveTrainingRecord}
         initialEmployeeName={prefillTrainingRecord?.employeeName}
         initialProcedureCode={prefillTrainingRecord?.procedureCode}
       />

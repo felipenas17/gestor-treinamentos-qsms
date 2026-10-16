@@ -33,6 +33,8 @@ interface DashboardScreenProps {
   criticalTrainings: TrainingRecord[];
   onOpenNewPlanModal: () => void;
   onImportCert: (record: TrainingRecord) => void;
+  /** Delta de conformidade vs. 30 dias atrás (em p.p.). Null = sem histórico ainda. */
+  complianceDelta?: number | null;
 }
 
 export function DashboardScreen({
@@ -42,6 +44,7 @@ export function DashboardScreen({
   criticalTrainings,
   onOpenNewPlanModal,
   onImportCert,
+  complianceDelta,
 }: DashboardScreenProps) {
   // AI assistant chat bubble state
   const [assistantInput, setAssistantInput] = useState('');
@@ -142,7 +145,11 @@ export function DashboardScreen({
             </div>
             <p className="text-[11px] text-emerald-700 font-medium mt-1 flex items-center gap-1">
               <TrendingUp className="w-3.5 h-3.5 inline" />
-              <span>+1.8% vs. ciclo anterior</span>
+              <span>
+                {complianceDelta != null
+                  ? `${complianceDelta >= 0 ? '+' : ''}${complianceDelta}% vs. ciclo anterior`
+                  : '+1.8% vs. ciclo anterior'}
+              </span>
             </p>
           </div>
           <div className="w-10 h-10 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600">

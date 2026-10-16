@@ -93,13 +93,19 @@ export async function POST(req: NextRequest) {
   const score = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0;
   const passed = score >= minScore;
 
-  // ── Incrementa uses_count no link ─────────────────────────────────────────
+  // ── Incrementa uses_count atomicamente (evita race condition com +1 lido) ──
   if (linkId) {
-    const { error: usesErr } = await supabase
-      .from('assessment_links')
-      .update({ uses_count: (link?.uses_count ?? 0) + 1 })
-      .eq('id', linkId);
-    if (usesErr) console.error('[submit] uses_count update:', usesErr);
+    const { error: usesErr } = await supabase.rpc('increment_assessment_uses', {
+      p_link_id: linkId,
+    });
+    if (usesErr) {
+      // Fallback não-atômico se a função ainda não existir no banco
+      console.warn('[submit] rpc increment_assessment_uses falhou, usando fallback:', usesErr.message);
+      await supabase
+        .from('assessment_links')
+        .update({ uses_count: (link?.uses_count ?? 0) + 1 })
+        .eq('id', linkId);
+    }
   }
 
   // ── Garante um link_id para inserir em responses ──────────────────────────

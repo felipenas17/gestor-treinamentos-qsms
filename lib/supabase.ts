@@ -30,7 +30,8 @@ export async function fetchTrainingRecords() {
       employees (id, name, role, sector, email, avatar_url),
       procedures (id, code, revision, name, sector, hours)
     `)
-    .order('validity_date');
+    // NULLs last: Pendente fica no fim, vencidos/reciclar primeiro
+    .order('validity_date', { ascending: true, nullsFirst: false });
   if (error) { console.error('fetchTrainingRecords:', error); return null; }
   return data;
 }
@@ -100,7 +101,7 @@ export async function generateAssessmentLink(assessmentId: string, employeeId?: 
       assessment_id: assessmentId,
       employee_id: employeeId || null,
       expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-      max_uses: 1,
+      max_uses: 2, // 2 tentativas (alinhado com API route e max_attempts da avaliação)
     })
     .select('token_uuid')
     .single();
@@ -181,16 +182,14 @@ export async function autoGenerateMatrixForEmployee(employeeId: string, sector: 
 
   if (missing.length === 0) return { count: 0 };
 
-  // 3. Insere registros pendentes para os procedimentos que faltam
-  // Nota: completion_date e validity_date usam data-sentinel (hoje) pois a tabela
-  // tem NOT NULL. A UI exibe '—' para registros Pendentes independente da data.
-  const today = new Date().toISOString().split('T')[0];
+  // 3. Insere registros pendentes — datas NULL (migração 20261016 tornou colunas nullable)
+  // O trigger calcula_training_validity preserva status='Pendente' quando completion_date IS NULL.
   const records = missing.map((procedure_id: string) => ({
     employee_id: employeeId,
     procedure_id,
     status: 'Pendente',
-    completion_date: today,
-    validity_date: today,
+    completion_date: null,
+    validity_date: null,
     compliance_rate: 0,
   }));
 
@@ -414,15 +413,14 @@ export async function autoGenerateMatrixForProcedure(
 
   if (missing.length === 0) return { count: 0 };
 
-  // 3. Insere registros pendentes
-  // Nota: datas são sentinel (hoje) pois a tabela tem NOT NULL — a UI exibe '—' para Pendente.
-  const today = new Date().toISOString().split('T')[0];
+  // 3. Insere registros pendentes — datas NULL (migração 20261016 tornou colunas nullable)
+  // O trigger preserva status='Pendente' quando completion_date IS NULL.
   const records = missing.map((employee_id) => ({
     employee_id,
     procedure_id: procedureId,
     status: 'Pendente',
-    completion_date: today,
-    validity_date: today,
+    completion_date: null,
+    validity_date: null,
     compliance_rate: 0,
   }));
 
@@ -467,6 +465,51 @@ export async function fetchNormativeCerts(): Promise<NormativeCertRow[]> {
     .order('created_at', { ascending: false });
   if (error) { console.error('fetchNormativeCerts:', error); return []; }
   return (data ?? []) as NormativeCertRow[];
+}
+
+// ─── Compliance Snapshots (histórico para dashboard delta) ────────────────────
+
+export async function fetchComplianceHistory(): Promise<{
+  today: number | null;
+  thirtyDaysAgo: number | null;
+}> {
+  if (!supabase) return { today: null, thirtyDaysAgo: null };
+
+  const today = new Date().toISOString().split('T')[0];
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+  const { data } = await supabase
+    .from('compliance_snapshots')
+    .select('snapshot_date, general_compliance')
+    .in('snapshot_date', [today, thirtyDaysAgo])
+    .order('snapshot_date', { ascending: false });
+
+  if (!data || data.length === 0) return { today: null, thirtyDaysAgo: null };
+
+  const todayRow = data.find((r: any) => r.snapshot_date === today);
+  const oldRow = data.find((r: any) => r.snapshot_date <= thirtyDaysAgo);
+
+  return {
+    today: todayRow?.general_compliance ?? null,
+    thirtyDaysAgo: oldRow?.general_compliance ?? null,
+  };
+}
+
+export async function saveComplianceSnapshot(metrics: {
+  general_compliance: number;
+  active_certifications: number;
+  expiring_in_60_days: number;
+  expired_documents: number;
+  pending_count: number;
+}): Promise<void> {
+  if (!supabase) return;
+  const today = new Date().toISOString().split('T')[0];
+
+  // Upsert: um snapshot por dia
+  await supabase.from('compliance_snapshots').upsert({
+    snapshot_date: today,
+    ...metrics,
+  }, { onConflict: 'snapshot_date' });
 }
 
 /** Returns the permanent file URL on success (null when no file), or false on failure. */
