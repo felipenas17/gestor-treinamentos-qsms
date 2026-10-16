@@ -12,6 +12,7 @@ import {
   ClipboardCheck,
   Loader2,
   FilePenLine,
+  History,
 } from 'lucide-react';
 import { TrainingRecord, ComplianceStatus, Assessment, Employee } from '@/types';
 
@@ -22,6 +23,7 @@ interface MatrixScreenProps {
   onRegisterEmployee: () => void;
   onSendLink: (assessmentId: string, employeeId: string) => Promise<string | null>;
   onRegisterTraining: (rec: TrainingRecord) => void;
+  onViewHistory?: (rec: TrainingRecord) => void;
 }
 
 export function MatrixScreen({
@@ -31,6 +33,7 @@ export function MatrixScreen({
   onRegisterEmployee,
   onSendLink,
   onRegisterTraining,
+  onViewHistory,
 }: MatrixScreenProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSector, setSelectedSector] = useState<string>('Todos');
@@ -393,6 +396,16 @@ export function MatrixScreen({
                         >
                           <FilePenLine className="w-3 h-3" />
                           Registrar
+                        </button>
+                      )}
+                      {onViewHistory && (
+                        <button
+                          onClick={() => onViewHistory(rec)}
+                          title="Ver histórico de tentativas"
+                          className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-semibold rounded-lg bg-violet-50 text-violet-600 border border-violet-200 hover:bg-violet-100 transition-colors"
+                        >
+                          <History className="w-3 h-3" />
+                          <span className="hidden sm:inline">Histórico</span>
                         </button>
                       )}
                     </td>

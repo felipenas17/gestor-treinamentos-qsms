@@ -512,6 +512,69 @@ export async function saveComplianceSnapshot(metrics: {
   }, { onConflict: 'snapshot_date' });
 }
 
+// ─── Assessment History (tentativas por colaborador) ──────────────────────────
+
+export interface AssessmentAttempt {
+  id: string;
+  score: number;
+  passed: boolean;
+  status: 'Entregue' | 'Reprovado' | string;
+  completedAt: string | null;
+  procedureCode: string;
+  assessmentTitle: string;
+  minScore: number;
+}
+
+export async function fetchAssessmentHistory(
+  employeeId: string,
+  procedureCode?: string
+): Promise<AssessmentAttempt[]> {
+  if (!supabase) return [];
+
+  // 1. Busca links do colaborador (com dados da avaliação)
+  const { data: links, error: linksErr } = await supabase
+    .from('assessment_links')
+    .select('id, assessment_id, assessments(procedure_code, title, min_score_percent)')
+    .eq('employee_id', employeeId);
+
+  if (linksErr || !links || links.length === 0) return [];
+
+  // 2. Filtra por procedimento se especificado
+  const filteredLinks = procedureCode
+    ? links.filter((l: any) => l.assessments?.procedure_code === procedureCode)
+    : links;
+
+  if (filteredLinks.length === 0) return [];
+
+  const linkIds = filteredLinks.map((l: any) => l.id as string);
+
+  // 3. Busca respostas para esses links
+  const { data: responses, error: respErr } = await supabase
+    .from('responses')
+    .select('id, link_id, score_percent, status, completed_at')
+    .in('link_id', linkIds)
+    .order('completed_at', { ascending: false });
+
+  if (respErr || !responses) return [];
+
+  // 4. Mapeia com dados do link
+  const linkMap = new Map(filteredLinks.map((l: any) => [l.id as string, l]));
+
+  return responses.map((r: any): AssessmentAttempt => {
+    const link = linkMap.get(r.link_id);
+    return {
+      id: r.id,
+      score: r.score_percent ?? 0,
+      passed: r.status === 'Entregue',
+      status: r.status,
+      completedAt: r.completed_at,
+      procedureCode: link?.assessments?.procedure_code ?? '',
+      assessmentTitle: link?.assessments?.title ?? '',
+      minScore: link?.assessments?.min_score_percent ?? 80,
+    };
+  });
+}
+
 /** Returns the permanent file URL on success (null when no file), or false on failure. */
 export async function saveNormativeCert(
   cert: Omit<NormativeCertRow, 'created_at'>,

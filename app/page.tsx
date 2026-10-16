@@ -17,6 +17,7 @@ import { ProcedureDetailsModal } from '@/components/modals/procedure-details-mod
 import { ProcedureExamModal } from '@/components/modals/procedure-exam-modal';
 import { RegisterTrainingModal } from '@/components/modals/register-training-modal';
 import { NotifyModal } from '@/components/modals/notify-modal';
+import { TrainingHistoryModal } from '@/components/modals/training-history-modal';
 import { EmployeesScreen } from '@/components/screens/employees-screen';
 import { CertificatesScreen } from '@/components/screens/certificates-screen';
 // import { ImportDocumentModal } from '@/components/modals/import-document-modal'; // modal não ativo
@@ -108,6 +109,7 @@ export default function GestorTreinamentosApp() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [toastType, setToastType] = useState<'success' | 'error'>('success');
   const [complianceDelta, setComplianceDelta] = useState<number | null>(null);
+  const [historyRecord, setHistoryRecord] = useState<TrainingRecord | null>(null);
 
   // ─── Merge normative certs into dashboard data ───────────────────────────
   const adjustedMetrics = useMemo(() => {
@@ -504,6 +506,10 @@ export default function GestorTreinamentosApp() {
     showToast(`Procedimento ${importedProc.code} importado com ${importedProc.questionsCount} questões!`);
   };
 
+  const handleViewHistory = useCallback((rec: TrainingRecord) => {
+    setHistoryRecord(rec);
+  }, []);
+
   const handleSaveTrainingRecord = useCallback(async () => {
     showToast('Certificação registrada com sucesso!');
     await reloadLiveData();
@@ -850,6 +856,7 @@ export default function GestorTreinamentosApp() {
                 setPrefillTrainingRecord(rec);
                 setIsRegisterTrainingOpen(true);
               }}
+              onViewHistory={handleViewHistory}
             />
           )}
         </main>
@@ -887,6 +894,16 @@ export default function GestorTreinamentosApp() {
         initialProcedureCode={prefillTrainingRecord?.procedureCode}
       />
       <NotifyModal isOpen={notifyRecord !== null} onClose={() => setNotifyRecord(null)} record={notifyRecord} assessments={assessments} />
+      {historyRecord && (
+        <TrainingHistoryModal
+          isOpen={historyRecord !== null}
+          onClose={() => setHistoryRecord(null)}
+          employeeId={historyRecord.employeeId}
+          employeeName={historyRecord.employeeName}
+          procedureCode={historyRecord.procedureCode}
+          procedureName={historyRecord.procedureName}
+        />
+      )}
       {/* <ImportDocumentModal isOpen={isImportDocOpen} onClose={() => setIsImportDocOpen(false)} onProcedureImported={handleProcedureImported} /> */}
     </div>
   );
