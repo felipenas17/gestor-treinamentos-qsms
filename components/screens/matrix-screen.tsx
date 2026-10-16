@@ -348,7 +348,7 @@ export function MatrixScreen({
 
                     {/* Ação */}
                     <td className="py-3 px-4 text-right whitespace-nowrap">
-                      {rec.status === 'Pendente' && (
+                      {(rec.status === 'Pendente' || rec.status === 'Reciclar' || rec.status === 'Vencido') && (
                         <button
                           disabled={linkGenerating === rec.id}
                           onClick={async () => {
@@ -393,6 +393,7 @@ export function MatrixScreen({
                         <button
                           onClick={() => onRegisterTraining(rec)}
                           className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors"
+                          title="Registrar treinamento presencial"
                         >
                           <FilePenLine className="w-3 h-3" />
                           Registrar
