@@ -194,3 +194,58 @@ export interface ObligationRealization {
   fileName?: string | null;
   createdAt: string;
 }
+
+// ─── NC / CAPA ───────────────────────────────────────────────────────────────
+
+export type NCType = 'NC' | 'Observação' | 'Oportunidade de Melhoria';
+export type NCSeverity = 'Crítica' | 'Moderada' | 'Leve';
+export type NCSource =
+  | 'Auditoria Interna'
+  | 'Auditoria Externa'
+  | 'Inspeção'
+  | 'Reclamação'
+  | 'Análise Crítica'
+  | 'Outro';
+export type NCStatus =
+  | 'Aberta'
+  | 'Em tratamento'
+  | 'Aguardando verificação'
+  | 'Encerrada';
+
+export interface NonConformity {
+  id: string;
+  code: string;
+  title: string;
+  description?: string | null;
+  type: NCType;
+  severity: NCSeverity;
+  source: NCSource;
+  detectedDate: string;
+  deadline?: string | null;
+  status: NCStatus;
+  responsible?: string | null;
+  sector?: string | null;
+  rootCause?: string | null;
+  immediateAction?: string | null;
+  correctiveAction?: string | null;
+  preventiveAction?: string | null;
+  effectivenessCheck?: string | null;
+  closedDate?: string | null;
+  notes?: string | null;
+  createdAt: string;
+}
+
+// ─── Score de Conformidade ────────────────────────────────────────────────────
+
+export interface ModuleScore {
+  module: string;
+  compliant: number;
+  total: number;
+  score: number; // 0-100
+}
+
+export interface GlobalComplianceScore {
+  overall: number; // 0-100
+  modules: ModuleScore[];
+  generatedAt: string;
+}

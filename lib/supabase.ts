@@ -880,6 +880,69 @@ export async function fetchDocControlRenewals(docControlId: string) {
   return data ?? [];
 }
 
+// ─── NC / CAPA ───────────────────────────────────────────────────────────────
+
+export interface NonConformityRow {
+  id: string;
+  code: string;
+  title: string;
+  description: string | null;
+  type: string;
+  severity: string;
+  source: string;
+  detected_date: string;
+  deadline: string | null;
+  status: string;
+  responsible: string | null;
+  sector: string | null;
+  root_cause: string | null;
+  immediate_action: string | null;
+  corrective_action: string | null;
+  preventive_action: string | null;
+  effectiveness_check: string | null;
+  closed_date: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export async function fetchNonConformities(): Promise<NonConformityRow[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from('non_conformities')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) { console.error('fetchNonConformities:', error); return []; }
+  return (data ?? []) as NonConformityRow[];
+}
+
+export async function saveNonConformity(payload: Omit<NonConformityRow, 'id' | 'created_at'>): Promise<string | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from('non_conformities')
+    .insert(payload)
+    .select('id')
+    .single();
+  if (error) { console.error('saveNonConformity:', error); return null; }
+  return data?.id ?? null;
+}
+
+export async function updateNonConformity(id: string, patch: Partial<Omit<NonConformityRow, 'id' | 'created_at'>>): Promise<boolean> {
+  if (!supabase) return false;
+  const { error } = await supabase
+    .from('non_conformities')
+    .update(patch)
+    .eq('id', id);
+  if (error) { console.error('updateNonConformity:', error); return false; }
+  return true;
+}
+
+export async function deleteNonConformity(id: string): Promise<boolean> {
+  if (!supabase) return false;
+  const { error } = await supabase.from('non_conformities').delete().eq('id', id);
+  if (error) { console.error('deleteNonConformity:', error); return false; }
+  return true;
+}
+
 export async function addDocControlRenewal(data: {
   docControlId: string;
   eventDate: string;

@@ -14,6 +14,9 @@ import {
   ClipboardCheck,
   ChevronDown,
   ChevronRight,
+  ShieldCheck,
+  AlertTriangle,
+  BarChart3,
 } from 'lucide-react';
 
 interface NavItem {
@@ -55,6 +58,16 @@ const MODULES: Module[] = [
       { id: 'procedimentos',    label: 'Procedimentos & POPs',  sublabel: 'Revisões e Vigência',      icon: FileText },
       { id: 'doc-controle',     label: 'Controle Documental',   sublabel: 'Licenças e Autorizações',  icon: Shield          },
       { id: 'obrigacoes-legais', label: 'Obrigações Legais',    sublabel: 'Cumprimento e Prazos',     icon: ClipboardCheck  },
+    ],
+  },
+  {
+    id: 'sgi',
+    label: 'SGI / Conformidade',
+    icon: ShieldCheck,
+    items: [
+      { id: 'conformidade', label: 'Score de Conformidade', sublabel: 'Índice Global do SGI',      icon: ShieldCheck   },
+      { id: 'nc-capa',      label: 'NC / CAPA',             sublabel: 'Não Conformidades & Ações', icon: AlertTriangle },
+      { id: 'relatorio',    label: 'Relatório Gerencial',   sublabel: 'Visão Consolidada',         icon: BarChart3     },
     ],
   },
 ];

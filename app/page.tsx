@@ -22,6 +22,9 @@ import { EmployeesScreen } from '@/components/screens/employees-screen';
 import { CertificatesScreen } from '@/components/screens/certificates-screen';
 import { DocControlScreen } from '@/components/screens/doc-control-screen';
 import { LegalObligationsScreen } from '@/components/screens/legal-obligations-screen';
+import { NCCAPAScreen, type NCFormData } from '@/components/screens/nc-capa-screen';
+import { ComplianceScoreScreen } from '@/components/screens/compliance-score-screen';
+import { ManagementReportScreen } from '@/components/screens/management-report-screen';
 // import { ImportDocumentModal } from '@/components/modals/import-document-modal'; // modal não ativo
 
 import {
@@ -57,10 +60,15 @@ import {
   addDocControlRenewal,
   updateProcedure,
   saveRevisionHistory,
+  fetchNonConformities,
+  saveNonConformity,
+  updateNonConformity,
+  deleteNonConformity,
   type NormativeCertRow,
+  type NonConformityRow,
 } from '@/lib/supabase';
 
-import { Employee, Procedure, TrainingRecord, Assessment, RespondentStatus, ChartProjectionMetric, DocControl, LegalObligation, ExecutionStatus, ObligationRealization, DocControlRenewal, RenewalStatus } from '@/types';
+import { Employee, Procedure, TrainingRecord, Assessment, RespondentStatus, ChartProjectionMetric, DocControl, LegalObligation, ExecutionStatus, ObligationRealization, DocControlRenewal, RenewalStatus, NonConformity, GlobalComplianceScore } from '@/types';
 import { CertificateRecord } from '@/components/screens/certificates-screen';
 import { CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 
@@ -79,6 +87,7 @@ export default function GestorTreinamentosApp() {
   const [respondents, setRespondents] = useState<RespondentStatus[]>([]);
   const [documents, setDocuments] = useState<DocControl[]>([]);
   const [obligations, setObligations] = useState<LegalObligation[]>([]);
+  const [nonConformities, setNonConformities] = useState<NonConformity[]>([]);
 
   // Normative certifications (Supabase-persisted; localStorage as offline fallback)
   const [normativeCerts, setNormativeCerts] = useState<CertificateRecord[]>(() => {
@@ -205,6 +214,35 @@ export default function GestorTreinamentosApp() {
       })),
     [normativeCerts],
   );
+
+  // ─── Score de Conformidade Global ───────────────────────────────────────────
+  const complianceScore = useMemo<GlobalComplianceScore>(() => {
+    const docCompliant = documents.filter((d) => d.docStatus === 'Vigente').length;
+    const docScore = documents.length ? (docCompliant / documents.length) * 100 : 0;
+
+    const oblCompliant = obligations.filter((o) => o.status === 'Vigente').length;
+    const oblScore = obligations.length ? (oblCompliant / obligations.length) * 100 : 0;
+
+    const trainCompliant = records.filter((r) => r.status === 'Certificado').length;
+    const trainScore = records.length ? (trainCompliant / records.length) * 100 : 0;
+
+    const modules = [
+      { module: 'Documentos', compliant: docCompliant, total: documents.length, score: docScore },
+      { module: 'Obrigações Legais', compliant: oblCompliant, total: obligations.length, score: oblScore },
+      { module: 'Treinamentos', compliant: trainCompliant, total: records.length, score: trainScore },
+    ];
+
+    const activeModules = modules.filter((m) => m.total > 0);
+    const overall = activeModules.length
+      ? activeModules.reduce((sum, m) => sum + m.score, 0) / activeModules.length
+      : 0;
+
+    return {
+      overall: Math.round(overall * 10) / 10,
+      modules,
+      generatedAt: new Date().toISOString(),
+    };
+  }, [documents, obligations, records]);
 
   const showToast = useCallback((msg: string, type: 'success' | 'error' = 'success') => {
     setToastMessage(msg);
@@ -463,6 +501,33 @@ export default function GestorTreinamentosApp() {
         // Load legal obligations
         const dbObligations = await fetchLegalObligations();
         if (dbObligations) setObligations(mapObligations(dbObligations));
+
+        // Load non-conformities / CAPA
+        const dbNC = await fetchNonConformities();
+        if (dbNC && dbNC.length > 0) {
+          setNonConformities(dbNC.map((nc: NonConformityRow) => ({
+            id: nc.id,
+            code: nc.code,
+            title: nc.title,
+            description: nc.description ?? null,
+            type: nc.type as NonConformity['type'],
+            severity: nc.severity as NonConformity['severity'],
+            source: nc.source as NonConformity['source'],
+            detectedDate: nc.detected_date,
+            deadline: nc.deadline ?? null,
+            status: nc.status as NonConformity['status'],
+            responsible: nc.responsible ?? null,
+            sector: nc.sector ?? null,
+            rootCause: nc.root_cause ?? null,
+            immediateAction: nc.immediate_action ?? null,
+            correctiveAction: nc.corrective_action ?? null,
+            preventiveAction: nc.preventive_action ?? null,
+            effectivenessCheck: nc.effectiveness_check ?? null,
+            closedDate: nc.closed_date ?? null,
+            notes: nc.notes ?? null,
+            createdAt: nc.created_at,
+          })));
+        }
 
         // Load normative certs from Supabase (primary source of truth)
         const dbNormative = await fetchNormativeCerts();
@@ -890,6 +955,83 @@ export default function GestorTreinamentosApp() {
     }));
   }, []);
 
+  // ─── NC / CAPA handlers ──────────────────────────────────────────────────────
+  const handleSaveNC = useCallback(async (data: NCFormData, id?: string) => {
+    const payload: Omit<NonConformityRow, 'id' | 'created_at'> = {
+      code: data.code,
+      title: data.title,
+      description: data.description || null,
+      type: data.type,
+      severity: data.severity,
+      source: data.source,
+      detected_date: data.detectedDate,
+      deadline: data.deadline || null,
+      status: data.status,
+      responsible: data.responsible || null,
+      sector: data.sector || null,
+      root_cause: data.rootCause || null,
+      immediate_action: data.immediateAction || null,
+      corrective_action: data.correctiveAction || null,
+      preventive_action: data.preventiveAction || null,
+      effectiveness_check: data.effectivenessCheck || null,
+      closed_date: data.status === 'Encerrada' ? new Date().toISOString().split('T')[0] : null,
+      notes: data.notes || null,
+    };
+
+    if (id) {
+      const ok = await updateNonConformity(id, payload);
+      if (!ok) { showToast('Erro ao atualizar NC/CAPA.', 'error'); return; }
+      setNonConformities((prev) =>
+        prev.map((nc) =>
+          nc.id === id
+            ? {
+                ...nc,
+                ...data,
+                detectedDate: data.detectedDate,
+                deadline: data.deadline || null,
+                closedDate: data.status === 'Encerrada' ? new Date().toISOString().split('T')[0] : nc.closedDate,
+              }
+            : nc,
+        ),
+      );
+      showToast('NC/CAPA atualizada ✓');
+    } else {
+      const newId = await saveNonConformity(payload);
+      if (!newId) { showToast('Erro ao registrar NC/CAPA.', 'error'); return; }
+      const newNC: NonConformity = {
+        id: newId,
+        code: data.code,
+        title: data.title,
+        description: data.description || null,
+        type: data.type,
+        severity: data.severity,
+        source: data.source,
+        detectedDate: data.detectedDate,
+        deadline: data.deadline || null,
+        status: data.status,
+        responsible: data.responsible || null,
+        sector: data.sector || null,
+        rootCause: data.rootCause || null,
+        immediateAction: data.immediateAction || null,
+        correctiveAction: data.correctiveAction || null,
+        preventiveAction: data.preventiveAction || null,
+        effectivenessCheck: data.effectivenessCheck || null,
+        closedDate: data.status === 'Encerrada' ? new Date().toISOString().split('T')[0] : null,
+        notes: data.notes || null,
+        createdAt: new Date().toISOString(),
+      };
+      setNonConformities((prev) => [newNC, ...prev]);
+      showToast(`NC ${data.code} registrada ✓`);
+    }
+  }, [showToast]);
+
+  const handleDeleteNC = useCallback(async (id: string) => {
+    const ok = await deleteNonConformity(id);
+    if (!ok) { showToast('Erro ao excluir NC/CAPA.', 'error'); return; }
+    setNonConformities((prev) => prev.filter((nc) => nc.id !== id));
+    showToast('NC/CAPA excluída.');
+  }, [showToast]);
+
   const handleExportData = (format: 'csv' | 'json' | 'print') => {
     if (format === 'csv') {
       const headers = 'Colaborador,Cargo,Setor,Procedimento,DataConclusao,Validade,DiasRestantes,Conformidade,Status\n';
@@ -1057,6 +1199,61 @@ export default function GestorTreinamentosApp() {
                 setIsRegisterTrainingOpen(true);
               }}
               onViewHistory={handleViewHistory}
+            />
+          )}
+          {currentTab === 'conformidade' && (
+            <ComplianceScoreScreen
+              score={complianceScore}
+              onRefresh={async () => {
+                const [dbDocs, dbObs, dbRecs] = await Promise.all([
+                  fetchDocuments(),
+                  fetchLegalObligations(),
+                  fetchTrainingRecords(),
+                ]);
+                if (dbDocs) setDocuments(mapDocuments(dbDocs));
+                if (dbObs) setObligations(mapObligations(dbObs));
+                if (dbRecs && dbRecs.length > 0) {
+                  setRecords(dbRecs.map((r: any) => {
+                    const isPendente = r.status === 'Pendente';
+                    return {
+                      id: r.id,
+                      employeeId: r.employee_id,
+                      employeeName: r.employees?.name || '—',
+                      employeeRole: r.employees?.role || '—',
+                      employeeAvatar: r.employees?.avatar_url || '/images/avatar_engineer.svg',
+                      sector: r.employees?.sector || '—',
+                      procedureCode: r.procedures?.code || '—',
+                      procedureRevision: r.procedures?.revision || undefined,
+                      procedureName: r.procedures?.name || '—',
+                      completionDate: isPendente ? '—' : (r.completion_date ? new Date(r.completion_date).toLocaleDateString('pt-BR') : '—'),
+                      validityDate: isPendente ? '—' : (r.validity_date ? new Date(r.validity_date).toLocaleDateString('pt-BR') : '—'),
+                      daysRemaining: isPendente ? 0 : (r.days_remaining ?? 0),
+                      complianceRate: r.compliance_rate ?? 0,
+                      status: r.status || 'Pendente',
+                      instructor: r.instructor,
+                      certificateHash: r.certificate_hash || undefined,
+                      hours: r.procedures?.hours || 8,
+                    };
+                  }));
+                }
+                showToast('Score atualizado ✓');
+              }}
+            />
+          )}
+          {currentTab === 'nc-capa' && (
+            <NCCAPAScreen
+              items={nonConformities}
+              onSave={handleSaveNC}
+              onDelete={handleDeleteNC}
+            />
+          )}
+          {currentTab === 'relatorio' && (
+            <ManagementReportScreen
+              documents={documents}
+              obligations={obligations}
+              records={records}
+              nonConformities={nonConformities}
+              complianceScore={complianceScore}
             />
           )}
         </main>
