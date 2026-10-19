@@ -1,19 +1,24 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import {
   Users,
   UserPlus,
   Search,
-  CheckCircle2,
-  Clock,
-  AlertTriangle,
   Link2,
   ClipboardCheck,
   Loader2,
-  FilePenLine,
   History,
+  Download,
+  FileSpreadsheet,
+  LayoutList,
+  LayoutGrid,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 import { TrainingRecord, ComplianceStatus, Assessment, Employee } from '@/types';
 
 interface MatrixScreenProps {
@@ -41,6 +46,10 @@ export function MatrixScreen({
   const [selectedStatus, setSelectedStatus] = useState<string>('Todos');
   const [linkGenerating, setLinkGenerating] = useState<string | null>(null); // rec.id
   const [linkCopied, setLinkCopied] = useState<string | null>(null); // rec.id
+  const [viewMode, setViewMode] = useState<'list' | 'grouped'>('list');
+  const [expandedEmployees, setExpandedEmployees] = useState<Set<string>>(new Set());
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const tableRef = useRef<HTMLDivElement>(null);
 
   // Filter options
   const sectors = useMemo(() => {
@@ -78,6 +87,84 @@ export function MatrixScreen({
     });
   }, [records, searchTerm, selectedSector, selectedRole, selectedStatus]);
 
+  // ─── Grouped by employee ─────────────────────────────────────────────────────
+  const groupedByEmployee = useMemo(() => {
+    const map = new Map<string, { name: string; role: string; sector: string; avatar: string; records: TrainingRecord[] }>();
+    filtered.forEach((r) => {
+      if (!map.has(r.employeeId)) {
+        map.set(r.employeeId, { name: r.employeeName, role: r.employeeRole, sector: r.sector, avatar: r.employeeAvatar, records: [] });
+      }
+      map.get(r.employeeId)!.records.push(r);
+    });
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [filtered]);
+
+  // ─── Export handlers ──────────────────────────────────────────────────────────
+  const handleExportExcel = () => {
+    const data = filtered.map((r) => ({
+      Colaborador: r.employeeName,
+      Cargo: r.employeeRole,
+      Setor: r.sector,
+      'Código POP': r.procedureCode,
+      Treinamento: r.procedureName,
+      'Data Conclusão': r.completionDate,
+      'Data Validade': r.validityDate,
+      'Dias Restantes': r.daysRemaining,
+      'Conformidade %': r.complianceRate,
+      Status: r.status,
+    }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    // Column widths
+    ws['!cols'] = [22, 22, 18, 12, 36, 14, 14, 14, 14, 14].map((w) => ({ wch: w }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Matriz de Treinamentos');
+    XLSX.writeFile(wb, `matriz-treinamentos-tiger-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  };
+
+  const handleExportPdf = async () => {
+    if (!tableRef.current) return;
+    setIsExportingPdf(true);
+    try {
+      const canvas = await html2canvas(tableRef.current, { scale: 1.5, useCORS: true, backgroundColor: '#f8fafc', logging: false });
+      const imgData = canvas.toDataURL('image/png');
+      const imgW = canvas.width;
+      const imgH = canvas.height;
+      const pageW = 297; // A4 landscape mm
+      const pageH = 210;
+      const margin = 8;
+      const printW = pageW - margin * 2;
+      const printH = (imgH * printW) / imgW;
+      const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+      let yOffset = margin;
+      let remaining = printH;
+      while (remaining > 0) {
+        const sliceH = Math.min(pageH - margin * 2, remaining);
+        const srcY = ((printH - remaining) / printH) * imgH;
+        const srcH = (sliceH / printH) * imgH;
+        const sc = document.createElement('canvas');
+        sc.width = imgW; sc.height = srcH;
+        sc.getContext('2d')!.drawImage(canvas, 0, srcY, imgW, srcH, 0, 0, imgW, srcH);
+        pdf.addImage(sc.toDataURL('image/png'), 'PNG', margin, yOffset, printW, sliceH);
+        remaining -= sliceH;
+        if (remaining > 0) { pdf.addPage(); yOffset = margin; }
+      }
+      pdf.save(`matriz-treinamentos-tiger-${new Date().toISOString().slice(0, 10)}.pdf`);
+    } catch (e) {
+      console.error('PDF export error:', e);
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
+
+  const toggleEmployee = (name: string) => {
+    setExpandedEmployees((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  };
+
   const getStatusBadge = (status: ComplianceStatus) => {
     switch (status) {
       case 'Certificado':
@@ -104,7 +191,42 @@ export function MatrixScreen({
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
+          {/* View mode toggle */}
+          <div className="flex rounded-lg border border-slate-200 overflow-hidden">
+            <button
+              onClick={() => setViewMode('list')}
+              title="Vista em lista"
+              className={`p-2 transition-colors ${viewMode === 'list' ? 'bg-blue-600 text-white' : 'bg-white text-slate-500 hover:bg-slate-50'}`}
+            >
+              <LayoutList className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => setViewMode('grouped')}
+              title="Agrupar por colaborador"
+              className={`p-2 transition-colors ${viewMode === 'grouped' ? 'bg-blue-600 text-white' : 'bg-white text-slate-500 hover:bg-slate-50'}`}
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          {/* Export buttons */}
+          <button
+            onClick={handleExportExcel}
+            title="Exportar Excel"
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition-colors"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Excel</span>
+          </button>
+          <button
+            onClick={handleExportPdf}
+            disabled={isExportingPdf}
+            title="Exportar PDF"
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors disabled:opacity-60"
+          >
+            {isExportingPdf ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+            <span className="hidden sm:inline">{isExportingPdf ? 'Gerando...' : 'PDF'}</span>
+          </button>
           <button
             onClick={onRegisterEmployee}
             className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 rounded-lg shadow-sm transition-colors"
@@ -221,7 +343,30 @@ export function MatrixScreen({
         </div>
       </div>
 
-      {/* Main Matrix Table */}
+      {/* Results count */}
+      <div className="flex items-center justify-between text-xs text-slate-500">
+        <span>
+          Exibindo <strong className="text-slate-700">{filtered.length}</strong> de{' '}
+          <strong className="text-slate-700">{records.length}</strong> registros
+          {viewMode === 'grouped' && (
+            <span> · <strong className="text-slate-700">{groupedByEmployee.length}</strong> colaboradores</span>
+          )}
+        </span>
+        {filtered.length !== records.length && (
+          <button
+            onClick={() => { setSearchTerm(''); setSelectedSector('Todos'); setSelectedRole('Todos'); setSelectedStatus('Todos'); }}
+            className="text-blue-600 hover:underline font-medium"
+          >
+            Limpar filtros
+          </button>
+        )}
+      </div>
+
+      {/* Main Matrix — List or Grouped */}
+      <div ref={tableRef}>
+
+      {/* ── List view ── */}
+      {viewMode === 'list' && (
       <div className="rounded-xl bg-white border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
@@ -321,18 +466,18 @@ export function MatrixScreen({
                     </td>
 
                     {/* Conformidade % */}
-                    <td className="py-3 px-4 text-center font-mono font-bold tabular-nums whitespace-nowrap">
-                      <span
-                        className={
-                          rec.complianceRate >= 90
-                            ? 'text-emerald-700'
-                            : rec.complianceRate >= 70
-                            ? 'text-amber-700'
-                            : 'text-red-700'
-                        }
-                      >
-                        {rec.complianceRate}%
-                      </span>
+                    <td className="py-3 px-4 text-center whitespace-nowrap">
+                      <div className="flex flex-col items-center gap-1">
+                        <span className={`font-mono font-bold text-xs ${rec.complianceRate >= 90 ? 'text-emerald-700' : rec.complianceRate >= 70 ? 'text-amber-700' : 'text-red-700'}`}>
+                          {rec.complianceRate}%
+                        </span>
+                        <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all ${rec.complianceRate >= 90 ? 'bg-emerald-500' : rec.complianceRate >= 70 ? 'bg-amber-500' : 'bg-red-500'}`}
+                            style={{ width: `${rec.complianceRate}%` }}
+                          />
+                        </div>
+                      </div>
                     </td>
 
                     {/* Status badge */}
@@ -408,6 +553,95 @@ export function MatrixScreen({
           </table>
         </div>
       </div>
+      )} {/* end list view */}
+
+      {/* ── Grouped view ── */}
+      {viewMode === 'grouped' && (
+        <div className="space-y-3">
+          {groupedByEmployee.length === 0 && (
+            <div className="rounded-xl bg-white border border-slate-200 py-16 text-center">
+              <Users className="w-6 h-6 text-slate-300 mx-auto mb-2" />
+              <p className="text-sm font-semibold text-slate-500">Nenhum colaborador encontrado</p>
+            </div>
+          )}
+          {groupedByEmployee.map((emp) => {
+            const certOk = emp.records.filter((r) => r.status === 'Certificado').length;
+            const pct = emp.records.length > 0 ? Math.round((certOk / emp.records.length) * 100) : 0;
+            const isExpanded = expandedEmployees.has(emp.name);
+            return (
+              <div key={emp.name} className="rounded-xl bg-white border border-slate-200 shadow-sm overflow-hidden">
+                {/* Employee header row */}
+                <button
+                  onClick={() => toggleEmployee(emp.name)}
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left"
+                >
+                  {isExpanded ? <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" /> : <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />}
+                  <div className="w-9 h-9 rounded-full bg-slate-200 overflow-hidden shrink-0 border border-slate-300">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={emp.avatar} alt={emp.name} className="w-full h-full object-cover" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-slate-900 text-sm truncate">{emp.name}</p>
+                    <p className="text-[11px] text-slate-500">{emp.role} · {emp.sector}</p>
+                  </div>
+                  {/* Mini compliance */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <div className="text-right">
+                      <p className={`text-xs font-bold ${pct >= 80 ? 'text-emerald-600' : pct >= 60 ? 'text-amber-600' : 'text-red-600'}`}>{pct}%</p>
+                      <p className="text-[10px] text-slate-400">{certOk}/{emp.records.length} certs</p>
+                    </div>
+                    <div className="w-20 h-2 bg-slate-100 rounded-full overflow-hidden">
+                      <div className={`h-full rounded-full ${pct >= 80 ? 'bg-emerald-500' : pct >= 60 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${pct}%` }} />
+                    </div>
+                  </div>
+                  <div className="flex gap-1 shrink-0">
+                    {emp.records.filter(r => r.status === 'Certificado').length > 0 && (
+                      <span className="px-1.5 py-0.5 text-[10px] font-bold bg-emerald-50 text-emerald-700 rounded-full border border-emerald-200">
+                        {emp.records.filter(r => r.status === 'Certificado').length} ok
+                      </span>
+                    )}
+                    {emp.records.filter(r => r.status === 'Reciclar').length > 0 && (
+                      <span className="px-1.5 py-0.5 text-[10px] font-bold bg-amber-50 text-amber-700 rounded-full border border-amber-200">
+                        {emp.records.filter(r => r.status === 'Reciclar').length} reciclar
+                      </span>
+                    )}
+                    {emp.records.filter(r => r.status === 'Vencido').length > 0 && (
+                      <span className="px-1.5 py-0.5 text-[10px] font-bold bg-red-50 text-red-700 rounded-full border border-red-200">
+                        {emp.records.filter(r => r.status === 'Vencido').length} vencido
+                      </span>
+                    )}
+                  </div>
+                </button>
+                {/* Expanded: training records */}
+                {isExpanded && (
+                  <div className="border-t border-slate-100 divide-y divide-slate-50">
+                    {emp.records.map((rec) => (
+                      <div key={rec.id} className="flex items-center gap-3 px-4 py-2.5 bg-slate-50/50 hover:bg-slate-50 text-xs">
+                        <div className="flex-1 min-w-0">
+                          <span className="font-mono text-blue-700 font-semibold mr-2">{rec.procedureCode}</span>
+                          <span className="text-slate-600 truncate">{rec.procedureName}</span>
+                        </div>
+                        <div className="flex items-center gap-4 shrink-0 text-slate-500">
+                          <span className="hidden md:block">Conclusão: <strong className="text-slate-700">{rec.completionDate}</strong></span>
+                          <span>Validade: <strong className={rec.daysRemaining < 0 ? 'text-red-600' : rec.daysRemaining <= 60 ? 'text-amber-600' : 'text-slate-700'}>{rec.validityDate}</strong></span>
+                          <span className={`font-bold ${rec.daysRemaining < 0 ? 'text-red-600' : rec.daysRemaining <= 60 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                            {rec.daysRemaining < 0 ? `${Math.abs(rec.daysRemaining)}d vencido` : `${rec.daysRemaining}d restantes`}
+                          </span>
+                        </div>
+                        <span className={`px-2 py-0.5 rounded-full font-bold border text-[10px] ${getStatusBadge(rec.status)}`}>
+                          {rec.status}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )} {/* end grouped view */}
+
+      </div> {/* end tableRef */}
     </div>
   );
 }
