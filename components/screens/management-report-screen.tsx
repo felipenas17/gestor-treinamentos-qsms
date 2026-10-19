@@ -4,10 +4,14 @@ import React, { useState, useMemo, useRef } from 'react';
 import {
   BarChart3, Download, FileText, GraduationCap, Scale,
   ShieldCheck, AlertTriangle, CheckCircle2, XCircle, Clock,
-  Calendar, Building2, Printer, Loader2,
+  Calendar, Building2, Loader2,
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
+  Legend, ResponsiveContainer, Cell,
+} from 'recharts';
 import {
   DocControl, LegalObligation, TrainingRecord, NonConformity, GlobalComplianceScore,
 } from '@/types';
@@ -148,6 +152,59 @@ export function ManagementReportScreen({
     () => records.filter((r) => r.status === 'Vencido').slice(0, 5),
     [records]
   );
+
+  // ─── Chart data ──────────────────────────────────────────────────────────────
+
+  const moduleChartData = useMemo(() =>
+    complianceScore.modules.map((m) => ({
+      name: m.module.split(' ')[0],
+      fullName: m.module,
+      score: Math.round(m.score),
+      conformes: m.compliant,
+      total: m.total,
+    })),
+    [complianceScore.modules]
+  );
+
+  const expiryChartData = useMemo(() => {
+    const now = new Date();
+    const weeks = [
+      { label: 'Sem. 1 (0–7d)', Documentos: 0, Obrigações: 0, Treinamentos: 0 },
+      { label: 'Sem. 2 (8–14d)', Documentos: 0, Obrigações: 0, Treinamentos: 0 },
+      { label: 'Sem. 3 (15–21d)', Documentos: 0, Obrigações: 0, Treinamentos: 0 },
+      { label: 'Sem. 4 (22–30d)', Documentos: 0, Obrigações: 0, Treinamentos: 0 },
+    ];
+    const bucket = (diff: number) => {
+      if (diff >= 0 && diff <= 7) return 0;
+      if (diff >= 8 && diff <= 14) return 1;
+      if (diff >= 15 && diff <= 21) return 2;
+      if (diff >= 22 && diff <= 30) return 3;
+      return -1;
+    };
+    documents.forEach((d) => {
+      if (!d.expiryDate) return;
+      const diff = Math.floor((new Date(d.expiryDate).getTime() - now.getTime()) / 86_400_000);
+      const i = bucket(diff);
+      if (i >= 0) weeks[i].Documentos++;
+    });
+    obligations.forEach((o) => {
+      if (!o.nextDueDate) return;
+      const diff = Math.floor((new Date(o.nextDueDate).getTime() - now.getTime()) / 86_400_000);
+      const i = bucket(diff);
+      if (i >= 0) weeks[i].Obrigações++;
+    });
+    records.forEach((r) => {
+      const i = bucket(r.daysRemaining);
+      if (i >= 0) weeks[i].Treinamentos++;
+    });
+    return weeks;
+  }, [documents, obligations, records]);
+
+  const ncStatusData = useMemo(() => [
+    { name: 'Aberta', value: ncStats.abertas, fill: '#ef4444' },
+    { name: 'Em Tratamento', value: ncStats.emTratamento, fill: '#f59e0b' },
+    { name: 'Encerrada', value: ncStats.encerradas, fill: '#10b981' },
+  ], [ncStats]);
 
   const today = new Date().toLocaleDateString('pt-BR', {
     day: '2-digit', month: 'long', year: 'numeric',
@@ -312,6 +369,92 @@ export function ManagementReportScreen({
             sub={ncStats.criticas > 0 ? `${ncStats.criticas} crítica(s)` : `${ncStats.total} total`}
             accent={ncStats.criticas > 0}
           />
+        </div>
+
+        {/* ── Gráficos ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+          {/* Score por Módulo */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-5">
+            <SectionHeader
+              icon={<BarChart3 className="w-4 h-4 text-blue-500" />}
+              title="Score por Módulo"
+            />
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={moduleChartData} margin={{ top: 4, right: 8, left: -16, bottom: 4 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#64748b' }} />
+                <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: '#64748b' }} unit="%" />
+                <Tooltip
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  formatter={(value: unknown, _n: unknown, props: any) => [
+                    `${value}%`,
+                    (props?.payload?.fullName as string | undefined) ?? 'Score',
+                  ]}
+                  contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}
+                />
+                <Bar dataKey="score" radius={[4, 4, 0, 0]}>
+                  {moduleChartData.map((entry, index) => (
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={entry.score >= 80 ? '#10b981' : entry.score >= 60 ? '#f59e0b' : '#ef4444'}
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+            <p className="text-xs text-slate-400 text-center mt-1">% de conformidade por módulo do SGI</p>
+          </div>
+
+          {/* Vencimentos próximas 4 semanas */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-5">
+            <SectionHeader
+              icon={<Clock className="w-4 h-4 text-amber-500" />}
+              title="Vencimentos — Próximas 4 Semanas"
+            />
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={expiryChartData} margin={{ top: 4, right: 8, left: -16, bottom: 4 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#64748b' }} />
+                <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#64748b' }} />
+                <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0' }} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Bar dataKey="Documentos" fill="#3b82f6" radius={[3, 3, 0, 0]} />
+                <Bar dataKey="Obrigações" fill="#8b5cf6" radius={[3, 3, 0, 0]} />
+                <Bar dataKey="Treinamentos" fill="#10b981" radius={[3, 3, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+            <p className="text-xs text-slate-400 text-center mt-1">Itens com vencimento nos próximos 30 dias</p>
+          </div>
+
+          {/* Pipeline NC */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 lg:col-span-2">
+            <SectionHeader
+              icon={<AlertTriangle className="w-4 h-4 text-amber-500" />}
+              title="Pipeline NC / CAPA — Status Atual"
+            />
+            <ResponsiveContainer width="100%" height={120}>
+              <BarChart
+                data={ncStatusData}
+                layout="vertical"
+                margin={{ top: 4, right: 40, left: 8, bottom: 4 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
+                <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: '#64748b' }} />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 12, fill: '#475569' }} width={100} />
+                <Tooltip
+                  formatter={(value: unknown) => [`${value} NC(s)`, 'Quantidade']}
+                  contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}
+                />
+                <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                  {ncStatusData.map((entry, index) => (
+                    <Cell key={`nc-cell-${index}`} fill={entry.fill} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+            <p className="text-xs text-slate-400 text-center mt-1">Distribuição das não conformidades por status</p>
+          </div>
         </div>
 
         {/* ── Documentos ── */}
