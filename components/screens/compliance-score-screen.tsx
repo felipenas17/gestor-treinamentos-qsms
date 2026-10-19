@@ -1,19 +1,19 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
-  ShieldCheck, FileText, Scale, GraduationCap,
+  ShieldCheck, FileText, Scale, GraduationCap, ClipboardList,
   TrendingUp, TrendingDown, Minus, Info, RefreshCw,
+  AlertTriangle, Clock, ChevronDown, ChevronUp, XCircle,
 } from 'lucide-react';
-import { GlobalComplianceScore, ModuleScore } from '@/types';
+import { GlobalComplianceScore, ModuleScore, AlertItem, BreakdownItem } from '@/types';
 
 // ─── Gauge ────────────────────────────────────────────────────────────────────
 
 function Gauge({ value }: { value: number }) {
   const clamped = Math.min(100, Math.max(0, value));
-  const angle = (clamped / 100) * 180; // 0→180°
+  const angle = (clamped / 100) * 180;
   const RAD = Math.PI / 180;
-  // Arc path — semi-circle from left (-180°) to right (0°)
   const r = 80;
   const cx = 100;
   const cy = 100;
@@ -25,31 +25,19 @@ function Gauge({ value }: { value: number }) {
     clamped >= 60 ? '#f59e0b' :
     '#ef4444';
 
-  const trackColor = 'rgba(0,0,0,0.08)';
-
   return (
     <svg viewBox="0 0 200 110" className="w-full max-w-[220px]">
-      {/* Track */}
       <path
         d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`}
-        fill="none"
-        stroke={trackColor}
-        strokeWidth={16}
-        strokeLinecap="round"
+        fill="none" stroke="rgba(0,0,0,0.08)" strokeWidth={16} strokeLinecap="round"
       />
-      {/* Progress arc */}
       {clamped > 0 && (
         <path
           d={`M ${cx - r} ${cy} A ${r} ${r} 0 ${angle > 180 ? 1 : 0} 1 ${x} ${y}`}
-          fill="none"
-          stroke={color}
-          strokeWidth={16}
-          strokeLinecap="round"
+          fill="none" stroke={color} strokeWidth={16} strokeLinecap="round"
         />
       )}
-      {/* Needle dot */}
       <circle cx={x} cy={y} r={7} fill={color} />
-      {/* Value text */}
       <text x={cx} y={cy - 4} textAnchor="middle" fontSize={28} fontWeight="bold" fill={color}>
         {Math.round(clamped)}%
       </text>
@@ -60,39 +48,33 @@ function Gauge({ value }: { value: number }) {
   );
 }
 
-// ─── Module bar ───────────────────────────────────────────────────────────────
+// ─── Breakdown pill ────────────────────────────────────────────────────────────
 
-function ModuleBar({ mod }: { mod: ModuleScore }) {
-  const { score, compliant, total, module } = mod;
-  const color =
-    score >= 80 ? 'bg-emerald-500' :
-    score >= 60 ? 'bg-amber-500' :
-    'bg-red-500';
-  const textColor =
-    score >= 80 ? 'text-emerald-700' :
-    score >= 60 ? 'text-amber-700' :
-    'text-red-700';
+const PILL_COLORS: Record<BreakdownItem['variant'], string> = {
+  green: 'bg-emerald-100 text-emerald-700',
+  yellow: 'bg-amber-100 text-amber-700',
+  red: 'bg-red-100 text-red-700',
+  gray: 'bg-slate-100 text-slate-500',
+};
 
+const DOT_COLORS: Record<BreakdownItem['variant'], string> = {
+  green: 'bg-emerald-500',
+  yellow: 'bg-amber-500',
+  red: 'bg-red-500',
+  gray: 'bg-slate-400',
+};
+
+function BreakdownPill({ item }: { item: BreakdownItem }) {
+  if (item.count === 0) return null;
   return (
-    <div>
-      <div className="flex items-center justify-between mb-1.5">
-        <span className="text-sm font-medium text-slate-700">{module}</span>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-500">{compliant}/{total}</span>
-          <span className={`text-sm font-bold ${textColor}`}>{Math.round(score)}%</span>
-        </div>
-      </div>
-      <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
-        <div
-          className={`h-full rounded-full transition-all duration-700 ${color}`}
-          style={{ width: `${score}%` }}
-        />
-      </div>
-    </div>
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${PILL_COLORS[item.variant]}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${DOT_COLORS[item.variant]}`} />
+      {item.count} {item.label}
+    </span>
   );
 }
 
-// ─── Status badge ─────────────────────────────────────────────────────────────
+// ─── Score badge ──────────────────────────────────────────────────────────────
 
 function ScoreBadge({ score }: { score: number }) {
   if (score >= 90) return (
@@ -119,11 +101,106 @@ function ScoreBadge({ score }: { score: number }) {
 
 // ─── Module icon ──────────────────────────────────────────────────────────────
 
-function moduleIcon(name: string) {
-  if (name.includes('Documento')) return <FileText className="w-4 h-4 text-blue-500" />;
-  if (name.includes('Legal')) return <Scale className="w-4 h-4 text-purple-500" />;
-  if (name.includes('Treinamento')) return <GraduationCap className="w-4 h-4 text-emerald-500" />;
-  return <ShieldCheck className="w-4 h-4 text-slate-400" />;
+function ModuleIcon({ name, size = 'sm' }: { name: string; size?: 'sm' | 'md' }) {
+  const cls = size === 'md' ? 'w-5 h-5' : 'w-4 h-4';
+  if (name.includes('Documento')) return <FileText className={`${cls} text-blue-500`} />;
+  if (name.includes('Legal'))     return <Scale className={`${cls} text-purple-500`} />;
+  if (name.includes('Treinamento')) return <GraduationCap className={`${cls} text-emerald-500`} />;
+  if (name.includes('Conformidade') || name.includes('NC')) return <ClipboardList className={`${cls} text-orange-500`} />;
+  return <ShieldCheck className={`${cls} text-slate-400`} />;
+}
+
+// ─── Module card ──────────────────────────────────────────────────────────────
+
+function ModuleCard({ mod }: { mod: ModuleScore }) {
+  const { score, compliant, total, module, breakdown } = mod;
+  const barColor =
+    score >= 80 ? 'bg-emerald-500' :
+    score >= 60 ? 'bg-amber-500' :
+    'bg-red-500';
+  const textColor =
+    score >= 80 ? 'text-emerald-600' :
+    score >= 60 ? 'text-amber-600' :
+    'text-red-600';
+  const borderColor =
+    score >= 80 ? 'border-emerald-100' :
+    score >= 60 ? 'border-amber-100' :
+    'border-red-100';
+
+  return (
+    <div className={`bg-white border ${borderColor} rounded-xl p-4 shadow-sm`}>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <ModuleIcon name={module} size="md" />
+          <span className="text-sm font-semibold text-slate-700">{module}</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className={`text-lg font-bold ${textColor}`}>{Math.round(score)}%</span>
+          <ScoreBadge score={score} />
+        </div>
+      </div>
+
+      {/* Bar */}
+      {total === 0 ? (
+        <p className="text-xs text-slate-400 italic">Nenhum registro</p>
+      ) : (
+        <>
+          <div className="flex items-center gap-2 mb-2">
+            <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-700 ${barColor}`}
+                style={{ width: `${score}%` }}
+              />
+            </div>
+            <span className="text-xs text-slate-500 shrink-0">{compliant}/{total}</span>
+          </div>
+
+          {/* Breakdown pills */}
+          {breakdown && (
+            <div className="flex flex-wrap gap-1.5 mt-2.5">
+              {breakdown.map((b) => <BreakdownPill key={b.label} item={b} />)}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─── Alert row ────────────────────────────────────────────────────────────────
+
+function AlertRow({ alert }: { alert: AlertItem }) {
+  const { severity, daysUntilExpiry, module, label } = alert;
+
+  const config = severity === 'expired'
+    ? { bg: 'bg-red-50', border: 'border-red-200', dot: 'bg-red-500', text: 'text-red-700', badge: 'bg-red-100 text-red-700', tag: 'VENCIDO' }
+    : severity === 'critical'
+    ? { bg: 'bg-orange-50', border: 'border-orange-200', dot: 'bg-orange-500', text: 'text-orange-700', badge: 'bg-orange-100 text-orange-700', tag: 'CRÍTICO' }
+    : { bg: 'bg-amber-50', border: 'border-amber-200', dot: 'bg-amber-400', text: 'text-amber-700', badge: 'bg-amber-100 text-amber-700', tag: 'ATENÇÃO' };
+
+  const timeLabel = daysUntilExpiry < 0
+    ? `Vencido há ${Math.abs(daysUntilExpiry)}d`
+    : daysUntilExpiry === 0
+    ? 'Vence hoje'
+    : `Vence em ${daysUntilExpiry}d`;
+
+  return (
+    <div className={`flex items-start gap-2.5 p-2.5 rounded-lg border ${config.bg} ${config.border}`}>
+      <span className={`mt-1 w-2 h-2 rounded-full shrink-0 ${config.dot}`} />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
+          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${config.badge}`}>{config.tag}</span>
+          <span className="text-xs text-slate-400">{module}</span>
+        </div>
+        <p className={`text-xs font-medium ${config.text} truncate`}>{label}</p>
+      </div>
+      <div className="shrink-0 flex items-center gap-1 text-xs text-slate-500">
+        <Clock className="w-3 h-3" />
+        <span>{timeLabel}</span>
+      </div>
+    </div>
+  );
 }
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -136,9 +213,9 @@ interface ComplianceScoreScreenProps {
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export function ComplianceScoreScreen({ score, onRefresh }: ComplianceScoreScreenProps) {
-  const { overall, modules, generatedAt } = score;
+  const { overall, modules, generatedAt, alerts = [] } = score;
+  const [alertsExpanded, setAlertsExpanded] = useState(true);
 
-  // Non-zero modules (modules with data)
   const activeModules = useMemo(
     () => modules.filter((m) => m.total > 0),
     [modules]
@@ -152,7 +229,6 @@ export function ComplianceScoreScreen({ score, onRefresh }: ComplianceScoreScree
     [generatedAt]
   );
 
-  // Weakest module
   const weakest = useMemo(
     () => activeModules.length
       ? [...activeModules].sort((a, b) => a.score - b.score)[0]
@@ -160,15 +236,12 @@ export function ComplianceScoreScreen({ score, onRefresh }: ComplianceScoreScree
     [activeModules]
   );
 
-  // Total items across all modules
-  const totalItems = useMemo(
-    () => modules.reduce((acc, m) => acc + m.total, 0),
-    [modules]
-  );
-  const totalCompliant = useMemo(
-    () => modules.reduce((acc, m) => acc + m.compliant, 0),
-    [modules]
-  );
+  const totalItems     = useMemo(() => modules.reduce((acc, m) => acc + m.total, 0), [modules]);
+  const totalCompliant = useMemo(() => modules.reduce((acc, m) => acc + m.compliant, 0), [modules]);
+
+  const expiredCount  = alerts.filter((a) => a.severity === 'expired').length;
+  const criticalCount = alerts.filter((a) => a.severity === 'critical').length;
+  const warningCount  = alerts.filter((a) => a.severity === 'warning').length;
 
   return (
     <div className="p-6 space-y-6">
@@ -180,7 +253,7 @@ export function ComplianceScoreScreen({ score, onRefresh }: ComplianceScoreScree
             Score de Conformidade Global
           </h1>
           <p className="text-sm text-slate-500 mt-0.5">
-            Índice consolidado — Documentos · Obrigações Legais · Treinamentos
+            Índice consolidado — Documentos · Obrigações Legais · Treinamentos · NCs
           </p>
         </div>
         <button
@@ -192,7 +265,45 @@ export function ComplianceScoreScreen({ score, onRefresh }: ComplianceScoreScree
         </button>
       </div>
 
-      {/* Main card */}
+      {/* Alerts banner */}
+      {alerts.length > 0 && (
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+          <button
+            onClick={() => setAlertsExpanded((v) => !v)}
+            className="w-full flex items-center justify-between px-5 py-3.5 text-left hover:bg-slate-50 transition-colors"
+          >
+            <div className="flex items-center gap-2.5">
+              <AlertTriangle className="w-4.5 h-4.5 text-amber-500" />
+              <span className="text-sm font-semibold text-slate-700">Ações Necessárias</span>
+              <div className="flex items-center gap-1.5">
+                {expiredCount > 0 && (
+                  <span className="px-2 py-0.5 bg-red-100 text-red-700 text-xs font-bold rounded-full">{expiredCount} vencido{expiredCount > 1 ? 's' : ''}</span>
+                )}
+                {criticalCount > 0 && (
+                  <span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-xs font-bold rounded-full">{criticalCount} crítico{criticalCount > 1 ? 's' : ''}</span>
+                )}
+                {warningCount > 0 && (
+                  <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs font-bold rounded-full">{warningCount} atenção</span>
+                )}
+              </div>
+            </div>
+            {alertsExpanded
+              ? <ChevronUp className="w-4 h-4 text-slate-400" />
+              : <ChevronDown className="w-4 h-4 text-slate-400" />
+            }
+          </button>
+
+          {alertsExpanded && (
+            <div className="px-5 pb-4 space-y-2 border-t border-slate-100 pt-3">
+              {alerts.map((alert) => (
+                <AlertRow key={`${alert.module}-${alert.id}`} alert={alert} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Main score card */}
       <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
         <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-100">
           {/* Gauge side */}
@@ -234,7 +345,7 @@ export function ComplianceScoreScreen({ score, onRefresh }: ComplianceScoreScree
               </div>
             )}
 
-            {overall >= 80 && (
+            {overall >= 80 && alerts.length === 0 && (
               <div className="flex items-start gap-2.5 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-sm text-emerald-700">
                 <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5" />
                 <div>
@@ -249,27 +360,11 @@ export function ComplianceScoreScreen({ score, onRefresh }: ComplianceScoreScree
         </div>
       </div>
 
-      {/* Module breakdown */}
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6">
-        <h2 className="text-sm font-semibold text-slate-700 mb-5">Detalhamento por Módulo</h2>
-        <div className="space-y-5">
-          {modules.map((mod) => (
-            <div key={mod.module}>
-              <div className="flex items-center gap-2 mb-2">
-                {moduleIcon(mod.module)}
-                <span className="text-sm font-semibold text-slate-700">{mod.module}</span>
-              </div>
-              {mod.total === 0 ? (
-                <div className="text-xs text-slate-400 italic pl-6">
-                  Nenhum registro encontrado para este módulo.
-                </div>
-              ) : (
-                <div className="pl-6">
-                  <ModuleBar mod={mod} />
-                </div>
-              )}
-            </div>
-          ))}
+      {/* Module cards grid */}
+      <div>
+        <h2 className="text-sm font-semibold text-slate-700 mb-3">Detalhamento por Módulo</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {modules.map((mod) => <ModuleCard key={mod.module} mod={mod} />)}
         </div>
       </div>
 
@@ -284,23 +379,12 @@ export function ComplianceScoreScreen({ score, onRefresh }: ComplianceScoreScree
             O Score Global é a <strong>média simples</strong> dos scores de cada módulo ativo.
             Módulos sem registros são excluídos da média.
           </p>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mt-3">
             {[
-              {
-                icon: <FileText className="w-3.5 h-3.5 text-blue-500" />,
-                label: 'Documentos',
-                rule: 'Status = "Vigente" → conforme',
-              },
-              {
-                icon: <Scale className="w-3.5 h-3.5 text-purple-500" />,
-                label: 'Obrigações Legais',
-                rule: 'Status = "Vigente" → conforme',
-              },
-              {
-                icon: <GraduationCap className="w-3.5 h-3.5 text-emerald-500" />,
-                label: 'Treinamentos',
-                rule: 'Status = "Certificado" → conforme',
-              },
+              { icon: <FileText className="w-3.5 h-3.5 text-blue-500" />, label: 'Documentos', rule: 'Status = "Vigente" → conforme' },
+              { icon: <Scale className="w-3.5 h-3.5 text-purple-500" />, label: 'Obrigações Legais', rule: 'Status = "Vigente" → conforme' },
+              { icon: <GraduationCap className="w-3.5 h-3.5 text-emerald-500" />, label: 'Treinamentos', rule: 'Status = "Certificado" → conforme' },
+              { icon: <ClipboardList className="w-3.5 h-3.5 text-orange-500" />, label: 'Não Conformidades', rule: 'Status = "Encerrada" → conforme' },
             ].map((item) => (
               <div key={item.label} className="bg-white border border-slate-200 rounded-xl p-3">
                 <div className="flex items-center gap-1.5 mb-1.5">
@@ -312,7 +396,8 @@ export function ComplianceScoreScreen({ score, onRefresh }: ComplianceScoreScree
             ))}
           </div>
           <p className="mt-2 text-slate-500">
-            Fórmula por módulo: <code className="bg-white px-1.5 py-0.5 rounded border border-slate-200 font-mono">
+            Fórmula por módulo:{' '}
+            <code className="bg-white px-1.5 py-0.5 rounded border border-slate-200 font-mono">
               Score = (conformes / total) × 100
             </code>
           </p>

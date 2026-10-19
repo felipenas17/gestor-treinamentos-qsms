@@ -244,15 +244,31 @@ export interface NonConformity {
 
 // ─── Score de Conformidade ────────────────────────────────────────────────────
 
+export interface BreakdownItem {
+  label: string;
+  count: number;
+  variant: 'green' | 'yellow' | 'red' | 'gray';
+}
+
+export interface AlertItem {
+  id: string;
+  module: string;
+  label: string;
+  daysUntilExpiry: number; // negative = already expired
+  severity: 'expired' | 'critical' | 'warning';
+}
+
 export interface ModuleScore {
   module: string;
   compliant: number;
   total: number;
   score: number; // 0-100
+  breakdown?: BreakdownItem[];
 }
 
 export interface GlobalComplianceScore {
   overall: number; // 0-100
   modules: ModuleScore[];
   generatedAt: string;
+  alerts?: AlertItem[];
 }

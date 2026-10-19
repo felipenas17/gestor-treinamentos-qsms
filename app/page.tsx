@@ -68,7 +68,7 @@ import {
   type NonConformityRow,
 } from '@/lib/supabase';
 
-import { Employee, Procedure, TrainingRecord, Assessment, RespondentStatus, ChartProjectionMetric, DocControl, LegalObligation, ExecutionStatus, ObligationRealization, DocControlRenewal, RenewalStatus, NonConformity, GlobalComplianceScore, NCStatusHistoryEntry } from '@/types';
+import { Employee, Procedure, TrainingRecord, Assessment, RespondentStatus, ChartProjectionMetric, DocControl, LegalObligation, ExecutionStatus, ObligationRealization, DocControlRenewal, RenewalStatus, NonConformity, GlobalComplianceScore, ModuleScore, AlertItem, NCStatusHistoryEntry } from '@/types';
 import { CertificateRecord } from '@/components/screens/certificates-screen';
 import { CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 
@@ -217,19 +217,128 @@ export default function GestorTreinamentosApp() {
 
   // ─── Score de Conformidade Global ───────────────────────────────────────────
   const complianceScore = useMemo<GlobalComplianceScore>(() => {
-    const docCompliant = documents.filter((d) => d.docStatus === 'Vigente').length;
-    const docScore = documents.length ? (docCompliant / documents.length) * 100 : 0;
+    const now = new Date();
 
-    const oblCompliant = obligations.filter((o) => o.status === 'Vigente').length;
-    const oblScore = obligations.length ? (oblCompliant / obligations.length) * 100 : 0;
+    // ── Documentos ─────────────────────────────────────────────────────────────
+    const docVigente     = documents.filter((d) => d.docStatus === 'Vigente').length;
+    const docParaRenovar = documents.filter((d) => d.docStatus === 'Para Renovar').length;
+    const docVencido     = documents.filter((d) => d.docStatus === 'Vencido').length;
+    const docIndefinido  = documents.filter((d) => !d.docStatus || d.docStatus === 'Indefinido').length;
+    const docScore       = documents.length ? (docVigente / documents.length) * 100 : 0;
 
-    const trainCompliant = records.filter((r) => r.status === 'Certificado').length;
-    const trainScore = records.length ? (trainCompliant / records.length) * 100 : 0;
+    // ── Obrigações Legais ──────────────────────────────────────────────────────
+    const oblVigente = obligations.filter((o) => o.status === 'Vigente').length;
+    const oblProximo = obligations.filter((o) => o.status === 'Próximo').length;
+    const oblVencido = obligations.filter((o) => o.status === 'Vencido').length;
+    const oblScore   = obligations.length ? (oblVigente / obligations.length) * 100 : 0;
 
-    const modules = [
-      { module: 'Documentos', compliant: docCompliant, total: documents.length, score: docScore },
-      { module: 'Obrigações Legais', compliant: oblCompliant, total: obligations.length, score: oblScore },
-      { module: 'Treinamentos', compliant: trainCompliant, total: records.length, score: trainScore },
+    // ── Treinamentos ───────────────────────────────────────────────────────────
+    const trainCertificado = records.filter((r) => r.status === 'Certificado').length;
+    const trainReciclar    = records.filter((r) => r.status === 'Reciclar').length;
+    const trainVencido     = records.filter((r) => r.status === 'Vencido').length;
+    const trainPendente    = records.filter((r) => r.status === 'Pendente').length;
+    const trainScore       = records.length ? (trainCertificado / records.length) * 100 : 0;
+
+    // ── Não Conformidades ──────────────────────────────────────────────────────
+    const ncEncerradas   = nonConformities.filter((nc) => nc.status === 'Encerrada').length;
+    const ncEmTratamento = nonConformities.filter((nc) => nc.status === 'Em tratamento').length;
+    const ncAguardando   = nonConformities.filter((nc) => nc.status === 'Aguardando verificação').length;
+    const ncAbertas      = nonConformities.filter((nc) => nc.status === 'Aberta').length;
+    const ncScore        = nonConformities.length ? (ncEncerradas / nonConformities.length) * 100 : 0;
+
+    // ── Alertas ────────────────────────────────────────────────────────────────
+    const alerts: AlertItem[] = [];
+
+    documents.forEach((d) => {
+      if (d.expiryDate && d.docStatus && d.docStatus !== 'Vigente') {
+        const days = Math.floor((new Date(d.expiryDate).getTime() - now.getTime()) / 86400000);
+        if (days <= 60) {
+          alerts.push({
+            id: d.id, module: 'Documentos', label: d.name,
+            daysUntilExpiry: days,
+            severity: days < 0 ? 'expired' : days <= 30 ? 'critical' : 'warning',
+          });
+        }
+      }
+    });
+
+    obligations.forEach((o) => {
+      if (o.nextDueDate && o.status !== 'Vigente') {
+        const days = Math.floor((new Date(o.nextDueDate).getTime() - now.getTime()) / 86400000);
+        if (days <= 60) {
+          alerts.push({
+            id: o.id, module: 'Obrigações Legais', label: o.title,
+            daysUntilExpiry: days,
+            severity: days < 0 ? 'expired' : days <= 30 ? 'critical' : 'warning',
+          });
+        }
+      }
+    });
+
+    records.forEach((r) => {
+      if (r.status === 'Vencido' || r.status === 'Reciclar') {
+        alerts.push({
+          id: r.id, module: 'Treinamentos',
+          label: `${r.employeeName} — ${r.procedureName}`,
+          daysUntilExpiry: r.daysRemaining,
+          severity: r.daysRemaining < 0 ? 'expired' : r.daysRemaining <= 30 ? 'critical' : 'warning',
+        });
+      }
+    });
+
+    nonConformities.forEach((nc) => {
+      if (nc.status !== 'Encerrada' && nc.deadline) {
+        const days = Math.floor((new Date(nc.deadline).getTime() - now.getTime()) / 86400000);
+        if (days <= 30) {
+          alerts.push({
+            id: nc.id, module: 'Não Conformidades',
+            label: `${nc.code} — ${nc.title}`,
+            daysUntilExpiry: days,
+            severity: days < 0 ? 'expired' : days <= 7 ? 'critical' : 'warning',
+          });
+        }
+      }
+    });
+
+    alerts.sort((a, b) => a.daysUntilExpiry - b.daysUntilExpiry);
+
+    // ── Modules ────────────────────────────────────────────────────────────────
+    const modules: ModuleScore[] = [
+      {
+        module: 'Documentos', compliant: docVigente, total: documents.length, score: docScore,
+        breakdown: [
+          { label: 'Vigente', count: docVigente, variant: 'green' },
+          { label: 'Para Renovar', count: docParaRenovar, variant: 'yellow' },
+          { label: 'Vencido', count: docVencido, variant: 'red' },
+          ...(docIndefinido > 0 ? [{ label: 'Indefinido', count: docIndefinido, variant: 'gray' as const }] : []),
+        ],
+      },
+      {
+        module: 'Obrigações Legais', compliant: oblVigente, total: obligations.length, score: oblScore,
+        breakdown: [
+          { label: 'Vigente', count: oblVigente, variant: 'green' },
+          { label: 'Próximo', count: oblProximo, variant: 'yellow' },
+          { label: 'Vencido', count: oblVencido, variant: 'red' },
+        ],
+      },
+      {
+        module: 'Treinamentos', compliant: trainCertificado, total: records.length, score: trainScore,
+        breakdown: [
+          { label: 'Certificado', count: trainCertificado, variant: 'green' },
+          { label: 'Reciclar', count: trainReciclar, variant: 'yellow' },
+          { label: 'Vencido', count: trainVencido, variant: 'red' },
+          ...(trainPendente > 0 ? [{ label: 'Pendente', count: trainPendente, variant: 'gray' as const }] : []),
+        ],
+      },
+      {
+        module: 'Não Conformidades', compliant: ncEncerradas, total: nonConformities.length, score: ncScore,
+        breakdown: [
+          { label: 'Encerrada', count: ncEncerradas, variant: 'green' },
+          { label: 'Em tratamento', count: ncEmTratamento, variant: 'yellow' },
+          { label: 'Aguardando', count: ncAguardando, variant: 'yellow' },
+          { label: 'Aberta', count: ncAbertas, variant: 'red' },
+        ],
+      },
     ];
 
     const activeModules = modules.filter((m) => m.total > 0);
@@ -241,8 +350,9 @@ export default function GestorTreinamentosApp() {
       overall: Math.round(overall * 10) / 10,
       modules,
       generatedAt: new Date().toISOString(),
+      alerts: alerts.slice(0, 15),
     };
-  }, [documents, obligations, records]);
+  }, [documents, obligations, records, nonConformities]);
 
   const showToast = useCallback((msg: string, type: 'success' | 'error' = 'success') => {
     setToastMessage(msg);
@@ -1241,10 +1351,11 @@ export default function GestorTreinamentosApp() {
             <ComplianceScoreScreen
               score={complianceScore}
               onRefresh={async () => {
-                const [dbDocs, dbObs, dbRecs] = await Promise.all([
+                const [dbDocs, dbObs, dbRecs, dbNC] = await Promise.all([
                   fetchDocuments(),
                   fetchLegalObligations(),
                   fetchTrainingRecords(),
+                  fetchNonConformities(),
                 ]);
                 if (dbDocs) setDocuments(mapDocuments(dbDocs));
                 if (dbObs) setObligations(mapObligations(dbObs));
@@ -1271,6 +1382,31 @@ export default function GestorTreinamentosApp() {
                       hours: r.procedures?.hours || 8,
                     };
                   }));
+                }
+                if (dbNC && dbNC.length > 0) {
+                  setNonConformities(dbNC.map((nc: NonConformityRow) => ({
+                    id: nc.id,
+                    code: nc.code,
+                    title: nc.title,
+                    description: nc.description ?? null,
+                    type: nc.type as NonConformity['type'],
+                    severity: nc.severity as NonConformity['severity'],
+                    source: nc.source as NonConformity['source'],
+                    detectedDate: nc.detected_date,
+                    deadline: nc.deadline ?? null,
+                    status: nc.status as NonConformity['status'],
+                    responsible: nc.responsible ?? null,
+                    sector: nc.sector ?? null,
+                    rootCause: nc.root_cause ?? null,
+                    immediateAction: nc.immediate_action ?? null,
+                    correctiveAction: nc.corrective_action ?? null,
+                    preventiveAction: nc.preventive_action ?? null,
+                    effectivenessCheck: nc.effectiveness_check ?? null,
+                    closedDate: nc.closed_date ?? null,
+                    notes: nc.notes ?? null,
+                    createdAt: nc.created_at,
+                    statusHistory: (nc.status_history ?? []) as NCStatusHistoryEntry[],
+                  })));
                 }
                 showToast('Score atualizado ✓');
               }}
