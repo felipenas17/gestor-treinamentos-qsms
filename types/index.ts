@@ -212,6 +212,12 @@ export type NCStatus =
   | 'Aguardando verificação'
   | 'Encerrada';
 
+export interface NCStatusHistoryEntry {
+  status: NCStatus;
+  changedAt: string;   // ISO timestamp
+  note?: string;
+}
+
 export interface NonConformity {
   id: string;
   code: string;
@@ -233,6 +239,7 @@ export interface NonConformity {
   closedDate?: string | null;
   notes?: string | null;
   createdAt: string;
+  statusHistory?: NCStatusHistoryEntry[];
 }
 
 // ─── Score de Conformidade ────────────────────────────────────────────────────

@@ -6,6 +6,8 @@ import {
   ShieldCheck, AlertTriangle, CheckCircle2, XCircle, Clock,
   Calendar, Building2, Printer, Loader2,
 } from 'lucide-react';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 import {
   DocControl, LegalObligation, TrainingRecord, NonConformity, GlobalComplianceScore,
 } from '@/types';
@@ -152,11 +154,59 @@ export function ManagementReportScreen({
   });
 
   const handleExport = async () => {
+    if (!reportRef.current) return;
     setIsGenerating(true);
-    // Small delay for UX feedback
-    await new Promise((r) => setTimeout(r, 300));
     try {
-      window.print();
+      // Capture the report DOM at 2× resolution for sharp text
+      const canvas = await html2canvas(reportRef.current, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#f8fafc',
+        logging: false,
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      const imgW = canvas.width;
+      const imgH = canvas.height;
+
+      // A4 page in mm
+      const pageW = 210;
+      const pageH = 297;
+      const marginMm = 10;
+      const printW = pageW - marginMm * 2;
+      const printH = (imgH * printW) / imgW;    // maintain aspect ratio
+
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+      let yOffset = marginMm;
+      let remainingH = printH;
+
+      // Split tall report across multiple pages
+      while (remainingH > 0) {
+        const sliceH = Math.min(pageH - marginMm * 2, remainingH);
+        const srcY = ((printH - remainingH) / printH) * imgH;
+        const srcH = (sliceH / printH) * imgH;
+
+        // Create a slice canvas for each page
+        const sliceCanvas = document.createElement('canvas');
+        sliceCanvas.width = imgW;
+        sliceCanvas.height = srcH;
+        const ctx = sliceCanvas.getContext('2d')!;
+        ctx.drawImage(canvas, 0, srcY, imgW, srcH, 0, 0, imgW, srcH);
+
+        pdf.addImage(sliceCanvas.toDataURL('image/png'), 'PNG', marginMm, yOffset, printW, sliceH);
+
+        remainingH -= sliceH;
+        if (remainingH > 0) {
+          pdf.addPage();
+          yOffset = marginMm;
+        }
+      }
+
+      const fileName = `relatorio-gerencial-tiger-${new Date().toISOString().slice(0, 10)}.pdf`;
+      pdf.save(fileName);
+    } catch (err) {
+      console.error('PDF export error:', err);
     } finally {
       setIsGenerating(false);
     }
@@ -183,7 +233,7 @@ export function ManagementReportScreen({
           {isGenerating ? (
             <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Gerando...</>
           ) : (
-            <><Printer className="w-3.5 h-3.5" /> Exportar / Imprimir</>
+            <><Download className="w-3.5 h-3.5" /> Exportar PDF</>
           )}
         </button>
       </div>

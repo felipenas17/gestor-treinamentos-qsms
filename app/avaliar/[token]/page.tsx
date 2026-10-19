@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
+import SignaturePad from 'signature_pad';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -64,7 +65,7 @@ export default function ExamPage() {
 
   // Refs
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const isDrawingRef = useRef(false);
+  const sigPadRef = useRef<SignaturePad | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // ── Fetch assessment ────────────────────────────────────────────────────────
@@ -104,88 +105,35 @@ export default function ExamPage() {
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, []);
 
-  // ── Canvas signature ─────────────────────────────────────────────────────────
-  const getCanvasPos = (
-    canvas: HTMLCanvasElement,
-    clientX: number,
-    clientY: number
-  ) => {
-    const rect = canvas.getBoundingClientRect();
-    return {
-      x: (clientX - rect.left) * (canvas.width / rect.width),
-      y: (clientY - rect.top) * (canvas.height / rect.height),
+  // ── SignaturePad initialization ───────────────────────────────────────────────
+  useEffect(() => {
+    if (step !== 'signature') return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    // Resize canvas to match display size for crisp rendering
+    const ratio = Math.max(window.devicePixelRatio || 1, 1);
+    canvas.width = canvas.offsetWidth * ratio;
+    canvas.height = canvas.offsetHeight * ratio;
+    const ctx = canvas.getContext('2d');
+    if (ctx) ctx.scale(ratio, ratio);
+
+    const pad = new SignaturePad(canvas, {
+      minWidth: 1,
+      maxWidth: 2.5,
+      penColor: '#1e40af',
+      backgroundColor: 'rgba(0,0,0,0)',
+    });
+    sigPadRef.current = pad;
+
+    return () => {
+      pad.off();
+      sigPadRef.current = null;
     };
-  };
-
-  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    isDrawingRef.current = true;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    const { x, y } = getCanvasPos(canvas, e.clientX, e.clientY);
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-  };
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDrawingRef.current) return;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    const { x, y } = getCanvasPos(canvas, e.clientX, e.clientY);
-    ctx.lineTo(x, y);
-    ctx.strokeStyle = '#1e40af';
-    ctx.lineWidth = 2;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.stroke();
-  };
-
-  const handleMouseUp = () => { isDrawingRef.current = false; };
-
-  const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
-    e.preventDefault();
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    isDrawingRef.current = true;
-    const touch = e.touches[0];
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    const { x, y } = getCanvasPos(canvas, touch.clientX, touch.clientY);
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-  };
-
-  const handleTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
-    e.preventDefault();
-    if (!isDrawingRef.current) return;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    const touch = e.touches[0];
-    const { x, y } = getCanvasPos(canvas, touch.clientX, touch.clientY);
-    ctx.lineTo(x, y);
-    ctx.strokeStyle = '#1e40af';
-    ctx.lineWidth = 2;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.stroke();
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent<HTMLCanvasElement>) => {
-    e.preventDefault();
-    isDrawingRef.current = false;
-  };
+  }, [step]);
 
   const clearCanvas = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    sigPadRef.current?.clear();
   };
 
   // ── Start exam ───────────────────────────────────────────────────────────────
@@ -242,8 +190,8 @@ export default function ExamPage() {
   // ── Submit ───────────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
     if (submitting) return;
-    const canvas = canvasRef.current;
-    const signatureData = canvas ? canvas.toDataURL('image/png') : '';
+    const pad = sigPadRef.current;
+    const signatureData = (pad && !pad.isEmpty()) ? pad.toDataURL('image/png') : '';
 
     setSubmitting(true);
     try {
@@ -590,21 +538,12 @@ export default function ExamPage() {
             </div>
           </div>
 
-          {/* Canvas */}
+          {/* Canvas — signature_pad attaches its own listeners via useEffect */}
           <div className="rounded-xl overflow-hidden mb-3" style={{ border: '2px solid rgba(37,99,235,0.4)', background: '#fff' }}>
             <canvas
               ref={canvasRef}
-              width={600}
-              height={180}
               className="w-full cursor-crosshair touch-none"
-              style={{ display: 'block' }}
-              onMouseDown={handleMouseDown}
-              onMouseMove={handleMouseMove}
-              onMouseUp={handleMouseUp}
-              onMouseLeave={handleMouseUp}
-              onTouchStart={handleTouchStart}
-              onTouchMove={handleTouchMove}
-              onTouchEnd={handleTouchEnd}
+              style={{ display: 'block', height: '180px' }}
             />
           </div>
           <p className="text-white/30 text-xs text-center mb-5">Assine com o dedo ou mouse na área acima</p>

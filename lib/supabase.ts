@@ -903,6 +903,8 @@ export interface NonConformityRow {
   closed_date: string | null;
   notes: string | null;
   created_at: string;
+  // JSONB column — array of {status, changedAt, note?} entries
+  status_history: Array<{ status: string; changedAt: string; note?: string }> | null;
 }
 
 export async function fetchNonConformities(): Promise<NonConformityRow[]> {

@@ -6,7 +6,7 @@ import {
   ChevronDown, ChevronUp, Search, Filter, Edit2, Trash2,
   AlertOctagon, Info, TrendingUp, X, Save,
 } from 'lucide-react';
-import { NonConformity, NCType, NCSeverity, NCSource, NCStatus } from '@/types';
+import { NonConformity, NCType, NCSeverity, NCSource, NCStatus, NCStatusHistoryEntry } from '@/types';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -348,6 +348,8 @@ export function NCCAPAScreen({ items, onSave, onDelete }: NCCAPAScreenProps) {
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<NCStatus | 'Todos'>('Todos');
   const [filterSeverity, setFilterSeverity] = useState<NCSeverity | 'Todos'>('Todos');
+  const [filterType, setFilterType] = useState<NCType | 'Todos'>('Todos');
+  const [filterSource, setFilterSource] = useState<NCSource | 'Todos'>('Todos');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editItem, setEditItem] = useState<NonConformity | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -369,10 +371,12 @@ export function NCCAPAScreen({ items, onSave, onDelete }: NCCAPAScreenProps) {
     return items.filter((item) => {
       if (filterStatus !== 'Todos' && item.status !== filterStatus) return false;
       if (filterSeverity !== 'Todos' && item.severity !== filterSeverity) return false;
+      if (filterType !== 'Todos' && item.type !== filterType) return false;
+      if (filterSource !== 'Todos' && item.source !== filterSource) return false;
       if (q && !item.title.toLowerCase().includes(q) && !item.code.toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [items, search, filterStatus, filterSeverity]);
+  }, [items, search, filterStatus, filterSeverity, filterType, filterSource]);
 
   const handleSave = async (data: NCFormData) => {
     await onSave(data, editItem?.id);
@@ -454,7 +458,7 @@ export function NCCAPAScreen({ items, onSave, onDelete }: NCCAPAScreenProps) {
             value={search} onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
           <Filter className="w-3.5 h-3.5 text-slate-400" />
           <select
             className="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition-all"
@@ -469,6 +473,20 @@ export function NCCAPAScreen({ items, onSave, onDelete }: NCCAPAScreenProps) {
           >
             <option value="Todos">Toda severidade</option>
             {NC_SEVERITIES.map((s) => <option key={s}>{s}</option>)}
+          </select>
+          <select
+            className="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition-all"
+            value={filterType} onChange={(e) => setFilterType(e.target.value as any)}
+          >
+            <option value="Todos">Todos os tipos</option>
+            {NC_TYPES.map((t) => <option key={t}>{t}</option>)}
+          </select>
+          <select
+            className="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition-all"
+            value={filterSource} onChange={(e) => setFilterSource(e.target.value as any)}
+          >
+            <option value="Todos">Todas as origens</option>
+            {NC_SOURCES.map((s) => <option key={s}>{s}</option>)}
           </select>
         </div>
       </div>
@@ -584,6 +602,30 @@ export function NCCAPAScreen({ items, onSave, onDelete }: NCCAPAScreenProps) {
                       <div className="md:col-span-2">
                         <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Notas</p>
                         <p className="text-slate-700">{nc.notes}</p>
+                      </div>
+                    )}
+
+                    {/* Status History Timeline */}
+                    {nc.statusHistory && nc.statusHistory.length > 0 && (
+                      <div className="md:col-span-2">
+                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Histórico de Status</p>
+                        <ol className="relative border-l border-slate-200 ml-2 space-y-2">
+                          {nc.statusHistory.map((entry: NCStatusHistoryEntry, idx: number) => (
+                            <li key={idx} className="ml-4">
+                              <span className="absolute -left-1.5 mt-1 w-3 h-3 rounded-full border-2 border-white bg-blue-400" />
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full border ${statusStyle(entry.status as NCStatus)}`}>
+                                  {statusIcon(entry.status as NCStatus)}
+                                  {entry.status}
+                                </span>
+                                <span className="text-[11px] text-slate-400">
+                                  {new Date(entry.changedAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                                {entry.note && <span className="text-[11px] text-slate-500 italic">{entry.note}</span>}
+                              </div>
+                            </li>
+                          ))}
+                        </ol>
                       </div>
                     )}
                   </div>

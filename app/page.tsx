@@ -68,7 +68,7 @@ import {
   type NonConformityRow,
 } from '@/lib/supabase';
 
-import { Employee, Procedure, TrainingRecord, Assessment, RespondentStatus, ChartProjectionMetric, DocControl, LegalObligation, ExecutionStatus, ObligationRealization, DocControlRenewal, RenewalStatus, NonConformity, GlobalComplianceScore } from '@/types';
+import { Employee, Procedure, TrainingRecord, Assessment, RespondentStatus, ChartProjectionMetric, DocControl, LegalObligation, ExecutionStatus, ObligationRealization, DocControlRenewal, RenewalStatus, NonConformity, GlobalComplianceScore, NCStatusHistoryEntry } from '@/types';
 import { CertificateRecord } from '@/components/screens/certificates-screen';
 import { CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 
@@ -526,6 +526,7 @@ export default function GestorTreinamentosApp() {
             closedDate: nc.closed_date ?? null,
             notes: nc.notes ?? null,
             createdAt: nc.created_at,
+            statusHistory: (nc.status_history ?? []) as NCStatusHistoryEntry[],
           })));
         }
 
@@ -957,28 +958,38 @@ export default function GestorTreinamentosApp() {
 
   // ─── NC / CAPA handlers ──────────────────────────────────────────────────────
   const handleSaveNC = useCallback(async (data: NCFormData, id?: string) => {
-    const payload: Omit<NonConformityRow, 'id' | 'created_at'> = {
-      code: data.code,
-      title: data.title,
-      description: data.description || null,
-      type: data.type,
-      severity: data.severity,
-      source: data.source,
-      detected_date: data.detectedDate,
-      deadline: data.deadline || null,
-      status: data.status,
-      responsible: data.responsible || null,
-      sector: data.sector || null,
-      root_cause: data.rootCause || null,
-      immediate_action: data.immediateAction || null,
-      corrective_action: data.correctiveAction || null,
-      preventive_action: data.preventiveAction || null,
-      effectiveness_check: data.effectivenessCheck || null,
-      closed_date: data.status === 'Encerrada' ? new Date().toISOString().split('T')[0] : null,
-      notes: data.notes || null,
-    };
+    const now = new Date().toISOString();
 
     if (id) {
+      // Determine if status changed and build updated history
+      const existing = nonConformities.find((nc) => nc.id === id);
+      const prevHistory: NCStatusHistoryEntry[] = existing?.statusHistory ?? [];
+      const newHistory: NCStatusHistoryEntry[] = existing && existing.status !== data.status
+        ? [...prevHistory, { status: data.status, changedAt: now }]
+        : prevHistory;
+
+      const payload: Partial<Omit<NonConformityRow, 'id' | 'created_at'>> = {
+        code: data.code,
+        title: data.title,
+        description: data.description || null,
+        type: data.type,
+        severity: data.severity,
+        source: data.source,
+        detected_date: data.detectedDate,
+        deadline: data.deadline || null,
+        status: data.status,
+        responsible: data.responsible || null,
+        sector: data.sector || null,
+        root_cause: data.rootCause || null,
+        immediate_action: data.immediateAction || null,
+        corrective_action: data.correctiveAction || null,
+        preventive_action: data.preventiveAction || null,
+        effectiveness_check: data.effectivenessCheck || null,
+        closed_date: data.status === 'Encerrada' ? now.split('T')[0] : null,
+        notes: data.notes || null,
+        status_history: newHistory,
+      };
+
       const ok = await updateNonConformity(id, payload);
       if (!ok) { showToast('Erro ao atualizar NC/CAPA.', 'error'); return; }
       setNonConformities((prev) =>
@@ -989,13 +1000,37 @@ export default function GestorTreinamentosApp() {
                 ...data,
                 detectedDate: data.detectedDate,
                 deadline: data.deadline || null,
-                closedDate: data.status === 'Encerrada' ? new Date().toISOString().split('T')[0] : nc.closedDate,
+                closedDate: data.status === 'Encerrada' ? now.split('T')[0] : nc.closedDate,
+                statusHistory: newHistory,
               }
             : nc,
         ),
       );
       showToast('NC/CAPA atualizada ✓');
     } else {
+      const initialHistory: NCStatusHistoryEntry[] = [{ status: data.status, changedAt: now }];
+      const payload: Omit<NonConformityRow, 'id' | 'created_at'> = {
+        code: data.code,
+        title: data.title,
+        description: data.description || null,
+        type: data.type,
+        severity: data.severity,
+        source: data.source,
+        detected_date: data.detectedDate,
+        deadline: data.deadline || null,
+        status: data.status,
+        responsible: data.responsible || null,
+        sector: data.sector || null,
+        root_cause: data.rootCause || null,
+        immediate_action: data.immediateAction || null,
+        corrective_action: data.correctiveAction || null,
+        preventive_action: data.preventiveAction || null,
+        effectiveness_check: data.effectivenessCheck || null,
+        closed_date: data.status === 'Encerrada' ? now.split('T')[0] : null,
+        notes: data.notes || null,
+        status_history: initialHistory,
+      };
+
       const newId = await saveNonConformity(payload);
       if (!newId) { showToast('Erro ao registrar NC/CAPA.', 'error'); return; }
       const newNC: NonConformity = {
@@ -1016,14 +1051,15 @@ export default function GestorTreinamentosApp() {
         correctiveAction: data.correctiveAction || null,
         preventiveAction: data.preventiveAction || null,
         effectivenessCheck: data.effectivenessCheck || null,
-        closedDate: data.status === 'Encerrada' ? new Date().toISOString().split('T')[0] : null,
+        closedDate: data.status === 'Encerrada' ? now.split('T')[0] : null,
         notes: data.notes || null,
-        createdAt: new Date().toISOString(),
+        createdAt: now,
+        statusHistory: initialHistory,
       };
       setNonConformities((prev) => [newNC, ...prev]);
       showToast(`NC ${data.code} registrada ✓`);
     }
-  }, [showToast]);
+  }, [showToast, nonConformities]);
 
   const handleDeleteNC = useCallback(async (id: string) => {
     const ok = await deleteNonConformity(id);

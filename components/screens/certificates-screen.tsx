@@ -83,10 +83,24 @@ function CertificatePreview({ cert, onClose }: { cert: CertificateRecord; onClos
             {cert.programContent && cert.programContent.length > 0 && (
               <div style={{width:'297mm',height:'210mm',position:'relative',fontFamily:'Arial,sans-serif',overflow:'hidden'}}>
                 <img src={CERT_BG} style={{position:'absolute',inset:0,width:'100%',height:'100%',objectFit:'cover'}} alt=""/>
-                <div style={{position:'absolute',top:'22mm',left:'68mm',right:'8mm',bottom:'8mm',padding:'0 12mm'}}>
-                  <div style={{fontSize:'15px',fontWeight:700,color:'#111',marginBottom:'3mm'}}>Conteúdo Programático</div>
-                  <div style={{fontSize:'8.5px',color:'#555',marginBottom:'3mm'}}>Carga Horária: {cert.hours} hora{cert.hours!==1?'s':''}</div>
-                  <ul style={{fontSize:'9.5px',lineHeight:'2.1',color:'#111',paddingLeft:'5mm'}}>{cert.programContent.map((item,i)=><li key={i}>{item}</li>)}</ul>
+                {/* Company header — same as page 1 */}
+                <div style={{position:'absolute',top:'12mm',right:'12mm',textAlign:'right',fontSize:'7.5px',color:'#111'}}>Tiger Rentank do Brasil Equipamentos Industriais LTDA<br/>CNPJ: 09.488.992/0002-01</div>
+                {/* Content area — left margin avoids Tiger logo strip */}
+                <div style={{position:'absolute',top:'20mm',left:'68mm',right:'8mm',bottom:'8mm',padding:'0 12mm',display:'flex',flexDirection:'column'}}>
+                  <div style={{fontSize:'16px',fontWeight:800,color:'#111',marginBottom:'2mm',letterSpacing:'1px'}}>CONTEÚDO PROGRAMÁTICO</div>
+                  <div style={{width:'40mm',height:'1px',background:'#2563eb',marginBottom:'4mm'}}/>
+                  <div style={{fontSize:'8.5px',color:'#444',marginBottom:'4mm',display:'flex',gap:'8mm'}}>
+                    <span>Treinamento: <strong>{cert.trainingName}</strong></span>
+                    <span>Carga Horária: <strong>{cert.hours}h</strong></span>
+                  </div>
+                  <ul style={{fontSize:'9.5px',lineHeight:'2.0',color:'#111',paddingLeft:'5mm',flex:1}}>
+                    {cert.programContent.map((item,i)=>(
+                      <li key={i} style={{borderBottom:'1px solid rgba(0,0,0,0.06)',paddingBottom:'1mm'}}>{item}</li>
+                    ))}
+                  </ul>
+                  <div style={{marginTop:'auto',paddingTop:'4mm',fontSize:'7px',color:'#888',textAlign:'center',borderTop:'1px solid rgba(0,0,0,0.1)'}}>
+                    Código: {cert.certificateHash} · Concluído em: {cert.completionDate}
+                  </div>
                 </div>
               </div>
             )}
@@ -114,6 +128,7 @@ function RegisterModal({ onClose, onSave }: { onClose:()=>void; onSave:(c:Certif
   const [validityMonths,setValidityMonths]=useState('24');
   const [hours,setHours]=useState('8');
   const [certFile,setCertFile]=useState<File|null>(null);
+  const [programContentRaw,setProgramContentRaw]=useState('');
   const fileRef=useRef<HTMLInputElement>(null);
 
   // Calcula data de vencimento a partir da conclusão + validade
@@ -133,6 +148,10 @@ function RegisterModal({ onClose, onSave }: { onClose:()=>void; onSave:(c:Certif
     const days=Math.floor((v.getTime()-Date.now())/86400000);
     // Never store a blob: URL — it expires immediately in other tabs/sessions.
     // The permanent URL is set after Supabase Storage upload completes.
+    const programContent = programContentRaw
+      .split('\n')
+      .map(l => l.trim())
+      .filter(Boolean);
     onSave({
       id:`c-${Date.now()}`,employeeName,employeeCpf,sector,trainingName,trainingCode,
       provider,completionDate:d.toLocaleDateString('pt-BR'),
@@ -141,6 +160,7 @@ function RegisterModal({ onClose, onSave }: { onClose:()=>void; onSave:(c:Certif
       status:days<0?'Vencido':days<=60?'Reciclar':'Certificado',
       certificateHash:`CERT-${new Date().getFullYear()}-BR-${Math.floor(1000+Math.random()*9000)}`,
       certificateFileUrl:undefined,
+      programContent: programContent.length > 0 ? programContent : undefined,
     }, certFile ?? undefined);
     onClose();
   };
@@ -206,6 +226,18 @@ function RegisterModal({ onClose, onSave }: { onClose:()=>void; onSave:(c:Certif
             <div className="h-9 px-3 border border-slate-200 rounded-lg text-sm bg-slate-50 flex items-center text-slate-500 font-mono">
               {computedValidityDate || '—'}
             </div>
+          </div>
+          {/* Conteúdo Programático */}
+          <div className="col-span-2 flex flex-col gap-1">
+            <label className="text-xs font-medium text-slate-600">Conteúdo Programático <span className="text-slate-400 font-normal">(opcional — um item por linha)</span></label>
+            <textarea
+              value={programContentRaw}
+              onChange={e=>setProgramContentRaw(e.target.value)}
+              placeholder={'Ex:\nEquipamentos de proteção individual\nTrabalho em altura\nPrimeiros socorros'}
+              rows={4}
+              className="px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 w-full resize-none leading-relaxed"
+            />
+            <p className="text-[11px] text-slate-400">Se preenchido, será impresso na 2ª página do certificado.</p>
           </div>
           {/* Upload do certificado */}
           <div className="col-span-2 flex flex-col gap-1">
