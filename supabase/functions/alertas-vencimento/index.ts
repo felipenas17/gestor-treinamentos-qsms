@@ -15,7 +15,7 @@
  *   "0 11 * * *"  =>  08:00 BRT (UTC-3)
  */
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'npm:@supabase/supabase-js@2';
 
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL')!,
