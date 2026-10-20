@@ -1426,15 +1426,7 @@ export default function GestorTreinamentosApp() {
               onDelete={handleDeleteNC}
             />
           )}
-          {currentTab === 'auditoria-interna' && (
-            <AuditScreen
-              procedures={procedures}
-              records={records}
-              documents={documents}
-              obligations={obligations}
-              nonConformities={nonConformities}
-            />
-          )}
+          {currentTab === 'auditoria-interna' && <AuditScreen />}
           {currentTab === 'relatorio' && (
             <ManagementReportScreen
               documents={documents}
