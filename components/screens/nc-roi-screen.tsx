@@ -175,7 +175,8 @@ export function NCROIScreen() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { void load(); }, [load]);
 
   // ── Autocomplete serial ────────────────────────────────────────────────────
   const handleSerialChange = (val: string) => {
