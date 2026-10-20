@@ -9,7 +9,6 @@ import {
   Anchor,
   Award,
   GraduationCap,
-  FolderOpen,
   Shield,
   ClipboardCheck,
   ChevronDown,
@@ -33,12 +32,30 @@ interface SubGroup {
   items: NavItem[];
 }
 
+type ModuleChild = NavItem | SubGroup;
+
+function isSubGroup(child: ModuleChild): child is SubGroup {
+  return 'items' in child;
+}
+
+function getAllItemIds(mod: Module): string[] {
+  const ids: string[] = [];
+  mod.items?.forEach(item => ids.push(item.id));
+  mod.groups?.forEach(g => g.items.forEach(item => ids.push(item.id)));
+  mod.children?.forEach(child => {
+    if (isSubGroup(child)) child.items.forEach(item => ids.push(item.id));
+    else ids.push(child.id);
+  });
+  return ids;
+}
+
 interface Module {
   id: string;
   label: string;
   icon: React.ElementType;
-  items?: NavItem[];
-  groups?: SubGroup[];
+  children?: ModuleChild[]; // ordered mix: NavItem | SubGroup
+  items?: NavItem[];         // legacy flat list
+  groups?: SubGroup[];       // legacy grouped list
 }
 
 interface SidebarProps {
@@ -59,13 +76,22 @@ const MODULES: Module[] = [
     id: 'sgi',
     label: 'SGI',
     icon: ShieldCheck,
-    items: [
-      { id: 'conformidade',      label: 'Score de Conformidade', sublabel: 'Índice Global do SGI',      icon: ShieldCheck    },
-      { id: 'nc-capa',           label: 'Não Conformidade',      sublabel: 'Não Conformidades & Ações', icon: AlertTriangle  },
-      { id: 'auditoria-interna', label: 'Auditoria Interna',     sublabel: 'Diagnóstico Automático',    icon: ClipboardCheck },
-      { id: 'procedimentos',     label: 'Procedimentos & POPs',  sublabel: 'Revisões e Vigência',       icon: FileText       },
-      { id: 'doc-controle',      label: 'Controle Documental',   sublabel: 'Licenças e Autorizações',   icon: Shield         },
-      { id: 'obrigacoes-legais', label: 'Obrigações Legais',     sublabel: 'Cumprimento e Prazos',      icon: ClipboardCheck },
+    children: [
+      { id: 'conformidade',      label: 'Score de Conformidade', sublabel: 'Índice Global do SGI',     icon: ShieldCheck    },
+      {
+        id: 'nao-conformidade',
+        label: 'Não Conformidade',
+        icon: AlertTriangle,
+        items: [
+          { id: 'nc-capa',      label: 'RNC',       sublabel: 'Registro de Não Conformidade',  icon: AlertTriangle },
+          { id: 'nc-roi',       label: 'ROI',       sublabel: 'Registro de Ocorrência Interna', icon: FileText     },
+          { id: 'nc-dashboard', label: 'Dashboard', sublabel: 'RNC × ROI — Indicadores',        icon: BarChart3    },
+        ],
+      },
+      { id: 'auditoria-interna', label: 'Auditoria Interna',    sublabel: 'Diagnóstico Automático',  icon: ClipboardCheck },
+      { id: 'procedimentos',     label: 'Procedimentos & POPs', sublabel: 'Revisões e Vigência',     icon: FileText       },
+      { id: 'doc-controle',      label: 'Controle Documental',  sublabel: 'Licenças e Autorizações', icon: Shield         },
+      { id: 'obrigacoes-legais', label: 'Obrigações Legais',    sublabel: 'Cumprimento e Prazos',    icon: ClipboardCheck },
     ],
   },
   {
@@ -91,8 +117,7 @@ const MODULES: Module[] = [
 export function Sidebar({ currentTab, onSelectTab }: SidebarProps) {
   const activeModuleId = useMemo(() => {
     for (const mod of MODULES) {
-      if (mod.items?.some(item => item.id === currentTab)) return mod.id;
-      if (mod.groups?.some(g => g.items.some(item => item.id === currentTab))) return mod.id;
+      if (getAllItemIds(mod).includes(currentTab)) return mod.id;
     }
     return MODULES[0].id;
   }, [currentTab]);
@@ -101,6 +126,9 @@ export function Sidebar({ currentTab, onSelectTab }: SidebarProps) {
     for (const mod of MODULES) {
       for (const g of mod.groups ?? []) {
         if (g.items.some(item => item.id === currentTab)) return g.id;
+      }
+      for (const child of mod.children ?? []) {
+        if (isSubGroup(child) && child.items.some(item => item.id === currentTab)) return child.id;
       }
     }
     return null;
@@ -125,11 +153,7 @@ export function Sidebar({ currentTab, onSelectTab }: SidebarProps) {
   const toggleModule = (moduleId: string) => {
     setOpenModules(prev => {
       const next = new Set(prev);
-      if (next.has(moduleId)) {
-        next.delete(moduleId);
-      } else {
-        next.add(moduleId);
-      }
+      if (next.has(moduleId)) next.delete(moduleId); else next.add(moduleId);
       return next;
     });
   };
@@ -141,6 +165,58 @@ export function Sidebar({ currentTab, onSelectTab }: SidebarProps) {
       return next;
     });
     onSelectTab(tabId);
+  };
+
+  const renderNavItem = (item: NavItem, moduleId: string) => {
+    const Icon = item.icon;
+    const isActive = currentTab === item.id;
+    return (
+      <button
+        key={item.id}
+        onClick={() => handleSelectTab(item.id, moduleId)}
+        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all text-left group ${
+          isActive
+            ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
+            : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+        }`}
+      >
+        <Icon className={`w-4 h-4 shrink-0 transition-colors ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-blue-400'}`} />
+        <div className="flex-1 truncate">
+          <div className="truncate leading-tight font-medium">{item.label}</div>
+          <div className={`text-[11px] truncate ${isActive ? 'text-blue-100' : 'text-slate-500'}`}>{item.sublabel}</div>
+        </div>
+      </button>
+    );
+  };
+
+  const renderSubGroup = (group: SubGroup, moduleId: string) => {
+    const GIcon = group.icon;
+    const isGroupOpen = openGroups.has(group.id);
+    const groupHasActive = group.items.some(item => item.id === currentTab);
+    return (
+      <div key={group.id}>
+        <button
+          onClick={() => toggleGroup(group.id)}
+          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-left group ${
+            groupHasActive
+              ? 'text-blue-300 bg-blue-950/40'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
+          }`}
+        >
+          <GIcon className={`w-4 h-4 shrink-0 ${groupHasActive ? 'text-blue-400' : 'text-slate-500 group-hover:text-slate-300'}`} />
+          <span className="flex-1 truncate text-[12px] font-semibold">{group.label}</span>
+          {isGroupOpen
+            ? <ChevronDown className="w-3 h-3 shrink-0 text-slate-600" />
+            : <ChevronRight className="w-3 h-3 shrink-0 text-slate-600" />
+          }
+        </button>
+        {isGroupOpen && (
+          <div className="ml-2 pl-3 border-l border-slate-800/50 space-y-0.5 mt-0.5 mb-1">
+            {group.items.map(item => renderNavItem(item, moduleId))}
+          </div>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -173,9 +249,7 @@ export function Sidebar({ currentTab, onSelectTab }: SidebarProps) {
         {MODULES.map((mod) => {
           const ModIcon = mod.icon;
           const isOpen = openModules.has(mod.id);
-          const hasActive =
-            mod.items?.some(item => item.id === currentTab) ||
-            mod.groups?.some(g => g.items.some(item => item.id === currentTab));
+          const hasActive = getAllItemIds(mod).includes(currentTab);
 
           return (
             <div key={mod.id}>
@@ -198,83 +272,22 @@ export function Sidebar({ currentTab, onSelectTab }: SidebarProps) {
                 }
               </button>
 
-              {/* Module Items */}
+              {/* Module Content */}
               {isOpen && (
                 <div className="ml-2 pl-3 border-l border-slate-800/70 space-y-0.5 mb-2">
 
-                  {/* Direct items (e.g. SGI) */}
-                  {mod.items?.map((item) => {
-                    const Icon = item.icon;
-                    const isActive = currentTab === item.id;
-                    return (
-                      <button
-                        key={item.id}
-                        onClick={() => handleSelectTab(item.id, mod.id)}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all text-left group ${
-                          isActive
-                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
-                            : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
-                        }`}
-                      >
-                        <Icon className={`w-4 h-4 shrink-0 transition-colors ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-blue-400'}`} />
-                        <div className="flex-1 truncate">
-                          <div className="truncate leading-tight font-medium">{item.label}</div>
-                          <div className={`text-[11px] truncate ${isActive ? 'text-blue-100' : 'text-slate-500'}`}>{item.sublabel}</div>
-                        </div>
-                      </button>
-                    );
-                  })}
+                  {/* Ordered children (NavItem | SubGroup mixed) */}
+                  {mod.children?.map(child =>
+                    isSubGroup(child)
+                      ? renderSubGroup(child, mod.id)
+                      : renderNavItem(child, mod.id)
+                  )}
 
-                  {/* Sub-groups (e.g. SMS → Treinamentos) */}
-                  {mod.groups?.map((group) => {
-                    const GIcon = group.icon;
-                    const isGroupOpen = openGroups.has(group.id);
-                    const groupHasActive = group.items.some(item => item.id === currentTab);
-                    return (
-                      <div key={group.id}>
-                        <button
-                          onClick={() => toggleGroup(group.id)}
-                          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-left group ${
-                            groupHasActive
-                              ? 'text-blue-300 bg-blue-950/40'
-                              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
-                          }`}
-                        >
-                          <GIcon className={`w-4 h-4 shrink-0 ${groupHasActive ? 'text-blue-400' : 'text-slate-500 group-hover:text-slate-300'}`} />
-                          <span className="flex-1 truncate text-[12px] font-semibold">{group.label}</span>
-                          {isGroupOpen
-                            ? <ChevronDown className="w-3 h-3 shrink-0 text-slate-600" />
-                            : <ChevronRight className="w-3 h-3 shrink-0 text-slate-600" />
-                          }
-                        </button>
-                        {isGroupOpen && (
-                          <div className="ml-2 pl-3 border-l border-slate-800/50 space-y-0.5 mt-0.5 mb-1">
-                            {group.items.map((item) => {
-                              const Icon = item.icon;
-                              const isActive = currentTab === item.id;
-                              return (
-                                <button
-                                  key={item.id}
-                                  onClick={() => handleSelectTab(item.id, mod.id)}
-                                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all text-left group ${
-                                    isActive
-                                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
-                                      : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
-                                  }`}
-                                >
-                                  <Icon className={`w-4 h-4 shrink-0 transition-colors ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-blue-400'}`} />
-                                  <div className="flex-1 truncate">
-                                    <div className="truncate leading-tight font-medium">{item.label}</div>
-                                    <div className={`text-[11px] truncate ${isActive ? 'text-blue-100' : 'text-slate-500'}`}>{item.sublabel}</div>
-                                  </div>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                  {/* Legacy: direct items */}
+                  {mod.items?.map(item => renderNavItem(item, mod.id))}
+
+                  {/* Legacy: sub-groups */}
+                  {mod.groups?.map(group => renderSubGroup(group, mod.id))}
 
                 </div>
               )}

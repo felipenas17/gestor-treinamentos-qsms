@@ -1585,12 +1585,22 @@ export default function GestorTreinamentosApp() {
               }}
             />
           )}
-          {currentTab === 'nc-capa' && (
+          {(currentTab === 'nc-capa' || currentTab === 'nc-rnc') && (
             <NCCAPAScreen
               items={nonConformities}
               onSave={handleSaveNC}
               onDelete={handleDeleteNC}
             />
+          )}
+          {currentTab === 'nc-roi' && (
+            <div className="flex items-center justify-center h-full text-slate-400 text-sm">
+              ROI — Registro de Ocorrência Interna (em breve)
+            </div>
+          )}
+          {currentTab === 'nc-dashboard' && (
+            <div className="flex items-center justify-center h-full text-slate-400 text-sm">
+              Dashboard RNC × ROI (em breve)
+            </div>
           )}
           {currentTab === 'auditoria-interna' && <AuditScreen />}
           {currentTab === 'relatorio' && (
