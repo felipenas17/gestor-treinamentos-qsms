@@ -72,6 +72,7 @@ export interface Procedure {
   docNextRevisionDate?: string | null;
   docRevisionStatus?: DocRevisionStatus;
   docResponsible?: string | null;
+  programContent?: string[];
 }
 
 export interface Employee {
@@ -105,6 +106,7 @@ export interface TrainingRecord {
   certificateHash?: string;
   hours?: number;
   procedureRevision?: string;
+  programContent?: string[];
 }
 
 export interface AssessmentQuestion {

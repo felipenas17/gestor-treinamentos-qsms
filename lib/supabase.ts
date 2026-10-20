@@ -28,7 +28,7 @@ export async function fetchTrainingRecords() {
     .select(`
       *,
       employees (id, name, role, sector, email, avatar_url),
-      procedures (id, code, revision, name, sector, hours)
+      procedures (id, code, revision, name, sector, hours, program_content)
     `)
     // NULLs last: Pendente fica no fim, vencidos/reciclar primeiro
     .order('validity_date', { ascending: true, nullsFirst: false });

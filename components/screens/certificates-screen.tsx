@@ -342,6 +342,7 @@ export function CertificatesScreen({
         type: 'interno' as const,
         status: 'Certificado' as const,
         certificateHash: r.certificateHash || `CERT-${new Date().getFullYear()}-BR-0000`,
+        programContent: r.programContent,
       };
     });
 

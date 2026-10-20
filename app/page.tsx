@@ -453,6 +453,7 @@ export default function GestorTreinamentosApp() {
         docNextRevisionDate: p.doc_next_revision_date || null,
         docRevisionStatus: p.doc_revision_status || undefined,
         docResponsible: p.doc_responsible || null,
+        programContent: Array.isArray(p.program_content) && p.program_content.length > 0 ? p.program_content : undefined,
       };
     });
   }, []);
@@ -558,6 +559,7 @@ export default function GestorTreinamentosApp() {
               instructor: r.instructor,
               certificateHash: r.certificate_hash,
               hours: r.procedures?.hours || 8,
+              programContent: Array.isArray(r.procedures?.program_content) && r.procedures.program_content.length > 0 ? r.procedures.program_content : undefined,
             };
           }));
         }
@@ -692,6 +694,7 @@ export default function GestorTreinamentosApp() {
           instructor: r.instructor,
           certificateHash: r.certificate_hash,
           hours: r.procedures?.hours || 8,
+          programContent: Array.isArray(r.procedures?.program_content) && r.procedures.program_content.length > 0 ? r.procedures.program_content : undefined,
         })));
       }
     } catch (err) {
@@ -821,6 +824,7 @@ export default function GestorTreinamentosApp() {
             instructor: r.instructor,
             certificateHash: r.certificate_hash || undefined,
             hours: r.procedures?.hours || 8,
+            programContent: Array.isArray(r.procedures?.program_content) && r.procedures.program_content.length > 0 ? r.procedures.program_content : undefined,
           };
         }));
       }
@@ -1297,6 +1301,7 @@ export default function GestorTreinamentosApp() {
                         instructor: r.instructor,
                         certificateHash: r.certificate_hash || undefined,
                         hours: r.procedures?.hours || 8,
+                        programContent: Array.isArray(r.procedures?.program_content) && r.procedures.program_content.length > 0 ? r.procedures.program_content : undefined,
                       };
                     }));
                   }
@@ -1380,6 +1385,7 @@ export default function GestorTreinamentosApp() {
                       instructor: r.instructor,
                       certificateHash: r.certificate_hash || undefined,
                       hours: r.procedures?.hours || 8,
+                      programContent: Array.isArray(r.procedures?.program_content) && r.procedures.program_content.length > 0 ? r.procedures.program_content : undefined,
                     };
                   }));
                 }
