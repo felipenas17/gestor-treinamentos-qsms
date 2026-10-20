@@ -287,7 +287,7 @@ export function CertificatesScreen({
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(()=>{ if(initialNormativeCerts) setCerts(initialNormativeCerts); },[initialNormativeCerts]);
   // Map de procedure_code → { cpf, signature } buscado das respostas
-  const [responsesMap,setResponsesMap]=useState<Record<string,{cpf:string;signature:string}>>({});
+  const [responsesMap,setResponsesMap]=useState<Record<string,{cpf:string;signature:string;responseId:string}>>({});
 
   useEffect(() => {
     if (!supabase) return;
@@ -311,10 +311,10 @@ export function CertificatesScreen({
       const aMap: Record<string,string> = {};
       for (const a of (assessments||[]) as any[]) aMap[a.id]=a.procedure_code;
       // Build final responsesMap keyed by procedure_code
-      const map: Record<string,{cpf:string;signature:string}> = {};
+      const map: Record<string,{cpf:string;signature:string;responseId:string}> = {};
       for (const r of responses as any[]) {
         const pc = aMap[linkMap[r.link_id]];
-        if (pc && !map[pc]) map[pc]={ cpf: r.employee_cpf||'', signature: r.employee_signature||'' };
+        if (pc && !map[pc]) map[pc]={ cpf: r.employee_cpf||'', signature: r.employee_signature||'', responseId: r.id };
       }
       setResponsesMap(map);
     })();
@@ -430,7 +430,14 @@ export function CertificatesScreen({
         </table>
       </div>
       {preview&&<CertificatePreview cert={preview} onClose={()=>setPreview(null)}/>}
-      {signTarget&&<SignatureModal employeeName={signTarget.employeeName} trainingName={signTarget.trainingName} certificateHash={signTarget.certificateHash} onConfirm={(sig)=>{setSignatures(p=>({...p,[signTarget.id]:sig}));setSignTarget(null);}} onClose={()=>setSignTarget(null)}/>}
+      {signTarget&&<SignatureModal employeeName={signTarget.employeeName} trainingName={signTarget.trainingName} certificateHash={signTarget.certificateHash} onConfirm={async(sig)=>{
+        const entry=responsesMap[signTarget.trainingCode];
+        if(entry?.responseId&&supabase){
+          await supabase.from('responses').update({employee_signature:sig}).eq('id',entry.responseId);
+          setResponsesMap(p=>({...p,[signTarget.trainingCode]:{...entry,signature:sig}}));
+        }
+        setSignTarget(null);
+      }} onClose={()=>setSignTarget(null)}/>}
       {showReg&&<RegisterModal onClose={()=>setShowReg(false)} onSave={(c,file)=>{ setCerts(p=>[c,...p]); onSaveNormativeCert?.(c,file); }}/>}
       <input ref={attachInputRef} type="file" accept=".pdf,image/*" className="hidden" onChange={(e)=>{
         const file=e.target.files?.[0];
