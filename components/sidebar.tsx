@@ -48,34 +48,27 @@ const MODULES: Module[] = [
     ],
   },
   {
-    id: 'treinamento',
-    label: 'Treinamento',
-    icon: GraduationCap,
-    items: [
-      { id: 'dashboard',     label: 'Dashboard',            sublabel: 'Painel Geral',           icon: LayoutDashboard },
-      { id: 'provas',        label: 'Provas & Links',       sublabel: 'Avaliações de Eficácia', icon: CheckSquare     },
-      { id: 'certificados',  label: 'Certificados',         sublabel: 'Internos e Normativos',  icon: Award           },
-      { id: 'matriz',        label: 'Matriz & Colaboradores', sublabel: 'Conformidade de Equipes', icon: Users         },
-    ],
-  },
-  {
-    id: 'documentacao',
-    label: 'Documentação & Controle',
-    icon: FolderOpen,
-    items: [
-      { id: 'procedimentos',    label: 'Procedimentos & POPs',  sublabel: 'Revisões e Vigência',      icon: FileText },
-      { id: 'doc-controle',     label: 'Controle Documental',   sublabel: 'Licenças e Autorizações',  icon: Shield          },
-      { id: 'obrigacoes-legais', label: 'Obrigações Legais',    sublabel: 'Cumprimento e Prazos',     icon: ClipboardCheck  },
-    ],
-  },
-  {
     id: 'sgi',
-    label: 'SGI / Conformidade',
+    label: 'SGI',
     icon: ShieldCheck,
     items: [
-      { id: 'conformidade',     label: 'Score de Conformidade', sublabel: 'Índice Global do SGI',      icon: ShieldCheck   },
-      { id: 'nc-capa',          label: 'NC / CAPA',             sublabel: 'Não Conformidades & Ações', icon: AlertTriangle },
-      { id: 'auditoria-interna', label: 'Auditoria Interna',    sublabel: 'Diagnóstico Automático',    icon: ClipboardCheck },
+      { id: 'conformidade',      label: 'Score de Conformidade', sublabel: 'Índice Global do SGI',      icon: ShieldCheck    },
+      { id: 'nc-capa',           label: 'NC / CAPA',             sublabel: 'Não Conformidades & Ações', icon: AlertTriangle  },
+      { id: 'auditoria-interna', label: 'Auditoria Interna',     sublabel: 'Diagnóstico Automático',    icon: ClipboardCheck },
+      { id: 'procedimentos',     label: 'Procedimentos & POPs',  sublabel: 'Revisões e Vigência',       icon: FileText       },
+      { id: 'doc-controle',      label: 'Controle Documental',   sublabel: 'Licenças e Autorizações',   icon: Shield         },
+      { id: 'obrigacoes-legais', label: 'Obrigações Legais',     sublabel: 'Cumprimento e Prazos',      icon: ClipboardCheck },
+    ],
+  },
+  {
+    id: 'sms',
+    label: 'SMS',
+    icon: GraduationCap,
+    items: [
+      { id: 'dashboard',    label: 'Dashboard',              sublabel: 'Painel Geral',            icon: LayoutDashboard },
+      { id: 'provas',       label: 'Provas & Links',         sublabel: 'Avaliações de Eficácia',  icon: CheckSquare     },
+      { id: 'certificados', label: 'Certificados',           sublabel: 'Internos e Normativos',   icon: Award           },
+      { id: 'matriz',       label: 'Matriz & Colaboradores', sublabel: 'Conformidade de Equipes', icon: Users           },
     ],
   },
 ];
