@@ -1,11 +1,14 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ClipboardCheck, ChevronDown, ChevronRight,
-  CheckCircle2, AlertTriangle, XCircle, MinusCircle,
+  CheckCircle2, AlertTriangle, XCircle,
   Printer, Save, RotateCcw, FileText, Shield, Leaf,
+  Cpu, ThumbsUp, Info,
 } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
+import { runAuditDiagnostic, DiagnosticMap } from '@/lib/audit-diagnostic';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -146,6 +149,65 @@ export function AuditScreen(_props: AuditScreenProps) {
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
   const [saved, setSaved] = useState(false);
 
+  // ── Diagnóstico automático ──────────────────────────────────────────────────
+  const [diagnostic, setDiagnostic] = useState<DiagnosticMap | null>(null);
+  const [diagLoading, setDiagLoading] = useState(false);
+  const [diagError, setDiagError] = useState<string | null>(null);
+  const [diagExpanded, setDiagExpanded] = useState<Record<string, boolean>>({});
+
+  async function handleRunDiagnostic() {
+    setDiagLoading(true);
+    setDiagError(null);
+    try {
+      if (!supabase) throw new Error('Supabase client não disponível.');
+      const result = await runAuditDiagnostic(supabase);
+      setDiagnostic(result);
+    } catch (e) {
+      setDiagError('Erro ao executar diagnóstico. Verifique a conexão.');
+      console.error(e);
+    } finally {
+      setDiagLoading(false);
+    }
+  }
+
+  function handleApplyAll() {
+    if (!diagnostic) return;
+    const hasData = Object.values(states).some(s => s.avaliacao);
+    if (hasData) {
+      if (!window.confirm('Aplicar sugestões automáticas a todos os itens ainda não avaliados?')) return;
+    }
+    const patch: Record<string, ItemState> = { ...states };
+    Object.entries(diagnostic).forEach(([id, res]) => {
+      const current = patch[id];
+      // Só aplica se item ainda não foi avaliado
+      if (!current?.avaliacao) {
+        const evidText = res.evidencias.length
+          ? res.evidencias.slice(0, 3).join(' | ')
+          : 'Sem evidências encontradas no sistema.';
+        patch[id] = {
+          avaliacao: res.sugestao,
+          evidencia_observada: evidText,
+          parecer: `Sugestão automática do sistema (${res.total} registros encontrados)`,
+        };
+      }
+    });
+    setStates(patch);
+    setSaved(false);
+  }
+
+  function handleAcceptOne(id: string) {
+    if (!diagnostic?.[id]) return;
+    const res = diagnostic[id];
+    const evidText = res.evidencias.length
+      ? res.evidencias.slice(0, 3).join(' | ')
+      : 'Sem evidências encontradas no sistema.';
+    setState(id, {
+      avaliacao: res.sugestao,
+      evidencia_observada: evidText,
+      parecer: `Sugestão automática do sistema (${res.total} registros encontrados)`,
+    });
+  }
+
   // Persist to localStorage
   useEffect(() => {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(states)); } catch {}
@@ -203,6 +265,10 @@ export function AuditScreen(_props: AuditScreenProps) {
             const av = st.avaliacao;
             const avColor = av === 'OK' ? 'bg-emerald-50 border-emerald-200' : av === 'OM' ? 'bg-amber-50 border-amber-200' : av === 'NC' ? 'bg-red-50 border-red-200' : av === 'NA' ? 'bg-slate-50 border-slate-200' : 'bg-white border-slate-200';
 
+            // Diagnóstico automático para este item
+            const diag = diagnostic?.[item.id];
+            const diagEv = diagExpanded[item.id] ?? false;
+
             return (
               <div key={item.id} className={`rounded-xl border ${avColor} overflow-hidden transition-colors`}>
                 {/* Question header */}
@@ -225,7 +291,7 @@ export function AuditScreen(_props: AuditScreenProps) {
                   </div>
 
                   {/* Avaliação buttons */}
-                  <div className="flex items-center gap-1.5 mt-2.5 ml-9">
+                  <div className="flex items-center gap-1.5 mt-2.5 ml-9 flex-wrap">
                     {(['OK', 'OM', 'NC', 'NA'] as Avaliacao[]).map(opt => {
                       const active = av === opt;
                       const cls = opt === 'OK'
@@ -248,6 +314,61 @@ export function AuditScreen(_props: AuditScreenProps) {
                     })}
                     {av && <span className="ml-1 text-[11px] text-slate-400">{av === 'OK' ? 'Conforme' : av === 'OM' ? 'Oportunidade de Melhoria' : av === 'NC' ? 'Não Conformidade' : 'Não Avaliado'}</span>}
                   </div>
+
+                  {/* ── Badge de diagnóstico automático ──────────────────── */}
+                  {diag && (
+                    <div className="ml-9 mt-2.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {/* Badge sugestão */}
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                          diag.sugestao === 'OK'
+                            ? 'bg-emerald-100 text-emerald-700 border-emerald-300'
+                            : diag.sugestao === 'OM'
+                            ? 'bg-amber-100 text-amber-700 border-amber-300'
+                            : 'bg-red-100 text-red-700 border-red-300'
+                        }`}>
+                          <Cpu className="w-2.5 h-2.5" />
+                          Sistema: {diag.sugestao} · {diag.total} reg.
+                        </span>
+                        {/* Botão Aceitar */}
+                        {!av && (
+                          <button
+                            type="button"
+                            onClick={() => handleAcceptOne(item.id)}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-700 border border-purple-300 hover:bg-purple-200 transition"
+                          >
+                            <ThumbsUp className="w-2.5 h-2.5" /> Aceitar
+                          </button>
+                        )}
+                        {/* Toggle evidências encontradas */}
+                        {diag.evidencias.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setDiagExpanded(prev => ({ ...prev, [item.id]: !prev[item.id] }))}
+                            className="text-[10px] text-purple-600 hover:text-purple-800 underline"
+                          >
+                            {diagEv ? 'Ocultar evidências' : `Ver ${diag.evidencias.length} evidência(s)`}
+                          </button>
+                        )}
+                      </div>
+                      {/* Lista de evidências do sistema */}
+                      {diagEv && diag.evidencias.length > 0 && (
+                        <div className="mt-1.5 bg-purple-50 border border-purple-200 rounded-lg px-3 py-2">
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-purple-500 mb-1">Registros encontrados no sistema</p>
+                          <ul className="space-y-0.5">
+                            {diag.evidencias.map((ev, i) => (
+                              <li key={i} className="text-[10px] text-purple-800 flex items-start gap-1.5">
+                                <span className="text-purple-400 shrink-0 mt-0.5">▸</span>{ev}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {diagEv && diag.evidencias.length === 0 && (
+                        <p className="mt-1 text-[10px] text-red-500 ml-1">Nenhum registro encontrado no sistema para este item.</p>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Expanded detail */}
@@ -328,7 +449,32 @@ export function AuditScreen(_props: AuditScreenProps) {
             <p className="text-[11px] text-slate-400">ISO 9001 · ISO 45001 · ISO 14001 — Tiger Rentank</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Botão principal: Diagnóstico Automático */}
+          <button
+            onClick={handleRunDiagnostic}
+            disabled={diagLoading}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition ${
+              diagLoading
+                ? 'bg-purple-100 text-purple-400 cursor-wait'
+                : diagnostic
+                ? 'bg-purple-600 text-white hover:bg-purple-700'
+                : 'bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100'
+            }`}
+          >
+            <Cpu className="w-3.5 h-3.5" />
+            {diagLoading ? 'Analisando…' : diagnostic ? 'Re-analisar' : 'Diagnóstico Automático'}
+          </button>
+          {/* Aplicar sugestões quando diagnóstico pronto */}
+          {diagnostic && (
+            <button
+              onClick={handleApplyAll}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 rounded-lg transition"
+            >
+              <ThumbsUp className="w-3.5 h-3.5" /> Aplicar Sugestões
+            </button>
+          )}
+          <div className="w-px h-5 bg-slate-200 mx-1" />
           <button onClick={handleReset} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-lg">
             <RotateCcw className="w-3.5 h-3.5" /> Limpar
           </button>
@@ -339,6 +485,19 @@ export function AuditScreen(_props: AuditScreenProps) {
             <Printer className="w-3.5 h-3.5" /> Imprimir
           </button>
         </div>
+        {/* Banner de erro de diagnóstico */}
+        {diagError && (
+          <div className="w-full mt-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 flex items-center gap-2">
+            <XCircle className="w-3.5 h-3.5 shrink-0" /> {diagError}
+          </div>
+        )}
+        {/* Banner de sucesso */}
+        {diagnostic && !diagError && (
+          <div className="w-full mt-2 text-xs text-purple-700 bg-purple-50 border border-purple-200 rounded-lg px-3 py-2 flex items-center gap-2">
+            <Info className="w-3.5 h-3.5 shrink-0" />
+            Diagnóstico concluído — {Object.keys(diagnostic).length} itens analisados. Badges roxos indicam a sugestão do sistema. Clique em <strong>Aceitar</strong> por item ou use <strong>Aplicar Sugestões</strong> para preencher todos os não avaliados.
+          </div>
+        )}
       </div>
 
       {/* ── Info da auditoria ── */}
