@@ -19,8 +19,14 @@ const DOC_TYPES = [
   'Licença Sanitária (ANVISA)',
   'Certificado INMETRO',
   'Certificado de Empresa',
+  'Certificado de Aprovação (Corpo de Bombeiros)',
+  'Certificado de Aprovação (INMETRO)',
+  'Autorização de Funcionamento (Anvisa)',
   'Autorização Especial',
-  'Outro',
+  'Certificado de Conformidade',
+  'Laudo Técnico',
+  'Habilitação Técnica',
+  'Portaria de Autorização',
 ];
 
 const RENEWAL_OPTIONS = [
@@ -54,7 +60,7 @@ export function NewDocModal({ onSaved, onClose }: NewDocModalProps) {
   const [form, setForm] = useState<FormData>({
     code: '',
     name: '',
-    docType: 'Licença Polícia Federal',
+    docType: '',
     issuingBody: '',
     issueDate: '',
     expiryDate: '',
@@ -128,13 +134,18 @@ export function NewDocModal({ onSaved, onClose }: NewDocModalProps) {
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Tipo de Documento *</label>
-                <select
+                <input
+                  type="text"
+                  list="doc-types-list"
+                  placeholder="Digite ou selecione…"
                   value={form.docType}
                   onChange={e => set('docType', e.target.value)}
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                >
-                  {DOC_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
+                  required
+                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <datalist id="doc-types-list">
+                  {DOC_TYPES.map(t => <option key={t} value={t} />)}
+                </datalist>
               </div>
             </div>
 
