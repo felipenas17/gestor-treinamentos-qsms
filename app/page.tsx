@@ -954,7 +954,7 @@ export default function GestorTreinamentosApp() {
     name?: string; revision?: string; status?: string; criticality?: string;
     docType?: string; docLastRevisionDate?: string | null;
     docRevisionMonths?: number; docResponsible?: string | null;
-    revisionNotes?: string; procedureCode?: string;
+    revisionNotes?: string; procedureCode?: string; programContent?: string[];
   }) => {
     const result = await updateProcedure(id, data);
     if (result.error) {

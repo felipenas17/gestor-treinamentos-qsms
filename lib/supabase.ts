@@ -640,6 +640,7 @@ export async function updateProcedure(
     docLastRevisionDate?: string | null;
     docRevisionMonths?: number;
     docResponsible?: string | null;
+    programContent?: string[];
   }
 ) {
   if (!supabase) return { error: 'Supabase não configurado' };
@@ -652,6 +653,7 @@ export async function updateProcedure(
   if (data.docLastRevisionDate !== undefined) patch.doc_last_revision_date = data.docLastRevisionDate || null;
   if (data.docRevisionMonths !== undefined)  patch.doc_revision_months = data.docRevisionMonths;
   if (data.docResponsible !== undefined)     patch.doc_responsible = data.docResponsible || null;
+  if (data.programContent !== undefined)     patch.program_content = data.programContent.length > 0 ? data.programContent : null;
 
   const { error } = await supabase.from('procedures').update(patch).eq('id', id);
   return { error: error?.message ?? null };
