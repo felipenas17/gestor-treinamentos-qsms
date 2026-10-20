@@ -33,6 +33,7 @@ interface FormData {
   docRevisionMonths: string;
   docResponsible: string;
   revisionNotes: string;
+  programContentRaw: string;
 }
 
 export interface EditProcedurePayload {
@@ -46,6 +47,7 @@ export interface EditProcedurePayload {
   docResponsible: string;
   revisionNotes: string;
   procedureCode: string;
+  programContent: string[];
 }
 
 interface EditProcedureModalProps {
@@ -65,6 +67,7 @@ export function EditProcedureModal({ procedure, onSaved, onClose }: EditProcedur
     docRevisionMonths: String(procedure.docRevisionMonths ?? 36),
     docResponsible: procedure.docResponsible ?? '',
     revisionNotes: '',
+    programContentRaw: procedure.programContent?.join('\n') ?? '',
   });
   const [saving, setSaving] = useState(false);
 
@@ -87,6 +90,7 @@ export function EditProcedureModal({ procedure, onSaved, onClose }: EditProcedur
       ...form,
       docRevisionMonths: Number(form.docRevisionMonths),
       procedureCode: procedure.code,
+      programContent: form.programContentRaw.split('\n').map((l: string) => l.trim()).filter(Boolean),
     });
     setSaving(false);
     onClose();
@@ -237,6 +241,24 @@ export function EditProcedureModal({ procedure, onSaved, onClose }: EditProcedur
                 placeholder="Ex: Atualizado conforme nova NR-10, incluída seção 4.3 sobre EPI…"
                 className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
               />
+            </div>
+          </section>
+
+          {/* Conteúdo Programático */}
+          <section className="space-y-3">
+            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Conteúdo Programático</h3>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Itens do Conteúdo <span className="text-slate-400 font-normal">(opcional — um item por linha)</span>
+              </label>
+              <textarea
+                rows={4}
+                value={form.programContentRaw}
+                onChange={e => set('programContentRaw', e.target.value)}
+                placeholder={'Ex:\nEquipamentos de proteção individual\nTrabalho em altura\nPrimeiros socorros'}
+                className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none leading-relaxed"
+              />
+              <p className="text-[11px] text-slate-400 mt-1">Se preenchido, será impresso na 2ª página do certificado.</p>
             </div>
           </section>
 
