@@ -8,7 +8,7 @@ import {
   Cpu, ThumbsUp, Info,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { runAuditDiagnostic, DiagnosticMap } from '@/lib/audit-diagnostic';
+import { runAuditDiagnostic, DiagnosticMap, DiagnosticResult } from '@/lib/audit-diagnostic';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -170,6 +170,20 @@ export function AuditScreen(_props: AuditScreenProps) {
     }
   }
 
+  /** Monta texto estruturado de evidência para preencher automaticamente o campo */
+  function buildEvidText(res: DiagnosticResult): string {
+    if (res.evidencias.length === 0) {
+      return 'Nenhum registro encontrado no sistema para este requisito.';
+    }
+    const lista = res.evidencias.map((e, i) => `${i + 1}. ${e}`).join('\n');
+    const conclusao = res.sugestao === 'OK'
+      ? `✔ ${res.total} registro(s) atendendo ao requisito.`
+      : res.sugestao === 'OM'
+      ? `⚠ ${res.total} registro(s) encontrado(s) com pendências ou validade próxima do vencimento. Verificar completude.`
+      : `✘ Registros insuficientes para atender ao requisito. Evidências adicionais necessárias.`;
+    return `Registros encontrados no sistema:\n${lista}\n\n${conclusao}`;
+  }
+
   function handleApplyAll() {
     if (!diagnostic) return;
     const hasData = Object.values(states).some(s => s.avaliacao);
@@ -179,15 +193,11 @@ export function AuditScreen(_props: AuditScreenProps) {
     const patch: Record<string, ItemState> = { ...states };
     Object.entries(diagnostic).forEach(([id, res]) => {
       const current = patch[id];
-      // Só aplica se item ainda não foi avaliado
       if (!current?.avaliacao) {
-        const evidText = res.evidencias.length
-          ? res.evidencias.join(' | ')
-          : 'Sem evidências encontradas no sistema.';
         patch[id] = {
           avaliacao: res.sugestao,
-          evidencia_observada: evidText,
-          parecer: `Sugestão automática do sistema (${res.total} registros encontrados)`,
+          evidencia_observada: buildEvidText(res),
+          parecer: '',
         };
       }
     });
@@ -198,13 +208,10 @@ export function AuditScreen(_props: AuditScreenProps) {
   function handleAcceptOne(id: string) {
     if (!diagnostic?.[id]) return;
     const res = diagnostic[id];
-    const evidText = res.evidencias.length
-      ? res.evidencias.join(' | ')
-      : 'Sem evidências encontradas no sistema.';
     setState(id, {
       avaliacao: res.sugestao,
-      evidencia_observada: evidText,
-      parecer: `Sugestão automática do sistema (${res.total} registros encontrados)`,
+      evidencia_observada: buildEvidText(res),
+      parecer: '',
     });
   }
 
