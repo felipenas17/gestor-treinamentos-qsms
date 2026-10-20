@@ -210,9 +210,11 @@ export type NCSource =
   | 'Outro';
 export type NCStatus =
   | 'Aberta'
-  | 'Em tratamento'
-  | 'Aguardando verificação'
-  | 'Encerrada';
+  | 'Em Investigação'
+  | 'Em Andamento'
+  | 'Concluída';
+
+export type NCEffectiveness = 'Eficaz' | 'Não Eficaz';
 
 export interface NCStatusHistoryEntry {
   status: NCStatus;
@@ -233,11 +235,66 @@ export interface NonConformity {
   status: NCStatus;
   responsible?: string | null;
   sector?: string | null;
-  rootCause?: string | null;
+
+  // Item da Ocorrência (checkboxes)
+  itemQualidade?: boolean;
+  itemAmbiental?: boolean;
+  itemSSO?: boolean;
+
+  // Origem específica (FOR-TR-SMS-006)
+  origin?: string | null;
+
+  // Fase 1 — Registro
   immediateAction?: string | null;
+
+  // Fase 2 — Investigação & CAPA
+  rootCause?: string | null;
   correctiveAction?: string | null;
-  preventiveAction?: string | null;
+  actionResponsible?: string | null;
+  actionDeadline?: string | null;
+  riskReviewRequired?: boolean;
+  changeManagementRequired?: boolean;
+
+  // Follow-up
+  actionImplemented?: string | null;
+  implementationDate?: string | null;
+  followUpStatus?: string | null;
+
+  // Análise de Causas — Ishikawa 6M
+  ishikawaManpower?: string | null;
+  ishikawaEnvironment?: string | null;
+  ishikawaMaterials?: string | null;
+  ishikawaMachinery?: string | null;
+  ishikawaMeasurement?: string | null;
+  ishikawaMethods?: string | null;
+
+  // 5 Porquês
+  why1?: string | null;
+  why2?: string | null;
+  why3?: string | null;
+  why4?: string | null;
+  why5?: string | null;
+
+  // 5W2H
+  w2h_what?: string | null;
+  w2h_why?: string | null;
+  w2h_where?: string | null;
+  w2h_when?: string | null;
+  w2h_who?: string | null;
+  w2h_how?: string | null;
+  w2h_howMuch?: string | null;
+
+  // Causa Raiz Identificada (síntese)
+  rootCauseIdentified?: string | null;
+
+  // Verificação & Eficácia
+  effectiveness?: NCEffectiveness | null;
+  effectivenessDate?: string | null;
+  qsmsResponsible?: string | null;
   effectivenessCheck?: string | null;
+
+  // Campos legados / extras
+  preventiveAction?: string | null;
   closedDate?: string | null;
   notes?: string | null;
   createdAt: string;

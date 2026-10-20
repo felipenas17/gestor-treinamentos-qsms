@@ -132,11 +132,11 @@ export function ManagementReportScreen({
   // ─── NC stats ────────────────────────────────────────────────────────────────
   const ncStats = useMemo(() => {
     const abertas = nonConformities.filter((n) => n.status === 'Aberta').length;
-    const emTratamento = nonConformities.filter((n) => n.status === 'Em tratamento').length;
-    const encerradas = nonConformities.filter((n) => n.status === 'Encerrada').length;
-    const criticas = nonConformities.filter((n) => n.severity === 'Crítica' && n.status !== 'Encerrada').length;
+    const emAndamento = nonConformities.filter((n) => n.status === 'Em Andamento' || n.status === 'Em Investigação').length;
+    const concluidas = nonConformities.filter((n) => n.status === 'Concluída').length;
+    const criticas = nonConformities.filter((n) => n.severity === 'Crítica' && n.status !== 'Concluída').length;
     const total = nonConformities.length;
-    return { abertas, emTratamento, encerradas, criticas, total };
+    return { abertas, emAndamento, concluidas, criticas, total };
   }, [nonConformities]);
 
   // ─── Critical items ──────────────────────────────────────────────────────────
@@ -202,8 +202,8 @@ export function ManagementReportScreen({
 
   const ncStatusData = useMemo(() => [
     { name: 'Aberta', value: ncStats.abertas, fill: '#ef4444' },
-    { name: 'Em Tratamento', value: ncStats.emTratamento, fill: '#f59e0b' },
-    { name: 'Encerrada', value: ncStats.encerradas, fill: '#10b981' },
+    { name: 'Em Andamento', value: ncStats.emAndamento, fill: '#f59e0b' },
+    { name: 'Concluída', value: ncStats.concluidas, fill: '#10b981' },
   ], [ncStats]);
 
   const today = new Date().toLocaleDateString('pt-BR', {
@@ -365,7 +365,7 @@ export function ManagementReportScreen({
           <StatCard
             icon={<AlertTriangle className="w-3.5 h-3.5" />}
             label="NC/CAPA em Aberto"
-            value={ncStats.abertas + ncStats.emTratamento}
+            value={ncStats.abertas + ncStats.emAndamento}
             sub={ncStats.criticas > 0 ? `${ncStats.criticas} crítica(s)` : `${ncStats.total} total`}
             accent={ncStats.criticas > 0}
           />
@@ -431,7 +431,7 @@ export function ManagementReportScreen({
           <div className="bg-white border border-slate-200 rounded-2xl p-5 lg:col-span-2">
             <SectionHeader
               icon={<AlertTriangle className="w-4 h-4 text-amber-500" />}
-              title="Pipeline NC / CAPA — Status Atual"
+              title="Pipeline Não Conformidade — Status Atual"
             />
             <ResponsiveContainer width="100%" height={120}>
               <BarChart
@@ -565,14 +565,14 @@ export function ManagementReportScreen({
         <div className="bg-white border border-slate-200 rounded-2xl p-5">
           <SectionHeader
             icon={<AlertTriangle className="w-4 h-4 text-amber-500" />}
-            title="NC / CAPA — Não Conformidades"
+            title="Não Conformidade"
           />
           <div className="grid grid-cols-4 gap-3">
             {[
               { label: 'Total', value: ncStats.total, cls: 'text-slate-700', bg: 'bg-slate-50' },
               { label: 'Em Aberto', value: ncStats.abertas, cls: 'text-red-700', bg: 'bg-red-50' },
-              { label: 'Em Tratamento', value: ncStats.emTratamento, cls: 'text-amber-700', bg: 'bg-amber-50' },
-              { label: 'Encerradas', value: ncStats.encerradas, cls: 'text-emerald-700', bg: 'bg-emerald-50' },
+              { label: 'Em Andamento', value: ncStats.emAndamento, cls: 'text-amber-700', bg: 'bg-amber-50' },
+              { label: 'Concluídas', value: ncStats.concluidas, cls: 'text-emerald-700', bg: 'bg-emerald-50' },
             ].map((s) => (
               <div key={s.label} className={`${s.bg} rounded-xl p-3 text-center border border-slate-100`}>
                 <p className="text-xs text-slate-500">{s.label}</p>

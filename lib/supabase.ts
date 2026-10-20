@@ -897,11 +897,55 @@ export interface NonConformityRow {
   status: string;
   responsible: string | null;
   sector: string | null;
-  root_cause: string | null;
+  // Checkboxes
+  item_qualidade?: boolean | null;
+  item_ambiental?: boolean | null;
+  item_sso?: boolean | null;
+  // Origem específica
+  origin?: string | null;
+  // Fase 1
   immediate_action: string | null;
+  // Fase 2 — Investigação & CAPA
+  root_cause: string | null;
   corrective_action: string | null;
-  preventive_action: string | null;
+  action_responsible?: string | null;
+  action_deadline?: string | null;
+  risk_review_required?: boolean | null;
+  change_management_required?: boolean | null;
+  // Follow-up
+  action_implemented?: string | null;
+  implementation_date?: string | null;
+  follow_up_status?: string | null;
+  // Ishikawa 6M
+  ishikawa_manpower?: string | null;
+  ishikawa_environment?: string | null;
+  ishikawa_materials?: string | null;
+  ishikawa_machinery?: string | null;
+  ishikawa_measurement?: string | null;
+  ishikawa_methods?: string | null;
+  // 5 Porquês
+  why1?: string | null;
+  why2?: string | null;
+  why3?: string | null;
+  why4?: string | null;
+  why5?: string | null;
+  // 5W2H
+  w2h_what?: string | null;
+  w2h_why?: string | null;
+  w2h_where?: string | null;
+  w2h_when?: string | null;
+  w2h_who?: string | null;
+  w2h_how?: string | null;
+  w2h_how_much?: string | null;
+  // Causa raiz identificada (síntese)
+  root_cause_identified?: string | null;
+  // Verificação & Eficácia
+  effectiveness?: string | null;
+  effectiveness_date?: string | null;
+  qsms_responsible?: string | null;
   effectiveness_check: string | null;
+  // Legado
+  preventive_action: string | null;
   closed_date: string | null;
   notes: string | null;
   created_at: string;

@@ -4,9 +4,12 @@ import React, { useState, useMemo, useCallback } from 'react';
 import {
   AlertTriangle, Plus, CheckCircle2, Clock, XCircle,
   ChevronDown, ChevronUp, Search, Filter, Edit2, Trash2,
-  AlertOctagon, Info, TrendingUp, X, Save,
+  AlertOctagon, Info, TrendingUp, X, Save, ChevronRight,
 } from 'lucide-react';
-import { NonConformity, NCType, NCSeverity, NCSource, NCStatus, NCStatusHistoryEntry } from '@/types';
+import {
+  NonConformity, NCType, NCSeverity, NCSource, NCStatus,
+  NCEffectiveness, NCStatusHistoryEntry,
+} from '@/types';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -16,27 +19,36 @@ const NC_SOURCES: NCSource[] = [
   'Auditoria Interna', 'Auditoria Externa', 'Inspeção',
   'Reclamação', 'Análise Crítica', 'Outro',
 ];
-const NC_STATUSES: NCStatus[] = ['Aberta', 'Em tratamento', 'Aguardando verificação', 'Encerrada'];
+const NC_STATUSES: NCStatus[] = ['Aberta', 'Em Investigação', 'Em Andamento', 'Concluída'];
+
+const NC_ORIGINS = [
+  'NC de processo',
+  'OBS de processo',
+  'NC de auditoria',
+  'OBS ou OM de auditoria',
+  'NC motivada por reclamação',
+  'OBS motivada por reclamação',
+];
 
 // ─── Style helpers ────────────────────────────────────────────────────────────
 
 function statusStyle(status: NCStatus) {
   switch (status) {
-    case 'Aberta':                 return 'bg-red-100 text-red-800 border-red-200';
-    case 'Em tratamento':          return 'bg-amber-100 text-amber-800 border-amber-200';
-    case 'Aguardando verificação': return 'bg-blue-100 text-blue-800 border-blue-200';
-    case 'Encerrada':              return 'bg-emerald-100 text-emerald-800 border-emerald-200';
-    default:                       return 'bg-slate-100 text-slate-700 border-slate-200';
+    case 'Aberta':          return 'bg-red-100 text-red-800 border-red-200';
+    case 'Em Investigação': return 'bg-amber-100 text-amber-800 border-amber-200';
+    case 'Em Andamento':    return 'bg-blue-100 text-blue-800 border-blue-200';
+    case 'Concluída':       return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+    default:                return 'bg-slate-100 text-slate-700 border-slate-200';
   }
 }
 
 function statusIcon(status: NCStatus) {
   switch (status) {
-    case 'Aberta':                 return <XCircle className="w-3 h-3" />;
-    case 'Em tratamento':          return <Clock className="w-3 h-3" />;
-    case 'Aguardando verificação': return <AlertTriangle className="w-3 h-3" />;
-    case 'Encerrada':              return <CheckCircle2 className="w-3 h-3" />;
-    default:                       return null;
+    case 'Aberta':          return <XCircle className="w-3 h-3" />;
+    case 'Em Investigação': return <AlertTriangle className="w-3 h-3" />;
+    case 'Em Andamento':    return <Clock className="w-3 h-3" />;
+    case 'Concluída':       return <CheckCircle2 className="w-3 h-3" />;
+    default:                return null;
   }
 }
 
@@ -58,14 +70,64 @@ function typeIcon(type: NCType) {
   }
 }
 
-// ─── Empty form ───────────────────────────────────────────────────────────────
+// ─── Form type ────────────────────────────────────────────────────────────────
 
 type NCFormData = {
-  code: string; title: string; description: string;
-  type: NCType; severity: NCSeverity; source: NCSource; status: NCStatus;
-  detectedDate: string; deadline: string; responsible: string; sector: string;
-  rootCause: string; immediateAction: string; correctiveAction: string;
-  preventiveAction: string; effectivenessCheck: string; notes: string;
+  // Identificação
+  code: string;
+  title: string;
+  description: string;
+  type: NCType;
+  severity: NCSeverity;
+  source: NCSource;
+  status: NCStatus;
+  detectedDate: string;
+  deadline: string;
+  responsible: string;
+  sector: string;
+  itemQualidade: boolean;
+  itemAmbiental: boolean;
+  itemSSO: boolean;
+  origin: string;
+  immediateAction: string;
+  // Investigação & CAPA
+  rootCause: string;
+  correctiveAction: string;
+  actionResponsible: string;
+  actionDeadline: string;
+  riskReviewRequired: boolean;
+  changeManagementRequired: boolean;
+  actionImplemented: string;
+  implementationDate: string;
+  followUpStatus: string;
+  // Análise de Causas
+  ishikawaManpower: string;
+  ishikawaEnvironment: string;
+  ishikawaMaterials: string;
+  ishikawaMachinery: string;
+  ishikawaMeasurement: string;
+  ishikawaMethods: string;
+  why1: string;
+  why2: string;
+  why3: string;
+  why4: string;
+  why5: string;
+  w2h_what: string;
+  w2h_why: string;
+  w2h_where: string;
+  w2h_when: string;
+  w2h_who: string;
+  w2h_how: string;
+  w2h_howMuch: string;
+  rootCauseIdentified: string;
+  // Verificação & Eficácia
+  effectiveness: '' | NCEffectiveness;
+  effectivenessDate: string;
+  qsmsResponsible: string;
+  effectivenessCheck: string;
+  // Extras
+  notes: string;
+  preventiveAction: string;
 };
 
 function emptyForm(): NCFormData {
@@ -74,10 +136,88 @@ function emptyForm(): NCFormData {
     type: 'NC', severity: 'Moderada', source: 'Auditoria Interna', status: 'Aberta',
     detectedDate: new Date().toISOString().split('T')[0],
     deadline: '', responsible: '', sector: '',
-    rootCause: '', immediateAction: '', correctiveAction: '',
-    preventiveAction: '', effectivenessCheck: '', notes: '',
+    itemQualidade: false, itemAmbiental: false, itemSSO: false,
+    origin: '', immediateAction: '',
+    rootCause: '', correctiveAction: '', actionResponsible: '',
+    actionDeadline: '', riskReviewRequired: false, changeManagementRequired: false,
+    actionImplemented: '', implementationDate: '', followUpStatus: '',
+    ishikawaManpower: '', ishikawaEnvironment: '', ishikawaMaterials: '',
+    ishikawaMachinery: '', ishikawaMeasurement: '', ishikawaMethods: '',
+    why1: '', why2: '', why3: '', why4: '', why5: '',
+    w2h_what: '', w2h_why: '', w2h_where: '', w2h_when: '',
+    w2h_who: '', w2h_how: '', w2h_howMuch: '',
+    rootCauseIdentified: '',
+    effectiveness: '', effectivenessDate: '', qsmsResponsible: '',
+    effectivenessCheck: '',
+    notes: '', preventiveAction: '',
   };
 }
+
+function formFromNC(nc: NonConformity): NCFormData {
+  return {
+    code: nc.code,
+    title: nc.title,
+    description: nc.description ?? '',
+    type: nc.type,
+    severity: nc.severity,
+    source: nc.source,
+    status: nc.status,
+    detectedDate: nc.detectedDate,
+    deadline: nc.deadline ?? '',
+    responsible: nc.responsible ?? '',
+    sector: nc.sector ?? '',
+    itemQualidade: nc.itemQualidade ?? false,
+    itemAmbiental: nc.itemAmbiental ?? false,
+    itemSSO: nc.itemSSO ?? false,
+    origin: nc.origin ?? '',
+    immediateAction: nc.immediateAction ?? '',
+    rootCause: nc.rootCause ?? '',
+    correctiveAction: nc.correctiveAction ?? '',
+    actionResponsible: nc.actionResponsible ?? '',
+    actionDeadline: nc.actionDeadline ?? '',
+    riskReviewRequired: nc.riskReviewRequired ?? false,
+    changeManagementRequired: nc.changeManagementRequired ?? false,
+    actionImplemented: nc.actionImplemented ?? '',
+    implementationDate: nc.implementationDate ?? '',
+    followUpStatus: nc.followUpStatus ?? '',
+    ishikawaManpower: nc.ishikawaManpower ?? '',
+    ishikawaEnvironment: nc.ishikawaEnvironment ?? '',
+    ishikawaMaterials: nc.ishikawaMaterials ?? '',
+    ishikawaMachinery: nc.ishikawaMachinery ?? '',
+    ishikawaMeasurement: nc.ishikawaMeasurement ?? '',
+    ishikawaMethods: nc.ishikawaMethods ?? '',
+    why1: nc.why1 ?? '',
+    why2: nc.why2 ?? '',
+    why3: nc.why3 ?? '',
+    why4: nc.why4 ?? '',
+    why5: nc.why5 ?? '',
+    w2h_what: nc.w2h_what ?? '',
+    w2h_why: nc.w2h_why ?? '',
+    w2h_where: nc.w2h_where ?? '',
+    w2h_when: nc.w2h_when ?? '',
+    w2h_who: nc.w2h_who ?? '',
+    w2h_how: nc.w2h_how ?? '',
+    w2h_howMuch: nc.w2h_howMuch ?? '',
+    rootCauseIdentified: nc.rootCauseIdentified ?? '',
+    effectiveness: (nc.effectiveness as '' | NCEffectiveness) ?? '',
+    effectivenessDate: nc.effectivenessDate ?? '',
+    qsmsResponsible: nc.qsmsResponsible ?? '',
+    effectivenessCheck: nc.effectivenessCheck ?? '',
+    notes: nc.notes ?? '',
+    preventiveAction: nc.preventiveAction ?? '',
+  };
+}
+
+// ─── Tab type ─────────────────────────────────────────────────────────────────
+
+type TabId = 'identificacao' | 'investigacao' | 'analise' | 'eficacia';
+
+const TABS: { id: TabId; label: string }[] = [
+  { id: 'identificacao', label: 'Identificação' },
+  { id: 'investigacao',  label: 'Investigação & CAPA' },
+  { id: 'analise',       label: 'Análise de Causas' },
+  { id: 'eficacia',      label: 'Verificação & Eficácia' },
+];
 
 // ─── Modal ────────────────────────────────────────────────────────────────────
 
@@ -89,32 +229,11 @@ interface NCModalProps {
 
 function NCModal({ initial, onSave, onClose }: NCModalProps) {
   const [form, setForm] = useState<NCFormData>(() =>
-    initial
-      ? {
-          code: initial.code,
-          title: initial.title,
-          description: initial.description ?? '',
-          type: initial.type,
-          severity: initial.severity,
-          source: initial.source,
-          status: initial.status,
-          detectedDate: initial.detectedDate,
-          deadline: initial.deadline ?? '',
-          responsible: initial.responsible ?? '',
-          sector: initial.sector ?? '',
-          rootCause: initial.rootCause ?? '',
-          immediateAction: initial.immediateAction ?? '',
-          correctiveAction: initial.correctiveAction ?? '',
-          preventiveAction: initial.preventiveAction ?? '',
-          effectivenessCheck: initial.effectivenessCheck ?? '',
-          notes: initial.notes ?? '',
-        }
-      : emptyForm()
+    initial ? formFromNC(initial) : emptyForm()
   );
+  const [tab, setTab] = useState<TabId>('identificacao');
 
-  const [tab, setTab] = useState<'identificacao' | 'capa' | 'verificacao'>('identificacao');
-
-  const set = (field: keyof NCFormData, value: string) =>
+  const set = <K extends keyof NCFormData>(field: K, value: NCFormData[K]) =>
     setForm((prev) => ({ ...prev, [field]: value }));
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -124,212 +243,628 @@ function NCModal({ initial, onSave, onClose }: NCModalProps) {
   };
 
   const inputCls = 'w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-all';
+  const textareaCls = inputCls + ' resize-none';
   const labelCls = 'block text-xs font-medium text-slate-600 mb-1';
-  const selectCls = inputCls;
+  const selectCls = inputCls + ' bg-white';
+  const sectionTitle = 'text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3';
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
           <div className="flex items-center gap-3">
             {typeIcon(form.type)}
             <div>
               <h2 className="text-base font-semibold text-slate-800">
-                {initial ? 'Editar NC / CAPA' : 'Registrar NC / CAPA'}
+                {initial ? 'Editar Não Conformidade' : 'Registrar Não Conformidade'}
               </h2>
-              <p className="text-xs text-slate-500">Não Conformidade, Observação ou Oportunidade de Melhoria</p>
+              <p className="text-xs text-slate-500">
+                FOR-TR-SMS-006 · {form.code || 'Novo registro'}
+              </p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors">
+          <button
+            onClick={onClose}
+            className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+          >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-slate-100 px-6">
-          {[
-            { id: 'identificacao' as const, label: 'Identificação' },
-            { id: 'capa' as const, label: 'Ação Corretiva (CAPA)' },
-            { id: 'verificacao' as const, label: 'Verificação' },
-          ].map((t) => (
+        <div className="flex border-b border-slate-100 px-6 shrink-0 overflow-x-auto">
+          {TABS.map((t, idx) => (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`px-4 py-3 text-xs font-medium border-b-2 transition-colors ${
+              className={`flex items-center gap-1.5 px-3 py-3 text-xs font-medium border-b-2 whitespace-nowrap transition-colors ${
                 tab === t.id
                   ? 'border-blue-600 text-blue-600'
                   : 'border-transparent text-slate-500 hover:text-slate-700'
               }`}
             >
+              <span className={`w-4 h-4 rounded-full text-[10px] font-bold flex items-center justify-center shrink-0 ${
+                tab === t.id ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-500'
+              }`}>{idx + 1}</span>
               {t.label}
             </button>
           ))}
         </div>
 
         {/* Body */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 py-5">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+
+          {/* ── TAB 1: IDENTIFICAÇÃO ── */}
           {tab === 'identificacao' && (
-            <div className="space-y-4">
+            <>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className={labelCls}>Código *</label>
-                  <input className={inputCls} placeholder="NC-2024-001" value={form.code}
-                    onChange={(e) => set('code', e.target.value)} required />
+                  <label className={labelCls}>Número do Relatório *</label>
+                  <input
+                    className={inputCls + ' font-mono'}
+                    placeholder="NC-2024-001"
+                    value={form.code}
+                    onChange={(e) => set('code', e.target.value)}
+                    required
+                  />
                 </div>
                 <div>
+                  <label className={labelCls}>Data *</label>
+                  <input
+                    type="date"
+                    className={inputCls}
+                    value={form.detectedDate}
+                    onChange={(e) => set('detectedDate', e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className={labelCls}>Departamento / Setor</label>
+                <input
+                  className={inputCls}
+                  placeholder="Ex: Operações Offshore"
+                  value={form.sector}
+                  onChange={(e) => set('sector', e.target.value)}
+                />
+              </div>
+
+              {/* Item da Ocorrência */}
+              <div>
+                <p className={labelCls}>Item da Ocorrência</p>
+                <div className="flex gap-4">
+                  {([
+                    { field: 'itemQualidade' as const, label: 'Qualidade' },
+                    { field: 'itemAmbiental' as const, label: 'Ambiental' },
+                    { field: 'itemSSO' as const, label: 'SSO' },
+                  ]).map(({ field, label }) => (
+                    <label key={field} className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={form[field] as boolean}
+                        onChange={(e) => set(field, e.target.checked as any)}
+                        className="w-3.5 h-3.5 rounded text-blue-600"
+                      />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Tipo, Severidade, Status */}
+              <div className="grid grid-cols-3 gap-4">
+                <div>
                   <label className={labelCls}>Tipo *</label>
-                  <select className={selectCls} value={form.type}
-                    onChange={(e) => set('type', e.target.value as NCType)}>
+                  <select
+                    className={selectCls}
+                    value={form.type}
+                    onChange={(e) => set('type', e.target.value as NCType)}
+                  >
                     {NC_TYPES.map((t) => <option key={t}>{t}</option>)}
                   </select>
                 </div>
-              </div>
-
-              <div>
-                <label className={labelCls}>Título *</label>
-                <input className={inputCls} placeholder="Descrição resumida da não conformidade" value={form.title}
-                  onChange={(e) => set('title', e.target.value)} required />
-              </div>
-
-              <div>
-                <label className={labelCls}>Descrição detalhada</label>
-                <textarea className={inputCls} rows={2} placeholder="Descreva em detalhes o problema identificado..."
-                  value={form.description} onChange={(e) => set('description', e.target.value)} />
-              </div>
-
-              <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className={labelCls}>Severidade *</label>
-                  <select className={selectCls} value={form.severity}
-                    onChange={(e) => set('severity', e.target.value as NCSeverity)}>
+                  <select
+                    className={selectCls}
+                    value={form.severity}
+                    onChange={(e) => set('severity', e.target.value as NCSeverity)}
+                  >
                     {NC_SEVERITIES.map((s) => <option key={s}>{s}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className={labelCls}>Origem *</label>
-                  <select className={selectCls} value={form.source}
-                    onChange={(e) => set('source', e.target.value as NCSource)}>
-                    {NC_SOURCES.map((s) => <option key={s}>{s}</option>)}
-                  </select>
-                </div>
-                <div>
                   <label className={labelCls}>Status *</label>
-                  <select className={selectCls} value={form.status}
-                    onChange={(e) => set('status', e.target.value as NCStatus)}>
+                  <select
+                    className={selectCls}
+                    value={form.status}
+                    onChange={(e) => set('status', e.target.value as NCStatus)}
+                  >
                     {NC_STATUSES.map((s) => <option key={s}>{s}</option>)}
                   </select>
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
+              {/* Origem */}
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className={labelCls}>Data de Detecção *</label>
-                  <input type="date" className={inputCls} value={form.detectedDate}
-                    onChange={(e) => set('detectedDate', e.target.value)} required />
+                  <label className={labelCls}>Fonte *</label>
+                  <select
+                    className={selectCls}
+                    value={form.source}
+                    onChange={(e) => set('source', e.target.value as NCSource)}
+                  >
+                    {NC_SOURCES.map((s) => <option key={s}>{s}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className={labelCls}>Origem da Ocorrência</label>
+                  <select
+                    className={selectCls}
+                    value={form.origin}
+                    onChange={(e) => set('origin', e.target.value)}
+                  >
+                    <option value="">— Selecionar —</option>
+                    {NC_ORIGINS.map((o) => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {/* Título e Descrição */}
+              <div>
+                <label className={labelCls}>Título / Resumo *</label>
+                <input
+                  className={inputCls}
+                  placeholder="Descrição resumida da não conformidade"
+                  value={form.title}
+                  onChange={(e) => set('title', e.target.value)}
+                  required
+                />
+              </div>
+              <div>
+                <label className={labelCls}>Descrição detalhada</label>
+                <textarea
+                  className={textareaCls}
+                  rows={3}
+                  placeholder="Descreva em detalhes o problema identificado, o que ocorreu, onde, quando…"
+                  value={form.description}
+                  onChange={(e) => set('description', e.target.value)}
+                />
+              </div>
+
+              {/* Ação de Correção Imediata */}
+              <div>
+                <label className={labelCls}>Ação de Correção Imediata</label>
+                <textarea
+                  className={textareaCls}
+                  rows={2}
+                  placeholder="O que foi feito imediatamente para conter o problema?"
+                  value={form.immediateAction}
+                  onChange={(e) => set('immediateAction', e.target.value)}
+                />
+              </div>
+
+              {/* Responsável e Prazo */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className={labelCls}>Responsável</label>
+                  <input
+                    className={inputCls}
+                    placeholder="Nome do responsável"
+                    value={form.responsible}
+                    onChange={(e) => set('responsible', e.target.value)}
+                  />
                 </div>
                 <div>
                   <label className={labelCls}>Prazo para Resolução</label>
-                  <input type="date" className={inputCls} value={form.deadline}
-                    onChange={(e) => set('deadline', e.target.value)} />
+                  <input
+                    type="date"
+                    className={inputCls}
+                    value={form.deadline}
+                    onChange={(e) => set('deadline', e.target.value)}
+                  />
                 </div>
-                <div>
-                  <label className={labelCls}>Setor</label>
-                  <input className={inputCls} placeholder="Ex: Operações Offshore" value={form.sector}
-                    onChange={(e) => set('sector', e.target.value)} />
-                </div>
               </div>
-
-              <div>
-                <label className={labelCls}>Responsável pela Tratativa</label>
-                <input className={inputCls} placeholder="Nome do responsável" value={form.responsible}
-                  onChange={(e) => set('responsible', e.target.value)} />
-              </div>
-
-              <div>
-                <label className={labelCls}>Causa Raiz</label>
-                <textarea className={inputCls} rows={2} placeholder="Análise de causa raiz (5 Porquês, Ishikawa...)"
-                  value={form.rootCause} onChange={(e) => set('rootCause', e.target.value)} />
-              </div>
-            </div>
+            </>
           )}
 
-          {tab === 'capa' && (
-            <div className="space-y-4">
+          {/* ── TAB 2: INVESTIGAÇÃO & CAPA ── */}
+          {tab === 'investigacao' && (
+            <>
               <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">
-                <strong>CAPA</strong> — Corrective and Preventive Action. Registre as ações imediatas,
-                corretivas (elimina a causa) e preventivas (evita recorrência).
+                <strong>Fase 2 — Investigação & CAPA.</strong> Preencha após investigação da causa raiz.
+                A NC deve estar em <em>Em Investigação</em> ou posterior para este conteúdo.
               </div>
 
               <div>
-                <label className={labelCls}>Ação Imediata (contenção)</label>
-                <textarea className={inputCls} rows={3}
-                  placeholder="O que foi feito imediatamente para conter o problema?"
-                  value={form.immediateAction} onChange={(e) => set('immediateAction', e.target.value)} />
+                <label className={labelCls}>Investigação da Causa</label>
+                <textarea
+                  className={textareaCls}
+                  rows={3}
+                  placeholder="Descreva a investigação realizada, os fatos levantados e as hipóteses de causa…"
+                  value={form.rootCause}
+                  onChange={(e) => set('rootCause', e.target.value)}
+                />
               </div>
 
               <div>
-                <label className={labelCls}>Ação Corretiva (elimina a causa)</label>
-                <textarea className={inputCls} rows={3}
-                  placeholder="Ação que elimina a causa raiz do problema..."
-                  value={form.correctiveAction} onChange={(e) => set('correctiveAction', e.target.value)} />
+                <label className={labelCls}>Ação Corretiva (elimina a causa raiz)</label>
+                <textarea
+                  className={textareaCls}
+                  rows={3}
+                  placeholder="Descreva a ação corretiva planejada para eliminar a causa raiz…"
+                  value={form.correctiveAction}
+                  onChange={(e) => set('correctiveAction', e.target.value)}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className={labelCls}>Responsável pela Ação</label>
+                  <input
+                    className={inputCls}
+                    placeholder="Nome / cargo"
+                    value={form.actionResponsible}
+                    onChange={(e) => set('actionResponsible', e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Prazo da Ação Corretiva</label>
+                  <input
+                    type="date"
+                    className={inputCls}
+                    value={form.actionDeadline}
+                    onChange={(e) => set('actionDeadline', e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* Revisão de Análise de Risco e Gestão de Mudanças */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                  <p className="text-xs font-medium text-slate-700 mb-2">Revisão de Análise de Risco</p>
+                  <div className="flex gap-4">
+                    {(['Sim', 'Não'] as const).map((v) => (
+                      <label key={v} className="flex items-center gap-2 text-sm cursor-pointer">
+                        <input
+                          type="radio"
+                          name="riskReview"
+                          checked={form.riskReviewRequired === (v === 'Sim')}
+                          onChange={() => set('riskReviewRequired', v === 'Sim')}
+                          className="text-blue-600"
+                        />
+                        {v}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                  <p className="text-xs font-medium text-slate-700 mb-2">Gestão de Mudanças</p>
+                  <div className="flex gap-4">
+                    {(['Sim', 'Não'] as const).map((v) => (
+                      <label key={v} className="flex items-center gap-2 text-sm cursor-pointer">
+                        <input
+                          type="radio"
+                          name="changeMgmt"
+                          checked={form.changeManagementRequired === (v === 'Sim')}
+                          onChange={() => set('changeManagementRequired', v === 'Sim')}
+                          className="text-blue-600"
+                        />
+                        {v}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Follow-up */}
+              <div className="pt-1">
+                <p className={sectionTitle}>Follow-up — Implementação</p>
+                <div className="space-y-4">
+                  <div>
+                    <label className={labelCls}>Ação Implementada</label>
+                    <textarea
+                      className={textareaCls}
+                      rows={2}
+                      placeholder="Descreva o que foi efetivamente implementado…"
+                      value={form.actionImplemented}
+                      onChange={(e) => set('actionImplemented', e.target.value)}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className={labelCls}>Data da Implementação</label>
+                      <input
+                        type="date"
+                        className={inputCls}
+                        value={form.implementationDate}
+                        onChange={(e) => set('implementationDate', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Status do Follow-up</label>
+                      <input
+                        className={inputCls}
+                        placeholder="Ex: Concluído, Pendente, Em andamento"
+                        value={form.followUpStatus}
+                        onChange={(e) => set('followUpStatus', e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div>
                 <label className={labelCls}>Ação Preventiva (evita recorrência)</label>
-                <textarea className={inputCls} rows={3}
-                  placeholder="Ação para prevenir que o problema ocorra em outros processos..."
-                  value={form.preventiveAction} onChange={(e) => set('preventiveAction', e.target.value)} />
+                <textarea
+                  className={textareaCls}
+                  rows={2}
+                  placeholder="Ação para prevenir recorrência em outros processos/áreas…"
+                  value={form.preventiveAction}
+                  onChange={(e) => set('preventiveAction', e.target.value)}
+                />
               </div>
 
               <div>
                 <label className={labelCls}>Observações adicionais</label>
-                <textarea className={inputCls} rows={2}
-                  placeholder="Notas, referências normativas, evidências..."
-                  value={form.notes} onChange={(e) => set('notes', e.target.value)} />
+                <textarea
+                  className={textareaCls}
+                  rows={2}
+                  placeholder="Notas, referências normativas, evidências coletadas…"
+                  value={form.notes}
+                  onChange={(e) => set('notes', e.target.value)}
+                />
               </div>
-            </div>
+            </>
           )}
 
-          {tab === 'verificacao' && (
-            <div className="space-y-4">
+          {/* ── TAB 3: ANÁLISE DE CAUSAS ── */}
+          {tab === 'analise' && (
+            <>
+              {/* Ishikawa 6M */}
+              <div>
+                <p className={sectionTitle}>Diagrama de Ishikawa — 6M</p>
+                <div className="grid grid-cols-2 gap-3">
+                  {([
+                    { field: 'ishikawaManpower'   as const, label: 'Mão de Obra' },
+                    { field: 'ishikawaEnvironment' as const, label: 'Meio Ambiente' },
+                    { field: 'ishikawaMaterials'   as const, label: 'Materiais' },
+                    { field: 'ishikawaMachinery'   as const, label: 'Máquinas' },
+                    { field: 'ishikawaMeasurement' as const, label: 'Medição' },
+                    { field: 'ishikawaMethods'     as const, label: 'Métodos' },
+                  ]).map(({ field, label }) => (
+                    <div key={field}>
+                      <label className={labelCls}>{label}</label>
+                      <textarea
+                        className={textareaCls}
+                        rows={2}
+                        placeholder={`Causas relacionadas a ${label.toLowerCase()}…`}
+                        value={form[field] as string}
+                        onChange={(e) => set(field, e.target.value as any)}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 5 Porquês */}
+              <div>
+                <p className={sectionTitle}>Análise dos 5 Porquês</p>
+                <div className="space-y-3">
+                  {([
+                    { field: 'why1' as const, n: 1 },
+                    { field: 'why2' as const, n: 2 },
+                    { field: 'why3' as const, n: 3 },
+                    { field: 'why4' as const, n: 4 },
+                    { field: 'why5' as const, n: 5 },
+                  ]).map(({ field, n }) => (
+                    <div key={field} className="flex items-start gap-3">
+                      <span className="mt-2 w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-[11px] font-bold flex items-center justify-center shrink-0">
+                        {n}
+                      </span>
+                      <div className="flex-1">
+                        <label className={labelCls}>Por quê {n}?</label>
+                        <input
+                          className={inputCls}
+                          placeholder={n === 1 ? 'Por que o problema ocorreu?' : `Por que a resposta ${n - 1} aconteceu?`}
+                          value={form[field] as string}
+                          onChange={(e) => set(field, e.target.value as any)}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 5W2H */}
+              <div>
+                <p className={sectionTitle}>5W2H — Plano de Ação</p>
+                <div className="grid grid-cols-2 gap-3">
+                  {([
+                    { field: 'w2h_what'    as const, label: 'O quê?',           placeholder: 'O que será feito?' },
+                    { field: 'w2h_why'     as const, label: 'Por quê?',         placeholder: 'Por que será feito?' },
+                    { field: 'w2h_where'   as const, label: 'Onde?',            placeholder: 'Onde será executado?' },
+                    { field: 'w2h_when'    as const, label: 'Quando?',          placeholder: 'Quando será concluído?' },
+                    { field: 'w2h_who'     as const, label: 'Quem?',            placeholder: 'Quem será responsável?' },
+                    { field: 'w2h_how'     as const, label: 'Como?',            placeholder: 'Como será executado?' },
+                    { field: 'w2h_howMuch' as const, label: 'Quanto custa?',    placeholder: 'Recursos necessários…' },
+                  ]).map(({ field, label, placeholder }) => (
+                    <div key={field} className={field === 'w2h_howMuch' ? 'col-span-2' : ''}>
+                      <label className={labelCls}>{label}</label>
+                      <input
+                        className={inputCls}
+                        placeholder={placeholder}
+                        value={form[field] as string}
+                        onChange={(e) => set(field, e.target.value as any)}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Causa Raiz Identificada */}
+              <div>
+                <label className={labelCls}>Causa Raiz Identificada (síntese)</label>
+                <textarea
+                  className={textareaCls}
+                  rows={3}
+                  placeholder="Com base nas análises acima, descreva a causa raiz identificada…"
+                  value={form.rootCauseIdentified}
+                  onChange={(e) => set('rootCauseIdentified', e.target.value)}
+                />
+              </div>
+            </>
+          )}
+
+          {/* ── TAB 4: VERIFICAÇÃO & EFICÁCIA ── */}
+          {tab === 'eficacia' && (
+            <>
               <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700">
-                A <strong>verificação de eficácia</strong> confirma que a ação corretiva foi efetiva e
-                que o problema não recorreu após o prazo de avaliação.
+                A <strong>verificação de eficácia</strong> ocorre normalmente 90 dias após a implementação
+                da ação corretiva. Confirma que o problema não recorreu.
               </div>
 
               <div>
-                <label className={labelCls}>Verificação de Eficácia</label>
-                <textarea className={inputCls} rows={4}
-                  placeholder="Descreva como foi verificada a eficácia das ações tomadas. Inclua evidências, datas de verificação e resultado..."
-                  value={form.effectivenessCheck} onChange={(e) => set('effectivenessCheck', e.target.value)} />
+                <label className={labelCls}>Verificação de Eficácia — Resultado</label>
+                <textarea
+                  className={textareaCls}
+                  rows={3}
+                  placeholder="Descreva como foi verificada a eficácia. Inclua evidências, data de verificação e resultado observado…"
+                  value={form.effectivenessCheck}
+                  onChange={(e) => set('effectivenessCheck', e.target.value)}
+                />
               </div>
 
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-600">
-                <p className="font-medium text-slate-700 mb-1">Para encerrar a NC/CAPA:</p>
-                <ul className="space-y-0.5 list-disc list-inside">
-                  <li>Todas as ações devem estar implementadas</li>
-                  <li>A verificação de eficácia deve estar documentada</li>
-                  <li>Altere o status para <strong>Encerrada</strong> na aba Identificação</li>
-                </ul>
+              {/* Eficaz / Não Eficaz */}
+              <div>
+                <p className={labelCls}>Resultado da Eficácia (após 90 dias)</p>
+                <div className="flex gap-4">
+                  {(['Eficaz', 'Não Eficaz'] as const).map((v) => (
+                    <label
+                      key={v}
+                      className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl border-2 cursor-pointer transition-all text-sm font-medium ${
+                        form.effectiveness === v
+                          ? v === 'Eficaz'
+                            ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                            : 'border-red-400 bg-red-50 text-red-700'
+                          : 'border-slate-200 text-slate-500 hover:border-slate-300'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="effectiveness"
+                        value={v}
+                        checked={form.effectiveness === v}
+                        onChange={() => set('effectiveness', v)}
+                        className="sr-only"
+                      />
+                      {v === 'Eficaz'
+                        ? <CheckCircle2 className="w-4 h-4" />
+                        : <XCircle className="w-4 h-4" />}
+                      {v}
+                    </label>
+                  ))}
+                  {form.effectiveness && (
+                    <button
+                      type="button"
+                      onClick={() => set('effectiveness', '')}
+                      className="text-xs text-slate-400 hover:text-slate-600"
+                    >
+                      Limpar
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className={labelCls}>Data de Encerramento</label>
+                  <input
+                    type="date"
+                    className={inputCls}
+                    value={form.effectivenessDate}
+                    onChange={(e) => set('effectivenessDate', e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Responsável QSMS</label>
+                  <input
+                    className={inputCls}
+                    placeholder="Nome do responsável QSMS"
+                    value={form.qsmsResponsible}
+                    onChange={(e) => set('qsmsResponsible', e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* Checklist de encerramento */}
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-600 space-y-1">
+                <p className="font-semibold text-slate-700 mb-2">Para concluir a Não Conformidade:</p>
+                {[
+                  'Todas as ações estão implementadas e documentadas',
+                  'A causa raiz foi identificada e registrada',
+                  'A verificação de eficácia foi realizada',
+                  'O resultado da eficácia (Eficaz / Não Eficaz) foi preenchido',
+                  'O status deve ser alterado para Concluída na aba Identificação',
+                ].map((item) => (
+                  <div key={item} className="flex items-start gap-2">
+                    <ChevronRight className="w-3 h-3 mt-0.5 shrink-0 text-slate-400" />
+                    <span>{item}</span>
+                  </div>
+                ))}
+              </div>
+            </>
           )}
         </form>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 bg-slate-50/50 rounded-b-2xl">
-          <button type="button" onClick={onClose}
-            className="px-4 py-2 text-sm text-slate-600 hover:text-slate-800 rounded-lg hover:bg-slate-100 transition-colors">
+        <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 bg-slate-50/50 rounded-b-2xl shrink-0">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 text-sm text-slate-600 hover:text-slate-800 rounded-lg hover:bg-slate-100 transition-colors"
+          >
             Cancelar
           </button>
-          <button
-            onClick={handleSubmit as any}
-            className="flex items-center gap-2 px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
-          >
-            <Save className="w-3.5 h-3.5" />
-            {initial ? 'Salvar alterações' : 'Registrar NC/CAPA'}
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Navigate between tabs */}
+            {tab !== 'identificacao' && (
+              <button
+                type="button"
+                onClick={() => {
+                  const idx = TABS.findIndex((t) => t.id === tab);
+                  if (idx > 0) setTab(TABS[idx - 1].id);
+                }}
+                className="px-3 py-2 text-xs text-slate-500 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition-colors"
+              >
+                ← Anterior
+              </button>
+            )}
+            {tab !== 'eficacia' && (
+              <button
+                type="button"
+                onClick={() => {
+                  const idx = TABS.findIndex((t) => t.id === tab);
+                  if (idx < TABS.length - 1) setTab(TABS[idx + 1].id);
+                }}
+                className="px-3 py-2 text-xs text-slate-500 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition-colors"
+              >
+                Próxima →
+              </button>
+            )}
+            <button
+              onClick={handleSubmit as any}
+              className="flex items-center gap-2 px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+            >
+              <Save className="w-3.5 h-3.5" />
+              {initial ? 'Salvar alterações' : 'Registrar NC'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -349,7 +884,6 @@ export function NCCAPAScreen({ items, onSave, onDelete }: NCCAPAScreenProps) {
   const [filterStatus, setFilterStatus] = useState<NCStatus | 'Todos'>('Todos');
   const [filterSeverity, setFilterSeverity] = useState<NCSeverity | 'Todos'>('Todos');
   const [filterType, setFilterType] = useState<NCType | 'Todos'>('Todos');
-  const [filterSource, setFilterSource] = useState<NCSource | 'Todos'>('Todos');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editItem, setEditItem] = useState<NonConformity | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -357,12 +891,12 @@ export function NCCAPAScreen({ items, onSave, onDelete }: NCCAPAScreenProps) {
 
   // ─── Summary stats ────────────────────────────────────────────────────────
   const stats = useMemo(() => ({
-    total: items.length,
-    abertas: items.filter((i) => i.status === 'Aberta').length,
-    em_tratamento: items.filter((i) => i.status === 'Em tratamento').length,
-    aguardando: items.filter((i) => i.status === 'Aguardando verificação').length,
-    encerradas: items.filter((i) => i.status === 'Encerrada').length,
-    criticas: items.filter((i) => i.severity === 'Crítica' && i.status !== 'Encerrada').length,
+    total:           items.length,
+    abertas:         items.filter((i) => i.status === 'Aberta').length,
+    em_investigacao: items.filter((i) => i.status === 'Em Investigação').length,
+    em_andamento:    items.filter((i) => i.status === 'Em Andamento').length,
+    concluidas:      items.filter((i) => i.status === 'Concluída').length,
+    criticas:        items.filter((i) => i.severity === 'Crítica' && i.status !== 'Concluída').length,
   }), [items]);
 
   // ─── Filtered list ────────────────────────────────────────────────────────
@@ -372,11 +906,10 @@ export function NCCAPAScreen({ items, onSave, onDelete }: NCCAPAScreenProps) {
       if (filterStatus !== 'Todos' && item.status !== filterStatus) return false;
       if (filterSeverity !== 'Todos' && item.severity !== filterSeverity) return false;
       if (filterType !== 'Todos' && item.type !== filterType) return false;
-      if (filterSource !== 'Todos' && item.source !== filterSource) return false;
       if (q && !item.title.toLowerCase().includes(q) && !item.code.toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [items, search, filterStatus, filterSeverity, filterType, filterSource]);
+  }, [items, search, filterStatus, filterSeverity, filterType]);
 
   const handleSave = async (data: NCFormData) => {
     await onSave(data, editItem?.id);
@@ -391,10 +924,9 @@ export function NCCAPAScreen({ items, onSave, onDelete }: NCCAPAScreenProps) {
   };
 
   // ─── Deadline urgency ─────────────────────────────────────────────────────
-  // Capture now once per render to keep the function pure
   const nowMs = useMemo(() => new Date().setHours(0, 0, 0, 0), []);
   const getDeadlineUrgency = useCallback((nc: NonConformity) => {
-    if (!nc.deadline || nc.status === 'Encerrada') return null;
+    if (!nc.deadline || nc.status === 'Concluída') return null;
     const diff = Math.ceil((new Date(nc.deadline).getTime() - nowMs) / 86400000);
     if (diff < 0) return { label: `${Math.abs(diff)}d vencido`, cls: 'text-red-600 font-semibold' };
     if (diff <= 7) return { label: `${diff}d restantes`, cls: 'text-amber-600 font-semibold' };
@@ -408,10 +940,10 @@ export function NCCAPAScreen({ items, onSave, onDelete }: NCCAPAScreenProps) {
         <div>
           <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
             <AlertTriangle className="w-5 h-5 text-amber-500" />
-            NC / CAPA
+            Não Conformidade
           </h1>
           <p className="text-sm text-slate-500 mt-0.5">
-            Não Conformidades, Observações e Ações Corretivas/Preventivas
+            Registro, Investigação & Ações Corretivas (FOR-TR-SMS-006)
           </p>
         </div>
         <button
@@ -419,18 +951,18 @@ export function NCCAPAScreen({ items, onSave, onDelete }: NCCAPAScreenProps) {
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
         >
           <Plus className="w-4 h-4" />
-          Nova NC / CAPA
+          Nova NC
         </button>
       </div>
 
       {/* Stats cards */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         {[
-          { label: 'Total', value: stats.total, cls: 'text-slate-700', bg: 'bg-slate-50' },
-          { label: 'Abertas', value: stats.abertas, cls: 'text-red-700', bg: 'bg-red-50' },
-          { label: 'Em Tratamento', value: stats.em_tratamento, cls: 'text-amber-700', bg: 'bg-amber-50' },
-          { label: 'Aguard. Verificação', value: stats.aguardando, cls: 'text-blue-700', bg: 'bg-blue-50' },
-          { label: 'Encerradas', value: stats.encerradas, cls: 'text-emerald-700', bg: 'bg-emerald-50' },
+          { label: 'Total',           value: stats.total,           cls: 'text-slate-700',   bg: 'bg-slate-50' },
+          { label: 'Abertas',         value: stats.abertas,         cls: 'text-red-700',     bg: 'bg-red-50' },
+          { label: 'Em Investigação', value: stats.em_investigacao, cls: 'text-amber-700',   bg: 'bg-amber-50' },
+          { label: 'Em Andamento',    value: stats.em_andamento,    cls: 'text-blue-700',    bg: 'bg-blue-50' },
+          { label: 'Concluídas',      value: stats.concluidas,      cls: 'text-emerald-700', bg: 'bg-emerald-50' },
         ].map((s) => (
           <div key={s.label} className={`${s.bg} rounded-xl p-4 border border-slate-100`}>
             <p className="text-xs text-slate-500 mb-1">{s.label}</p>
@@ -455,38 +987,35 @@ export function NCCAPAScreen({ items, onSave, onDelete }: NCCAPAScreenProps) {
           <input
             className="w-full text-sm border border-slate-200 rounded-lg pl-9 pr-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-all"
             placeholder="Buscar por título ou código..."
-            value={search} onChange={(e) => setSearch(e.target.value)}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
           />
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
           <Filter className="w-3.5 h-3.5 text-slate-400" />
           <select
             className="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition-all"
-            value={filterStatus} onChange={(e) => setFilterStatus(e.target.value as any)}
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value as any)}
           >
             <option value="Todos">Todos os status</option>
             {NC_STATUSES.map((s) => <option key={s}>{s}</option>)}
           </select>
           <select
             className="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition-all"
-            value={filterSeverity} onChange={(e) => setFilterSeverity(e.target.value as any)}
+            value={filterSeverity}
+            onChange={(e) => setFilterSeverity(e.target.value as any)}
           >
             <option value="Todos">Toda severidade</option>
             {NC_SEVERITIES.map((s) => <option key={s}>{s}</option>)}
           </select>
           <select
             className="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition-all"
-            value={filterType} onChange={(e) => setFilterType(e.target.value as any)}
+            value={filterType}
+            onChange={(e) => setFilterType(e.target.value as any)}
           >
             <option value="Todos">Todos os tipos</option>
             {NC_TYPES.map((t) => <option key={t}>{t}</option>)}
-          </select>
-          <select
-            className="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition-all"
-            value={filterSource} onChange={(e) => setFilterSource(e.target.value as any)}
-          >
-            <option value="Todos">Todas as origens</option>
-            {NC_SOURCES.map((s) => <option key={s}>{s}</option>)}
           </select>
         </div>
       </div>
@@ -495,8 +1024,8 @@ export function NCCAPAScreen({ items, onSave, onDelete }: NCCAPAScreenProps) {
       {filtered.length === 0 ? (
         <div className="text-center py-16 text-slate-400">
           <AlertTriangle className="w-12 h-12 mx-auto mb-3 opacity-30" />
-          <p className="text-sm font-medium">Nenhuma NC/CAPA encontrada</p>
-          <p className="text-xs mt-1">Registre a primeira não conformidade usando o botão acima.</p>
+          <p className="text-sm font-medium">Nenhuma não conformidade encontrada</p>
+          <p className="text-xs mt-1">Registre a primeira NC usando o botão acima.</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -519,14 +1048,24 @@ export function NCCAPAScreen({ items, onSave, onDelete }: NCCAPAScreenProps) {
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${severityStyle(nc.severity)}`}>
                         {nc.severity}
                       </span>
-                      {nc.source && (
-                        <span className="text-[11px] text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">{nc.source}</span>
+                      {/* Item flags */}
+                      {nc.itemQualidade && <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-medium">Q</span>}
+                      {nc.itemAmbiental && <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-medium">A</span>}
+                      {nc.itemSSO      && <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">SSO</span>}
+                      {nc.effectiveness && (
+                        <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${
+                          nc.effectiveness === 'Eficaz'
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : 'bg-red-100 text-red-700'
+                        }`}>
+                          {nc.effectiveness}
+                        </span>
                       )}
                     </div>
                     <p className="text-sm font-semibold text-slate-800 leading-snug">{nc.title}</p>
                     <div className="flex items-center gap-3 mt-1.5 text-xs text-slate-500">
                       {nc.detectedDate && (
-                        <span>Detectada: {new Date(nc.detectedDate).toLocaleDateString('pt-BR')}</span>
+                        <span>Detectada: {new Date(nc.detectedDate + 'T00:00:00').toLocaleDateString('pt-BR')}</span>
                       )}
                       {nc.responsible && <span>Resp: {nc.responsible}</span>}
                       {nc.sector && <span>{nc.sector}</span>}
@@ -568,28 +1107,34 @@ export function NCCAPAScreen({ items, onSave, onDelete }: NCCAPAScreenProps) {
                         <p className="text-slate-700 text-sm">{nc.description}</p>
                       </div>
                     )}
-                    {nc.rootCause && (
+                    {nc.origin && (
                       <div>
-                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Causa Raiz</p>
-                        <p className="text-slate-700">{nc.rootCause}</p>
+                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Origem</p>
+                        <p className="text-slate-700">{nc.origin}</p>
                       </div>
                     )}
                     {nc.immediateAction && (
                       <div>
-                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Ação Imediata</p>
+                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Ação de Correção Imediata</p>
                         <p className="text-slate-700">{nc.immediateAction}</p>
+                      </div>
+                    )}
+                    {nc.rootCause && (
+                      <div>
+                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Investigação da Causa</p>
+                        <p className="text-slate-700">{nc.rootCause}</p>
                       </div>
                     )}
                     {nc.correctiveAction && (
                       <div>
-                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Ação Corretiva (CAPA)</p>
+                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Ação Corretiva</p>
                         <p className="text-slate-700">{nc.correctiveAction}</p>
                       </div>
                     )}
-                    {nc.preventiveAction && (
-                      <div>
-                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Ação Preventiva</p>
-                        <p className="text-slate-700">{nc.preventiveAction}</p>
+                    {nc.rootCauseIdentified && (
+                      <div className="md:col-span-2">
+                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Causa Raiz Identificada</p>
+                        <p className="text-slate-700">{nc.rootCauseIdentified}</p>
                       </div>
                     )}
                     {nc.effectivenessCheck && (
@@ -619,7 +1164,10 @@ export function NCCAPAScreen({ items, onSave, onDelete }: NCCAPAScreenProps) {
                                   {entry.status}
                                 </span>
                                 <span className="text-[11px] text-slate-400">
-                                  {new Date(entry.changedAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                  {new Date(entry.changedAt).toLocaleString('pt-BR', {
+                                    day: '2-digit', month: '2-digit', year: 'numeric',
+                                    hour: '2-digit', minute: '2-digit',
+                                  })}
                                 </span>
                                 {entry.note && <span className="text-[11px] text-slate-500 italic">{entry.note}</span>}
                               </div>
