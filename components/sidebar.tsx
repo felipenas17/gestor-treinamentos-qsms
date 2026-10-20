@@ -40,6 +40,14 @@ interface SidebarProps {
 
 const MODULES: Module[] = [
   {
+    id: 'visao-geral',
+    label: 'Visão Geral',
+    icon: BarChart3,
+    items: [
+      { id: 'relatorio', label: 'Painel Geral', sublabel: 'Visão Consolidada', icon: BarChart3 },
+    ],
+  },
+  {
     id: 'treinamento',
     label: 'Treinamento',
     icon: GraduationCap,
@@ -67,7 +75,6 @@ const MODULES: Module[] = [
     items: [
       { id: 'conformidade', label: 'Score de Conformidade', sublabel: 'Índice Global do SGI',      icon: ShieldCheck   },
       { id: 'nc-capa',      label: 'NC / CAPA',             sublabel: 'Não Conformidades & Ações', icon: AlertTriangle },
-      { id: 'relatorio',    label: 'Relatório Gerencial',   sublabel: 'Visão Consolidada',         icon: BarChart3     },
     ],
   },
 ];
