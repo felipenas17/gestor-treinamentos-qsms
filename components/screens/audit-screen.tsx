@@ -182,7 +182,7 @@ export function AuditScreen(_props: AuditScreenProps) {
       // Só aplica se item ainda não foi avaliado
       if (!current?.avaliacao) {
         const evidText = res.evidencias.length
-          ? res.evidencias.slice(0, 3).join(' | ')
+          ? res.evidencias.join(' | ')
           : 'Sem evidências encontradas no sistema.';
         patch[id] = {
           avaliacao: res.sugestao,
@@ -199,7 +199,7 @@ export function AuditScreen(_props: AuditScreenProps) {
     if (!diagnostic?.[id]) return;
     const res = diagnostic[id];
     const evidText = res.evidencias.length
-      ? res.evidencias.slice(0, 3).join(' | ')
+      ? res.evidencias.join(' | ')
       : 'Sem evidências encontradas no sistema.';
     setState(id, {
       avaliacao: res.sugestao,

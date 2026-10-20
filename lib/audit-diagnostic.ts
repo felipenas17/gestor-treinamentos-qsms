@@ -229,8 +229,8 @@ export function buildDiagnostic(data: SystemData): DiagnosticMap {
 
   // Q3 – 4.4 Mapa de processos / fluxogramas
   {
-    const docs = findDocs(docControl, ['mapa de processo', 'fluxograma', 'macrofluxo', 'processo']);
-    const procs = findProcs(procedures, ['mapa de processo', 'fluxograma', 'processo']);
+    const docs = findDocs(docControl, ['mapa de processo', 'fluxograma', 'macrofluxo', 'bpmn', 'processo-chave', 'processo chave', 'turtle', 'tartaruga de processo']);
+    const procs = findProcs(procedures, ['mapa de processo', 'fluxograma', 'macrofluxo', 'bpmn', 'processo-chave']);
     const all = [...docs.map(descDoc), ...procs.map(descProc)];
     set('Q3', all.length >= 3 ? 'OK' : all.length > 0 ? 'OM' : 'NC', all);
   }
@@ -275,14 +275,14 @@ export function buildDiagnostic(data: SystemData): DiagnosticMap {
   // Q8 – 7.5 Informação documentada (procedimentos ativos)
   {
     const ativos = procedures.filter(p => p.status === 'Ativo');
-    const docTypes = findDocs(docControl, ['procedimento', 'instrução', 'pop', 'registro', 'formulário']);
+    const docTypes = findDocs(docControl, ['procedimento', 'instrução', 'pop', 'registro', 'formulário', 'lista mestre', 'listagem de documentos']);
     const all = [
-      ...ativos.slice(0, 10).map(descProc),
-      ...docTypes.slice(0, 5).map(descDoc),
+      ...ativos.map(descProc),
+      ...docTypes.map(descDoc),
     ];
     set('Q8',
       ativos.length >= 5 ? 'OK' : ativos.length > 0 ? 'OM' : 'NC',
-      all.length ? all : ativos.length > 0 ? [`${ativos.length} procedimentos ativos cadastrados`] : []
+      all.length ? all : []
     );
   }
 
@@ -301,12 +301,9 @@ export function buildDiagnostic(data: SystemData): DiagnosticMap {
         (p.doc_type || '').toLowerCase().includes(t.toLowerCase())
       )
     );
-    const msg = ativos.length > 0
-      ? [`${ativos.length} POPs/procedimentos operacionais ativos`]
-      : [];
     set('Q10',
       ativos.length >= 5 ? 'OK' : ativos.length > 0 ? 'OM' : 'NC',
-      msg
+      ativos.map(descProc)
     );
   }
 
@@ -333,11 +330,11 @@ export function buildDiagnostic(data: SystemData): DiagnosticMap {
       nc.type?.toLowerCase().includes(t.toLowerCase())
     ));
     const withCapa = ncs.filter(nc => nc.corrective_action);
-    const all = ncs.slice(0, 5).map(nc => `NC ${nc.title} [${nc.status}]`);
+    const all = ncs.map(nc => `NC ${nc.title} [${nc.status}]`);
     const docs = findDocs(docControl, ['não conformidade', 'produto não conforme', 'devolução']);
     set('Q13',
       docs.length > 0 || withCapa.length > 0 ? 'OK' : ncs.length > 0 ? 'OM' : 'NC',
-      [...all, ...docs.slice(0, 3).map(descDoc)]
+      [...all, ...docs.map(descDoc)]
     );
   }
 
@@ -363,12 +360,12 @@ export function buildDiagnostic(data: SystemData): DiagnosticMap {
     const open = nonConformities.filter(nc => nc.status !== 'Fechada' && nc.status !== 'Encerrada');
     const withCapa = nonConformities.filter(nc => nc.corrective_action && nc.root_cause);
     const total = nonConformities.length;
-    const msg = total > 0
-      ? [`${total} NCs registradas | ${withCapa.length} com CAPA | ${open.length} em aberto`]
-      : [];
+    const evids = nonConformities.map(nc =>
+      `${nc.title} [${nc.type || ''}] – ${nc.status}${nc.corrective_action ? ' (CAPA)' : ''}`
+    );
     set('Q16',
       total > 0 && withCapa.length > 0 ? (open.length <= 3 ? 'OK' : 'OM') : total > 0 ? 'OM' : 'NC',
-      msg
+      evids
     );
   }
 
@@ -407,12 +404,9 @@ export function buildDiagnostic(data: SystemData): DiagnosticMap {
     const vencidas = legalObligations.filter(o =>
       o.next_due_date && parseDate(o.next_due_date)! < today
     );
-    const msg = total > 0
-      ? [`${total} obrigações legais | ${cumpridas.length} cumpridas | ${vencidas.length} vencidas`]
-      : [];
     set('Q20',
       total >= 5 ? (vencidas.length === 0 ? 'OK' : 'OM') : total > 0 ? 'OM' : 'NC',
-      msg
+      legalObligations.map(descOb)
     );
   }
 
@@ -439,7 +433,7 @@ export function buildDiagnostic(data: SystemData): DiagnosticMap {
     const docs = findDocs(docControl, ['dds', 'diálogo diário', 'integração', 'comunicação de risco', 'nr-01']);
     const procs = findProcs(procedures, ['dds', 'diálogo diário', 'integração', 'nr-01']);
     const certs = findCerts(normativeCerts, ['nr-01', 'nr01', 'integração', 'indução']);
-    const all = [...docs.map(descDoc), ...procs.map(descProc), ...certs.slice(0, 5).map(descCert)];
+    const all = [...docs.map(descDoc), ...procs.map(descProc), ...certs.map(descCert)];
     set('S3', all.length > 0 ? 'OK' : 'NC', all);
   }
 
@@ -487,12 +481,14 @@ export function buildDiagnostic(data: SystemData): DiagnosticMap {
     set('S8', all.length > 0 ? 'OK' : 'NC', all);
   }
 
-  // S9 – NR-23/ABNT NBR 12693 Combate a incêndio / extintores
+  // S9 – NR-23/ABNT NBR 12693 Combate a incêndio / extintores (foco em inspeção de equipamentos)
   {
-    const docs = findDocs(docControl, ['extintor', 'incêndio', 'combate a incêndio', 'ppci', 'brigada', 'nr-23', 'nbr 12693']);
-    const obs = findObligations(legalObligations, ['extintor', 'incêndio', 'brigada', 'nr-23', 'ppci']);
-    const certs = findCerts(normativeCerts, ['brigada', 'incêndio', 'nr-23', 'combate a incêndio']);
-    const all = [...docs.map(descDoc), ...obs.map(descOb), ...certs.slice(0, 5).map(descCert)];
+    // Evidências primárias: documentos de inspeção/manutenção de extintores e hidrantes
+    const docs = findDocs(docControl, ['extintor', 'combate a incêndio', 'ppci', 'hidrante', 'inspeção de extintor', 'manutenção de extintor', 'nr-23', 'nbr 12693', 'nbr12693', 'carga de extintor', 'plano de combate']);
+    const obs = findObligations(legalObligations, ['extintor', 'combate a incêndio', 'nr-23', 'ppci', 'hidrante', 'inspeção de equipamento de incêndio']);
+    // Evidências complementares: treinamento de brigada (mostra que há brigada constituída)
+    const certs = findCerts(normativeCerts, ['brigada de incêndio', 'nr-23', 'combate a incêndio']);
+    const all = [...docs.map(descDoc), ...obs.map(descOb), ...certs.map(c => `Brigada: ${descCert(c)}`)];
     set('S9', all.length > 0 ? scoreDoc(docs) : 'NC', all);
   }
 
@@ -502,7 +498,7 @@ export function buildDiagnostic(data: SystemData): DiagnosticMap {
                  'elétrica', 'eletrica', 'espaço confinado', 'trabalho em altura', 'caldeiraria'];
     const certs = findCerts(normativeCerts, kws);
     const procs = findProcs(procedures, kws);
-    const all = [...certs.slice(0, 10).map(descCert), ...procs.map(descProc)];
+    const all = [...certs.map(descCert), ...procs.map(descProc)];
     const validos = certs.filter(c => c.status === 'Certificado');
     set('S10',
       validos.length > 0 ? (validos.length >= 5 ? 'OK' : 'OM') : certs.length > 0 ? 'OM' : 'NC',
@@ -515,7 +511,7 @@ export function buildDiagnostic(data: SystemData): DiagnosticMap {
     const docs = findDocs(docControl, ['cipa', 'nr-05', 'nr05', 'cipeiro', 'comissão interna']);
     const certs = findCerts(normativeCerts, ['cipa', 'nr-05', 'nr05']);
     const obs = findObligations(legalObligations, ['cipa', 'nr-05', 'cipeiro']);
-    const all = [...docs.map(descDoc), ...certs.slice(0, 5).map(descCert), ...obs.map(descOb)];
+    const all = [...docs.map(descDoc), ...certs.map(descCert), ...obs.map(descOb)];
     set('S11', all.length > 0 ? 'OK' : 'NC', all);
   }
 
@@ -546,7 +542,7 @@ export function buildDiagnostic(data: SystemData): DiagnosticMap {
     const docs = findDocs(docControl, ['investigação de acidente', 'investigação de incidente', 'rai', 'rii', 'acidente']);
     const procs = findProcs(procedures, ['investigação de acidente', 'incidente', 'acidente']);
     const all = [
-      ...ncs.slice(0, 5).map(nc => `NC: ${nc.title} [${nc.status}]`),
+      ...ncs.map(nc => `NC: ${nc.title} [${nc.status}]`),
       ...docs.map(descDoc),
       ...procs.map(descProc),
     ];
@@ -566,7 +562,7 @@ export function buildDiagnostic(data: SystemData): DiagnosticMap {
     const docs = findDocs(docControl, ['nr-12', 'nr12', 'máquina', 'maquina', 'equipamento', 'inventário de máquinas', 'proteção de máquina']);
     const certs = findCerts(normativeCerts, ['nr-12', 'nr12', 'máquina', 'maquina']);
     const obs = findObligations(legalObligations, ['nr-12', 'máquina', 'equipamento']);
-    const all = [...docs.map(descDoc), ...certs.slice(0, 5).map(descCert), ...obs.map(descOb)];
+    const all = [...docs.map(descDoc), ...certs.map(descCert), ...obs.map(descOb)];
     set('S16', all.length > 0 ? scoreDoc(docs) : 'NC', all);
   }
 
@@ -576,7 +572,7 @@ export function buildDiagnostic(data: SystemData): DiagnosticMap {
     const certs = findCerts(normativeCerts, ['nr-33', 'nr33', 'espaço confinado', 'espaco confinado']);
     const obs = findObligations(legalObligations, ['nr-33', 'espaço confinado']);
     const procs = findProcs(procedures, ['nr-33', 'espaço confinado', 'espaco confinado']);
-    const all = [...docs.map(descDoc), ...certs.slice(0, 8).map(descCert), ...obs.map(descOb), ...procs.map(descProc)];
+    const all = [...docs.map(descDoc), ...certs.map(descCert), ...obs.map(descOb), ...procs.map(descProc)];
     set('S17', all.length > 0 ? scoreCerts(certs) !== 'NC' ? scoreCerts(certs) : scoreDoc(docs) : 'NC', all);
   }
 
@@ -586,7 +582,7 @@ export function buildDiagnostic(data: SystemData): DiagnosticMap {
     const certs = findCerts(normativeCerts, ['nr-35', 'nr35', 'trabalho em altura', 'altura']);
     const obs = findObligations(legalObligations, ['nr-35', 'trabalho em altura']);
     const procs = findProcs(procedures, ['nr-35', 'trabalho em altura', 'altura']);
-    const all = [...docs.map(descDoc), ...certs.slice(0, 8).map(descCert), ...obs.map(descOb), ...procs.map(descProc)];
+    const all = [...docs.map(descDoc), ...certs.map(descCert), ...obs.map(descOb), ...procs.map(descProc)];
     set('S18', all.length > 0 ? scoreCerts(certs) !== 'NC' ? scoreCerts(certs) : scoreDoc(docs) : 'NC', all);
   }
 
@@ -662,7 +658,7 @@ export function buildDiagnostic(data: SystemData): DiagnosticMap {
     const docs = findDocs(docControl, ['inflamável', 'inflamavel', 'combustível', 'combustivel', 'nr-20', 'nr20', 'nbr 17505', 'armazenamento de líquido', 'tanque']);
     const certs = findCerts(normativeCerts, ['nr-20', 'nr20', 'inflamável', 'combustível', 'tanque']);
     const obs = findObligations(legalObligations, ['nr-20', 'inflamável', 'combustível', 'tanque', 'nbr 17505']);
-    const all = [...docs.map(descDoc), ...certs.slice(0, 5).map(descCert), ...obs.map(descOb)];
+    const all = [...docs.map(descDoc), ...certs.map(descCert), ...obs.map(descOb)];
     set('A9', all.length > 0 ? scoreDoc(docs) : 'NC', all);
   }
 
