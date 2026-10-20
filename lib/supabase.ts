@@ -991,6 +991,89 @@ export async function deleteNonConformity(id: string): Promise<boolean> {
   return true;
 }
 
+// ─── ROI — Registro de Ocorrência Interna ────────────────────────────────────
+
+export interface ROIRow {
+  id: string;
+  registration_number: number | null;
+  serial_number: string | null;
+  equipment_desc: string | null;
+  recorded_date: string;
+  site: string | null;
+  local: string | null;
+  tema: string | null;
+  subtema: string | null;
+  setor_responsavel: string | null;
+  tipo_processo: boolean;
+  tipo_vazamento: boolean;
+  tipo_revestimento: boolean;
+  tipo_etiquetas: boolean;
+  tipo_dano_avaria: boolean;
+  tipo_placas: boolean;
+  descricao: string | null;
+  created_at: string;
+}
+
+export async function fetchROIRecords(): Promise<ROIRow[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from('roi_records')
+    .select('*')
+    .order('recorded_date', { ascending: false });
+  if (error) { console.error('fetchROIRecords:', error); return []; }
+  return (data ?? []) as ROIRow[];
+}
+
+export async function saveROIRecord(
+  payload: Omit<ROIRow, 'id' | 'created_at'>
+): Promise<string | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from('roi_records')
+    .insert(payload)
+    .select('id')
+    .single();
+  if (error) { console.error('saveROIRecord:', error); return null; }
+  return data?.id ?? null;
+}
+
+export async function updateROIRecord(
+  id: string,
+  patch: Partial<Omit<ROIRow, 'id' | 'created_at'>>
+): Promise<boolean> {
+  if (!supabase) return false;
+  const { error } = await supabase
+    .from('roi_records')
+    .update(patch)
+    .eq('id', id);
+  if (error) { console.error('updateROIRecord:', error); return false; }
+  return true;
+}
+
+export async function deleteROIRecord(id: string): Promise<boolean> {
+  if (!supabase) return false;
+  const { error } = await supabase.from('roi_records').delete().eq('id', id);
+  if (error) { console.error('deleteROIRecord:', error); return false; }
+  return true;
+}
+
+// Busca equipamentos pelo número de série (autocomplete)
+export async function searchEquipmentBySerial(
+  query: string,
+  limit = 8
+): Promise<Array<{ serial_number: string; description: string }>> {
+  if (!supabase || !query.trim()) return [];
+  const { data, error } = await supabase
+    .from('equipment')
+    .select('serial_number, description')
+    .ilike('serial_number', `%${query}%`)
+    .limit(limit);
+  if (error) { console.error('searchEquipmentBySerial:', error); return []; }
+  return (data ?? []) as Array<{ serial_number: string; description: string }>;
+}
+
+// ─── Fim ROI ──────────────────────────────────────────────────────────────────
+
 export async function addDocControlRenewal(data: {
   docControlId: string;
   eventDate: string;

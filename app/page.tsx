@@ -23,6 +23,7 @@ import { CertificatesScreen } from '@/components/screens/certificates-screen';
 import { DocControlScreen } from '@/components/screens/doc-control-screen';
 import { LegalObligationsScreen } from '@/components/screens/legal-obligations-screen';
 import { NCCAPAScreen, type NCFormData } from '@/components/screens/nc-capa-screen';
+import { NCROIScreen } from '@/components/screens/nc-roi-screen';
 import { ComplianceScoreScreen } from '@/components/screens/compliance-score-screen';
 import { ManagementReportScreen } from '@/components/screens/management-report-screen';
 import { AuditScreen } from '@/components/screens/audit-screen';
@@ -1592,11 +1593,7 @@ export default function GestorTreinamentosApp() {
               onDelete={handleDeleteNC}
             />
           )}
-          {currentTab === 'nc-roi' && (
-            <div className="flex items-center justify-center h-full text-slate-400 text-sm">
-              ROI — Registro de Ocorrência Interna (em breve)
-            </div>
-          )}
+          {currentTab === 'nc-roi' && <NCROIScreen />}
           {currentTab === 'nc-dashboard' && (
             <div className="flex items-center justify-center h-full text-slate-400 text-sm">
               Dashboard RNC × ROI (em breve)

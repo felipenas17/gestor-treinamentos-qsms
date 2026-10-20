@@ -301,6 +301,64 @@ export interface NonConformity {
   statusHistory?: NCStatusHistoryEntry[];
 }
 
+// ─── ROI — Registro de Ocorrência Interna ────────────────────────────────────
+
+export type ROISite = 'RDO' | 'MC' | 'CLIENTE';
+
+export type ROILocal =
+  | 'ESTOQUE'
+  | 'TRANSBORDO'
+  | 'CARREGAMENTO'
+  | 'RECEBIMENTO'
+  | 'DESCONTAMINAÇÃO'
+  | 'LOGÍSTICA'
+  | 'N/A';
+
+export type ROITema =
+  | 'VAZAMENTO'
+  | 'PROCESSO'
+  | 'DANO / AVARIA NA ESTRUTURA'
+  | 'REVESTIMENTO'
+  | 'ETIQUETA'
+  | 'PLACAS / VALIDADE';
+
+export type ROISetor =
+  | 'ESTANQUEIDADE'
+  | 'DESCONTAMINAÇÃO'
+  | 'ASS. TÉCNICA'
+  | 'MANUTENÇÃO'
+  | 'PINTURA'
+  | 'TRANSBORDO RDO'
+  | 'INTERTANK'
+  | 'CLARIANT'
+  | 'ESLINGA';
+
+export interface ROIRecord {
+  id: string;
+  registration_number?: number | null;
+  serial_number?: string | null;
+  equipment_desc?: string | null;
+  recorded_date: string;           // YYYY-MM-DD
+  site?: ROISite | null;
+  local?: ROILocal | null;
+  tema?: ROITema | null;
+  subtema?: string | null;
+  setor_responsavel?: ROISetor | null;
+  tipo_processo: boolean;
+  tipo_vazamento: boolean;
+  tipo_revestimento: boolean;
+  tipo_etiquetas: boolean;
+  tipo_dano_avaria: boolean;
+  tipo_placas: boolean;
+  descricao?: string | null;
+  created_at: string;
+}
+
+export interface EquipmentSuggestion {
+  serial_number: string;
+  description: string;
+}
+
 // ─── Score de Conformidade ────────────────────────────────────────────────────
 
 export interface BreakdownItem {
