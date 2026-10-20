@@ -25,6 +25,7 @@ import { LegalObligationsScreen } from '@/components/screens/legal-obligations-s
 import { NCCAPAScreen, type NCFormData } from '@/components/screens/nc-capa-screen';
 import { ComplianceScoreScreen } from '@/components/screens/compliance-score-screen';
 import { ManagementReportScreen } from '@/components/screens/management-report-screen';
+import { AuditScreen } from '@/components/screens/audit-screen';
 // import { ImportDocumentModal } from '@/components/modals/import-document-modal'; // modal não ativo
 
 import {
@@ -1423,6 +1424,15 @@ export default function GestorTreinamentosApp() {
               items={nonConformities}
               onSave={handleSaveNC}
               onDelete={handleDeleteNC}
+            />
+          )}
+          {currentTab === 'auditoria-interna' && (
+            <AuditScreen
+              procedures={procedures}
+              records={records}
+              documents={documents}
+              obligations={obligations}
+              nonConformities={nonConformities}
             />
           )}
           {currentTab === 'relatorio' && (

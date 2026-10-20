@@ -73,8 +73,9 @@ const MODULES: Module[] = [
     label: 'SGI / Conformidade',
     icon: ShieldCheck,
     items: [
-      { id: 'conformidade', label: 'Score de Conformidade', sublabel: 'Índice Global do SGI',      icon: ShieldCheck   },
-      { id: 'nc-capa',      label: 'NC / CAPA',             sublabel: 'Não Conformidades & Ações', icon: AlertTriangle },
+      { id: 'conformidade',     label: 'Score de Conformidade', sublabel: 'Índice Global do SGI',      icon: ShieldCheck   },
+      { id: 'nc-capa',          label: 'NC / CAPA',             sublabel: 'Não Conformidades & Ações', icon: AlertTriangle },
+      { id: 'auditoria-interna', label: 'Auditoria Interna',    sublabel: 'Diagnóstico Automático',    icon: ClipboardCheck },
     ],
   },
 ];
