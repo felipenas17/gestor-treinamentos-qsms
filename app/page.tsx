@@ -243,9 +243,9 @@ export default function GestorTreinamentosApp() {
     const trainScore       = records.length ? (trainCertificado / records.length) * 100 : 0;
 
     // ── Não Conformidades ──────────────────────────────────────────────────────
-    const ncConcluidas      = nonConformities.filter((nc) => nc.status === 'Concluída').length;
-    const ncEmAndamento     = nonConformities.filter((nc) => nc.status === 'Em Andamento').length;
-    const ncEmInvestigacao  = nonConformities.filter((nc) => nc.status === 'Em Investigação').length;
+    const ncConcluidas      = nonConformities.filter((nc) => nc.status === 'Encerrada').length;
+    const ncEmAndamento     = nonConformities.filter((nc) => nc.status === 'Em tratamento').length;
+    const ncEmInvestigacao  = nonConformities.filter((nc) => nc.status === 'Aguardando verificação').length;
     const ncAbertas         = nonConformities.filter((nc) => nc.status === 'Aberta').length;
     const ncScore           = nonConformities.length ? (ncConcluidas / nonConformities.length) * 100 : 0;
 
@@ -290,7 +290,7 @@ export default function GestorTreinamentosApp() {
     });
 
     nonConformities.forEach((nc) => {
-      if (nc.status !== 'Concluída' && nc.deadline) {
+      if (nc.status !== 'Encerrada' && nc.deadline) {
         const days = Math.floor((new Date(nc.deadline).getTime() - now.getTime()) / 86400000);
         if (days <= 30) {
           alerts.push({
@@ -336,9 +336,9 @@ export default function GestorTreinamentosApp() {
       {
         module: 'Não Conformidades', compliant: ncConcluidas, total: nonConformities.length, score: ncScore,
         breakdown: [
-          { label: 'Concluída', count: ncConcluidas, variant: 'green' },
-          { label: 'Em Andamento', count: ncEmAndamento, variant: 'yellow' },
-          { label: 'Em Investigação', count: ncEmInvestigacao, variant: 'yellow' },
+          { label: 'Encerrada', count: ncConcluidas, variant: 'green' },
+          { label: 'Em tratamento', count: ncEmAndamento, variant: 'yellow' },
+          { label: 'Aguardando verificação', count: ncEmInvestigacao, variant: 'yellow' },
           { label: 'Aberta', count: ncAbertas, variant: 'red' },
         ],
       },
@@ -1179,7 +1179,7 @@ export default function GestorTreinamentosApp() {
         qsms_responsible: data.qsmsResponsible || null,
         preventive_action: data.preventiveAction || null,
         effectiveness_check: data.effectivenessCheck || null,
-        closed_date: data.status === 'Concluída' ? now.split('T')[0] : null,
+        closed_date: data.status === 'Encerrada' ? now.split('T')[0] : null,
         notes: data.notes || null,
         status_history: newHistory,
         client: data.client || null,
@@ -1206,7 +1206,7 @@ export default function GestorTreinamentosApp() {
                 effectiveness: data.effectiveness !== '' ? data.effectiveness : null,
                 detectedDate: data.detectedDate,
                 deadline: data.deadline || null,
-                closedDate: data.status === 'Concluída' ? now.split('T')[0] : nc.closedDate,
+                closedDate: data.status === 'Encerrada' ? now.split('T')[0] : nc.closedDate,
                 statusHistory: newHistory,
               }
             : nc,
@@ -1265,7 +1265,7 @@ export default function GestorTreinamentosApp() {
         qsms_responsible: data.qsmsResponsible || null,
         preventive_action: data.preventiveAction || null,
         effectiveness_check: data.effectivenessCheck || null,
-        closed_date: data.status === 'Concluída' ? now.split('T')[0] : null,
+        closed_date: data.status === 'Encerrada' ? now.split('T')[0] : null,
         notes: data.notes || null,
         status_history: initialHistory,
         client: data.client || null,
@@ -1334,7 +1334,7 @@ export default function GestorTreinamentosApp() {
         qsmsResponsible: data.qsmsResponsible || null,
         preventiveAction: data.preventiveAction || null,
         effectivenessCheck: data.effectivenessCheck || null,
-        closedDate: data.status === 'Concluída' ? now.split('T')[0] : null,
+        closedDate: data.status === 'Encerrada' ? now.split('T')[0] : null,
         notes: data.notes || null,
         createdAt: now,
         statusHistory: initialHistory,

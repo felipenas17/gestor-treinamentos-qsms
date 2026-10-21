@@ -132,9 +132,9 @@ export function ManagementReportScreen({
   // ─── NC stats ────────────────────────────────────────────────────────────────
   const ncStats = useMemo(() => {
     const abertas = nonConformities.filter((n) => n.status === 'Aberta').length;
-    const emAndamento = nonConformities.filter((n) => n.status === 'Em Andamento' || n.status === 'Em Investigação').length;
-    const concluidas = nonConformities.filter((n) => n.status === 'Concluída').length;
-    const criticas = nonConformities.filter((n) => n.severity === 'Crítica' && n.status !== 'Concluída').length;
+    const emAndamento = nonConformities.filter((n) => n.status === 'Em tratamento' || n.status === 'Aguardando verificação').length;
+    const concluidas = nonConformities.filter((n) => n.status === 'Encerrada').length;
+    const criticas = nonConformities.filter((n) => n.severity === 'Crítica' && n.status !== 'Encerrada').length;
     const total = nonConformities.length;
     return { abertas, emAndamento, concluidas, criticas, total };
   }, [nonConformities]);

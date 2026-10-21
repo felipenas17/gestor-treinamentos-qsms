@@ -19,7 +19,7 @@ const NC_SOURCES: NCSource[] = [
   'Auditoria Interna', 'Auditoria Externa', 'Inspeção',
   'Reclamação', 'Análise Crítica', 'Outro',
 ];
-const NC_STATUSES: NCStatus[] = ['Aberta', 'Em Investigação', 'Em Andamento', 'Concluída'];
+const NC_STATUSES: NCStatus[] = ['Aberta', 'Em tratamento', 'Aguardando verificação', 'Encerrada'];
 
 const NC_ORIGINS = [
   'NC de processo',
@@ -34,21 +34,21 @@ const NC_ORIGINS = [
 
 function statusStyle(status: NCStatus) {
   switch (status) {
-    case 'Aberta':          return 'bg-red-100 text-red-800 border-red-200';
-    case 'Em Investigação': return 'bg-amber-100 text-amber-800 border-amber-200';
-    case 'Em Andamento':    return 'bg-blue-100 text-blue-800 border-blue-200';
-    case 'Concluída':       return 'bg-emerald-100 text-emerald-800 border-emerald-200';
-    default:                return 'bg-slate-100 text-slate-700 border-slate-200';
+    case 'Aberta':                 return 'bg-red-100 text-red-800 border-red-200';
+    case 'Em tratamento':          return 'bg-amber-100 text-amber-800 border-amber-200';
+    case 'Aguardando verificação': return 'bg-blue-100 text-blue-800 border-blue-200';
+    case 'Encerrada':              return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+    default:                       return 'bg-slate-100 text-slate-700 border-slate-200';
   }
 }
 
 function statusIcon(status: NCStatus) {
   switch (status) {
-    case 'Aberta':          return <XCircle className="w-3 h-3" />;
-    case 'Em Investigação': return <AlertTriangle className="w-3 h-3" />;
-    case 'Em Andamento':    return <Clock className="w-3 h-3" />;
-    case 'Concluída':       return <CheckCircle2 className="w-3 h-3" />;
-    default:                return null;
+    case 'Aberta':                 return <XCircle className="w-3 h-3" />;
+    case 'Em tratamento':          return <Clock className="w-3 h-3" />;
+    case 'Aguardando verificação': return <AlertTriangle className="w-3 h-3" />;
+    case 'Encerrada':              return <CheckCircle2 className="w-3 h-3" />;
+    default:                       return null;
   }
 }
 
@@ -1053,37 +1053,72 @@ interface NCCAPAScreenProps {
 }
 
 export function NCCAPAScreen({ items, onSave, onDelete }: NCCAPAScreenProps) {
-  const [search, setSearch] = useState('');
+  type MainTab = 'todos' | 'clariant';
+  const [activeTab, setActiveTab]       = useState<MainTab>('todos');
+  const [search, setSearch]             = useState('');
   const [filterStatus, setFilterStatus] = useState<NCStatus | 'Todos'>('Todos');
-  const [filterSeverity, setFilterSeverity] = useState<NCSeverity | 'Todos'>('Todos');
-  const [filterType, setFilterType] = useState<NCType | 'Todos'>('Todos');
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editItem, setEditItem] = useState<NonConformity | null>(null);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [filterPrazo, setFilterPrazo]   = useState<'Todos' | 'No Prazo' | 'Fora do Prazo'>('Todos');
+  const [filterCliente, setFilterCliente] = useState('Todos');
+  const [isModalOpen, setIsModalOpen]   = useState(false);
+  const [editItem, setEditItem]         = useState<NonConformity | null>(null);
+  const [deletingId, setDeletingId]     = useState<string | null>(null);
 
-  // ─── Summary stats ────────────────────────────────────────────────────────
-  const stats = useMemo(() => ({
-    total:           items.length,
-    abertas:         items.filter((i) => i.status === 'Aberta').length,
-    em_investigacao: items.filter((i) => i.status === 'Em Investigação').length,
-    em_andamento:    items.filter((i) => i.status === 'Em Andamento').length,
-    concluidas:      items.filter((i) => i.status === 'Concluída').length,
-    criticas:        items.filter((i) => i.severity === 'Crítica' && i.status !== 'Concluída').length,
-  }), [items]);
+  // ─── Stats ────────────────────────────────────────────────────────────────
+  const stats = useMemo(() => {
+    const ativas    = items.filter((i) => i.status !== 'Encerrada');
+    const foraD1    = ativas.filter((i) => i.statusD1 === 'Fora do Prazo').length;
+    const foraD7    = ativas.filter((i) => i.statusD7 === 'Fora do Prazo').length;
+    const foraDoPrazo = ativas.filter(
+      (i) => i.statusD1 === 'Fora do Prazo' || i.statusD7 === 'Fora do Prazo'
+    ).length;
+    const noPrazo   = ativas.length - foraDoPrazo;
+    const pct       = ativas.length > 0 ? Math.round((noPrazo / ativas.length) * 100) : 0;
+    return {
+      totalAbertas: ativas.length,
+      foraDoPrazo, foraD1, foraD7,
+      noPrazo, pct,
+      concluidas: items.filter((i) => i.status === 'Encerrada').length,
+      criticas:   ativas.filter((i) => i.severity === 'Crítica').length,
+    };
+  }, [items]);
 
-  // ─── Filtered list ────────────────────────────────────────────────────────
-  const filtered = useMemo(() => {
-    const q = search.toLowerCase();
-    return items.filter((item) => {
-      if (filterStatus !== 'Todos' && item.status !== filterStatus) return false;
-      if (filterSeverity !== 'Todos' && item.severity !== filterSeverity) return false;
-      if (filterType !== 'Todos' && item.type !== filterType) return false;
-      if (q && !item.title.toLowerCase().includes(q) && !item.code.toLowerCase().includes(q)) return false;
-      return true;
-    });
-  }, [items, search, filterStatus, filterSeverity, filterType]);
+  // ─── Clariant subsets ─────────────────────────────────────────────────────
+  const clariantItems  = useMemo(() => items.filter((i) => i.client === 'Clariant'), [items]);
+  const clariantAtivas = useMemo(() => clariantItems.filter((i) => i.status !== 'Encerrada'), [clariantItems]);
 
+  const endCustomers = useMemo(() => {
+    const s = new Set(clariantItems.map((i) => i.endCustomer).filter(Boolean) as string[]);
+    return Array.from(s);
+  }, [clariantItems]);
+
+  const clariantClientesSummary = useMemo(
+    () => endCustomers.slice(0, 4).join(', '),
+    [endCustomers]
+  );
+
+  // ─── Filtered lists ───────────────────────────────────────────────────────
+  const q = search.toLowerCase();
+
+  const filteredAll = useMemo(() => items.filter((item) => {
+    if (filterStatus !== 'Todos' && item.status !== filterStatus) return false;
+    if (filterPrazo === 'No Prazo' && item.statusD1 !== 'No Prazo') return false;
+    if (filterPrazo === 'Fora do Prazo' && item.statusD1 !== 'Fora do Prazo' && item.statusD7 !== 'Fora do Prazo') return false;
+    if (q && !item.title.toLowerCase().includes(q) && !item.code.toLowerCase().includes(q) && !(item.client ?? '').toLowerCase().includes(q)) return false;
+    return true;
+  }), [items, filterStatus, filterPrazo, q]);
+
+  const filteredClariant = useMemo(() => clariantItems.filter((item) => {
+    if (filterCliente !== 'Todos' && item.endCustomer !== filterCliente) return false;
+    if (filterPrazo === 'No Prazo' && item.statusD1 !== 'No Prazo') return false;
+    if (filterPrazo === 'Fora do Prazo' && item.statusD1 !== 'Fora do Prazo' && item.statusD7 !== 'Fora do Prazo') return false;
+    if (q && !item.title.toLowerCase().includes(q)
+          && !(item.qnsNumber ?? '').toLowerCase().includes(q)
+          && !(item.chemicalProduct ?? '').toLowerCase().includes(q)
+          && !(item.originLocation ?? '').toLowerCase().includes(q)) return false;
+    return true;
+  }), [clariantItems, filterCliente, filterPrazo, q]);
+
+  // ─── Handlers ─────────────────────────────────────────────────────────────
   const handleSave = async (data: NCFormData) => {
     await onSave(data, editItem?.id);
     setIsModalOpen(false);
@@ -1096,24 +1131,38 @@ export function NCCAPAScreen({ items, onSave, onDelete }: NCCAPAScreenProps) {
     setDeletingId(null);
   };
 
-  // ─── Deadline urgency ─────────────────────────────────────────────────────
-  const nowMs = useMemo(() => new Date().setHours(0, 0, 0, 0), []);
-  const getDeadlineUrgency = useCallback((nc: NonConformity) => {
-    if (!nc.deadline || nc.status === 'Concluída') return null;
-    const diff = Math.ceil((new Date(nc.deadline).getTime() - nowMs) / 86400000);
-    if (diff < 0) return { label: `${Math.abs(diff)}d vencido`, cls: 'text-red-600 font-semibold' };
-    if (diff <= 7) return { label: `${diff}d restantes`, cls: 'text-amber-600 font-semibold' };
-    return { label: `${diff}d restantes`, cls: 'text-slate-500' };
-  }, [nowMs]);
+  // ─── Helpers ──────────────────────────────────────────────────────────────
+  function dBadge(status: string | undefined | null) {
+    if (!status || status === 'Pendente') return <span className="text-slate-300 text-xs">—</span>;
+    const ok = status === 'No Prazo';
+    return (
+      <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+        ok ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
+      }`}>
+        {ok ? 'OK' : 'Fora'}
+      </span>
+    );
+  }
 
+  function rowNum(idx: number) {
+    return `#${String(idx + 1).padStart(3, '0')}`;
+  }
+
+  function fmtDate(d: string | undefined | null) {
+    if (!d) return '—';
+    return new Date(d + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+  }
+
+  // ─── Render ───────────────────────────────────────────────────────────────
   return (
     <div className="p-6 space-y-5">
-      {/* Header */}
+
+      {/* ── Header ── */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
             <AlertTriangle className="w-5 h-5 text-amber-500" />
-            Não Conformidade
+            Não Conformidade · CAPA
           </h1>
           <p className="text-sm text-slate-500 mt-0.5">
             Registro, Investigação & Ações Corretivas (FOR-TR-SMS-006)
@@ -1124,26 +1173,35 @@ export function NCCAPAScreen({ items, onSave, onDelete }: NCCAPAScreenProps) {
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
         >
           <Plus className="w-4 h-4" />
-          Nova NC
+          Nova RNC
         </button>
       </div>
 
-      {/* Stats cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-        {[
-          { label: 'Total',           value: stats.total,           cls: 'text-slate-700',   bg: 'bg-slate-50' },
-          { label: 'Abertas',         value: stats.abertas,         cls: 'text-red-700',     bg: 'bg-red-50' },
-          { label: 'Em Investigação', value: stats.em_investigacao, cls: 'text-amber-700',   bg: 'bg-amber-50' },
-          { label: 'Em Andamento',    value: stats.em_andamento,    cls: 'text-blue-700',    bg: 'bg-blue-50' },
-          { label: 'Concluídas',      value: stats.concluidas,      cls: 'text-emerald-700', bg: 'bg-emerald-50' },
-        ].map((s) => (
-          <div key={s.label} className={`${s.bg} rounded-xl p-4 border border-slate-100`}>
-            <p className="text-xs text-slate-500 mb-1">{s.label}</p>
-            <p className={`text-2xl font-bold ${s.cls}`}>{s.value}</p>
-          </div>
-        ))}
+      {/* ── KPI Cards ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
+          <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1">Total Abertas</p>
+          <p className="text-3xl font-bold text-slate-800">{stats.totalAbertas}</p>
+          <p className="text-xs text-slate-400 mt-1">em andamento</p>
+        </div>
+        <div className="bg-red-50 rounded-xl p-4 border border-red-200">
+          <p className="text-[11px] font-semibold text-red-500 uppercase tracking-wide mb-1">Fora do Prazo</p>
+          <p className="text-3xl font-bold text-red-700">{stats.foraDoPrazo}</p>
+          <p className="text-xs text-red-400 mt-1">D1: {stats.foraD1} · D7: {stats.foraD7}</p>
+        </div>
+        <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-200">
+          <p className="text-[11px] font-semibold text-emerald-500 uppercase tracking-wide mb-1">No Prazo</p>
+          <p className="text-3xl font-bold text-emerald-700">{stats.noPrazo}</p>
+          <p className="text-xs text-emerald-400 mt-1">{stats.pct}% dentro do prazo</p>
+        </div>
+        <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
+          <p className="text-[11px] font-semibold text-blue-500 uppercase tracking-wide mb-1">Concluídas</p>
+          <p className="text-3xl font-bold text-blue-700">{stats.concluidas}</p>
+          <p className="text-xs text-blue-400 mt-1">Jan–Out 2026</p>
+        </div>
       </div>
 
+      {/* ── Alert críticas ── */}
       {stats.criticas > 0 && (
         <div className="flex items-center gap-2.5 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
           <AlertOctagon className="w-4 h-4 shrink-0" />
@@ -1153,207 +1211,265 @@ export function NCCAPAScreen({ items, onSave, onDelete }: NCCAPAScreenProps) {
         </div>
       )}
 
-      {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 min-w-48">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-          <input
-            className="w-full text-sm border border-slate-200 rounded-lg pl-9 pr-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-all"
-            placeholder="Buscar por título ou código..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-        <div className="flex flex-wrap items-center gap-1.5">
-          <Filter className="w-3.5 h-3.5 text-slate-400" />
-          <select
-            className="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition-all"
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value as any)}
-          >
-            <option value="Todos">Todos os status</option>
-            {NC_STATUSES.map((s) => <option key={s}>{s}</option>)}
-          </select>
-          <select
-            className="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition-all"
-            value={filterSeverity}
-            onChange={(e) => setFilterSeverity(e.target.value as any)}
-          >
-            <option value="Todos">Toda severidade</option>
-            {NC_SEVERITIES.map((s) => <option key={s}>{s}</option>)}
-          </select>
-          <select
-            className="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition-all"
-            value={filterType}
-            onChange={(e) => setFilterType(e.target.value as any)}
-          >
-            <option value="Todos">Todos os tipos</option>
-            {NC_TYPES.map((t) => <option key={t}>{t}</option>)}
-          </select>
+      {/* ── Tabs ── */}
+      <div className="border-b border-slate-200">
+        <div className="flex items-center">
+          {([
+            { id: 'todos',    label: 'Todos os Clientes', count: items.length,          active: 'border-blue-600 text-blue-700',   badge: 'bg-blue-100 text-blue-700' },
+            { id: 'clariant', label: '◆ Clariant',        count: clariantAtivas.length, active: 'border-orange-500 text-orange-700', badge: 'bg-orange-100 text-orange-700' },
+          ] as const).map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === tab.id
+                  ? tab.active
+                  : 'border-transparent text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              {tab.label}
+              <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                activeTab === tab.id ? tab.badge : 'bg-slate-100 text-slate-500'
+              }`}>{tab.count}</span>
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* List */}
-      {filtered.length === 0 ? (
-        <div className="text-center py-16 text-slate-400">
-          <AlertTriangle className="w-12 h-12 mx-auto mb-3 opacity-30" />
-          <p className="text-sm font-medium">Nenhuma não conformidade encontrada</p>
-          <p className="text-xs mt-1">Registre a primeira NC usando o botão acima.</p>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {filtered.map((nc) => {
-            const expanded = expandedId === nc.id;
-            const urgency = getDeadlineUrgency(nc);
+      {/* ══════════════════════════════════════════
+          TAB: TODOS OS CLIENTES
+      ══════════════════════════════════════════ */}
+      {activeTab === 'todos' && (
+        <div className="space-y-3">
+          {/* Filters */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative flex-1 min-w-48">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+              <input
+                className="w-full text-sm border border-slate-200 rounded-lg pl-9 pr-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                placeholder="Buscar por título, código ou cliente..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            <select
+              className="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value as NCStatus | 'Todos')}
+            >
+              <option value="Todos">Todos os status</option>
+              {NC_STATUSES.map((s) => <option key={s}>{s}</option>)}
+            </select>
+            <select
+              className="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+              value={filterPrazo}
+              onChange={(e) => setFilterPrazo(e.target.value as typeof filterPrazo)}
+            >
+              <option value="Todos">Todos os prazos</option>
+              <option value="No Prazo">No Prazo</option>
+              <option value="Fora do Prazo">Fora do Prazo</option>
+            </select>
+          </div>
 
-            return (
-              <div key={nc.id} className="bg-white border border-slate-200 rounded-xl overflow-hidden hover:border-slate-300 transition-colors">
-                {/* Row header */}
-                <div className="flex items-start gap-3 p-4">
-                  <div className="mt-0.5 shrink-0">{typeIcon(nc.type)}</div>
-
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap mb-1">
-                      <span className="text-xs font-mono text-slate-500">{nc.code}</span>
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium border ${statusStyle(nc.status)}`}>
-                        {statusIcon(nc.status)} {nc.status}
-                      </span>
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${severityStyle(nc.severity)}`}>
-                        {nc.severity}
-                      </span>
-                      {/* Item flags */}
-                      {nc.itemQualidade && <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-medium">Q</span>}
-                      {nc.itemAmbiental && <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-medium">A</span>}
-                      {nc.itemSSO      && <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">SSO</span>}
-                      {nc.effectiveness && (
-                        <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${
-                          nc.effectiveness === 'Eficaz'
-                            ? 'bg-emerald-100 text-emerald-700'
-                            : 'bg-red-100 text-red-700'
-                        }`}>
-                          {nc.effectiveness}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-sm font-semibold text-slate-800 leading-snug">{nc.title}</p>
-                    <div className="flex items-center gap-3 mt-1.5 text-xs text-slate-500">
-                      {nc.detectedDate && (
-                        <span>Detectada: {new Date(nc.detectedDate + 'T00:00:00').toLocaleDateString('pt-BR')}</span>
-                      )}
-                      {nc.responsible && <span>Resp: {nc.responsible}</span>}
-                      {nc.sector && <span>{nc.sector}</span>}
-                      {urgency && <span className={urgency.cls}>{urgency.label}</span>}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-1 shrink-0">
-                    <button
-                      onClick={() => { setEditItem(nc); setIsModalOpen(true); }}
-                      className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-blue-600 transition-colors"
-                      title="Editar"
-                    >
-                      <Edit2 className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(nc.id)}
-                      disabled={deletingId === nc.id}
-                      className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors disabled:opacity-50"
-                      title="Excluir"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => setExpandedId(expanded ? null : nc.id)}
-                      className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
-                    >
-                      {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Expanded details */}
-                {expanded && (
-                  <div className="border-t border-slate-100 px-4 py-4 bg-slate-50/50 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                    {nc.description && (
-                      <div className="md:col-span-2">
-                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Descrição</p>
-                        <p className="text-slate-700 text-sm">{nc.description}</p>
-                      </div>
-                    )}
-                    {nc.origin && (
-                      <div>
-                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Origem</p>
-                        <p className="text-slate-700">{nc.origin}</p>
-                      </div>
-                    )}
-                    {nc.immediateAction && (
-                      <div>
-                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Ação de Correção Imediata</p>
-                        <p className="text-slate-700">{nc.immediateAction}</p>
-                      </div>
-                    )}
-                    {nc.rootCause && (
-                      <div>
-                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Investigação da Causa</p>
-                        <p className="text-slate-700">{nc.rootCause}</p>
-                      </div>
-                    )}
-                    {nc.correctiveAction && (
-                      <div>
-                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Ação Corretiva</p>
-                        <p className="text-slate-700">{nc.correctiveAction}</p>
-                      </div>
-                    )}
-                    {nc.rootCauseIdentified && (
-                      <div className="md:col-span-2">
-                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Causa Raiz Identificada</p>
-                        <p className="text-slate-700">{nc.rootCauseIdentified}</p>
-                      </div>
-                    )}
-                    {nc.effectivenessCheck && (
-                      <div className="md:col-span-2">
-                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Verificação de Eficácia</p>
-                        <p className="text-slate-700">{nc.effectivenessCheck}</p>
-                      </div>
-                    )}
-                    {nc.notes && (
-                      <div className="md:col-span-2">
-                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Notas</p>
-                        <p className="text-slate-700">{nc.notes}</p>
-                      </div>
-                    )}
-
-                    {/* Status History Timeline */}
-                    {nc.statusHistory && nc.statusHistory.length > 0 && (
-                      <div className="md:col-span-2">
-                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Histórico de Status</p>
-                        <ol className="relative border-l border-slate-200 ml-2 space-y-2">
-                          {nc.statusHistory.map((entry: NCStatusHistoryEntry, idx: number) => (
-                            <li key={idx} className="ml-4">
-                              <span className="absolute -left-1.5 mt-1 w-3 h-3 rounded-full border-2 border-white bg-blue-400" />
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full border ${statusStyle(entry.status as NCStatus)}`}>
-                                  {statusIcon(entry.status as NCStatus)}
-                                  {entry.status}
-                                </span>
-                                <span className="text-[11px] text-slate-400">
-                                  {new Date(entry.changedAt).toLocaleString('pt-BR', {
-                                    day: '2-digit', month: '2-digit', year: 'numeric',
-                                    hour: '2-digit', minute: '2-digit',
-                                  })}
-                                </span>
-                                {entry.note && <span className="text-[11px] text-slate-500 italic">{entry.note}</span>}
-                              </div>
-                            </li>
-                          ))}
-                        </ol>
-                      </div>
-                    )}
-                  </div>
-                )}
+          {/* Table */}
+          {filteredAll.length === 0 ? (
+            <div className="text-center py-16 text-slate-400">
+              <AlertTriangle className="w-12 h-12 mx-auto mb-3 opacity-30" />
+              <p className="text-sm font-medium">Nenhuma não conformidade encontrada</p>
+            </div>
+          ) : (
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
+                      <th className="text-left px-4 py-3 w-12">N°</th>
+                      <th className="text-left px-4 py-3 w-20">Abertura</th>
+                      <th className="text-left px-4 py-3 w-28">Cliente</th>
+                      <th className="text-left px-4 py-3">Descrição</th>
+                      <th className="text-left px-4 py-3 w-32">Responsável</th>
+                      <th className="text-left px-4 py-3 w-28">Prazo D1</th>
+                      <th className="text-left px-4 py-3 w-36">Status</th>
+                      <th className="px-4 py-3 w-20"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredAll.map((nc, idx) => (
+                      <tr key={nc.id} className="hover:bg-slate-50/60 transition-colors">
+                        <td className="px-4 py-3 text-xs font-mono text-slate-400">{rowNum(idx)}</td>
+                        <td className="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">{fmtDate(nc.detectedDate)}</td>
+                        <td className="px-4 py-3">
+                          <span className="text-xs font-medium text-slate-700">{nc.client || '—'}</span>
+                        </td>
+                        <td className="px-4 py-3 max-w-xs">
+                          <p className="text-sm font-medium text-slate-800 truncate">{nc.title}</p>
+                          {nc.code && <p className="text-[10px] text-slate-400 font-mono mt-0.5">{nc.code}</p>}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-slate-600 whitespace-nowrap">{nc.responsible || '—'}</td>
+                        <td className="px-4 py-3">
+                          {nc.statusD1 ? (
+                            <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                              nc.statusD1 === 'No Prazo'      ? 'bg-emerald-100 text-emerald-700' :
+                              nc.statusD1 === 'Fora do Prazo' ? 'bg-red-100 text-red-700' :
+                              'bg-slate-100 text-slate-500'
+                            }`}>{nc.statusD1}</span>
+                          ) : <span className="text-slate-300 text-xs">—</span>}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border ${statusStyle(nc.status)}`}>
+                            {statusIcon(nc.status)} {nc.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-1 justify-end">
+                            <button
+                              onClick={() => { setEditItem(nc); setIsModalOpen(true); }}
+                              className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-blue-600 transition-colors"
+                              title="Editar"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(nc.id)}
+                              disabled={deletingId === nc.id}
+                              className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors disabled:opacity-50"
+                              title="Excluir"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            );
-          })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════
+          TAB: CLARIANT
+      ══════════════════════════════════════════ */}
+      {activeTab === 'clariant' && (
+        <div className="space-y-3">
+          {/* Summary bar */}
+          <div className="bg-orange-50 border border-orange-200 rounded-xl px-4 py-3 flex flex-wrap gap-4 text-sm items-center">
+            <span className="font-medium text-orange-800">
+              <strong>{clariantAtivas.length}</strong> abertas
+            </span>
+            <span className="text-red-600 font-medium">
+              <strong>{clariantAtivas.filter((i) => i.statusD1 === 'Fora do Prazo').length}</strong> fora do prazo D1
+            </span>
+            <span className="text-amber-600 font-medium">
+              <strong>{clariantAtivas.filter((i) => i.statusD7 === 'Fora do Prazo').length}</strong> fora do prazo D7
+            </span>
+            {clariantClientesSummary && (
+              <span className="text-slate-500 ml-auto text-xs">
+                Clientes finais: <span className="font-semibold text-slate-700">{clariantClientesSummary}</span>
+              </span>
+            )}
+          </div>
+
+          {/* Filters */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative flex-1 min-w-48">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+              <input
+                className="w-full text-sm border border-slate-200 rounded-lg pl-9 pr-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/30"
+                placeholder="Buscar por QNS, descrição, equipamento, químico..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            <select
+              className="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/30"
+              value={filterCliente}
+              onChange={(e) => setFilterCliente(e.target.value)}
+            >
+              <option value="Todos">Todos os clientes finais</option>
+              {endCustomers.map((c) => <option key={c}>{c}</option>)}
+            </select>
+            <select
+              className="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/30"
+              value={filterPrazo}
+              onChange={(e) => setFilterPrazo(e.target.value as typeof filterPrazo)}
+            >
+              <option value="Todos">Todos os prazos</option>
+              <option value="No Prazo">No Prazo</option>
+              <option value="Fora do Prazo">Fora do Prazo</option>
+            </select>
+          </div>
+
+          {/* Clariant table */}
+          {filteredClariant.length === 0 ? (
+            <div className="text-center py-12 text-slate-400">
+              <AlertTriangle className="w-10 h-10 mx-auto mb-3 opacity-30" />
+              <p className="text-sm">Nenhum registro Clariant encontrado</p>
+            </div>
+          ) : (
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm" style={{ minWidth: '900px' }}>
+                  <thead>
+                    <tr className="bg-orange-50 border-b border-orange-100 text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
+                      <th className="text-left px-3 py-3 w-10">N°</th>
+                      <th className="text-left px-3 py-3 w-32">QNS</th>
+                      <th className="text-left px-3 py-3 w-20">Abertura</th>
+                      <th className="text-left px-3 py-3 w-24">Cli. Final</th>
+                      <th className="text-left px-3 py-3">Descrição</th>
+                      <th className="text-left px-3 py-3 w-28">Equipamento</th>
+                      <th className="text-left px-3 py-3 w-28">Químico</th>
+                      <th className="text-center px-3 py-3 w-14">D1</th>
+                      <th className="text-center px-3 py-3 w-14">D5</th>
+                      <th className="text-center px-3 py-3 w-14">D7</th>
+                      <th className="px-3 py-3 w-16"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredClariant.map((nc, idx) => (
+                      <tr key={nc.id} className="hover:bg-orange-50/30 transition-colors">
+                        <td className="px-3 py-3 text-xs font-mono text-slate-400">{rowNum(idx)}</td>
+                        <td className="px-3 py-3">
+                          <span className="text-xs font-mono font-medium text-slate-700">{nc.qnsNumber || '—'}</span>
+                        </td>
+                        <td className="px-3 py-3 text-xs text-slate-500 whitespace-nowrap">{fmtDate(nc.detectedDate)}</td>
+                        <td className="px-3 py-3 text-xs font-medium text-slate-700">{nc.endCustomer || '—'}</td>
+                        <td className="px-3 py-3 max-w-[200px]">
+                          <p className="text-sm font-medium text-slate-800 truncate">{nc.title}</p>
+                        </td>
+                        <td className="px-3 py-3 text-xs text-slate-600">{nc.originLocation || '—'}</td>
+                        <td className="px-3 py-3 text-xs text-slate-600">{nc.chemicalProduct || '—'}</td>
+                        <td className="px-3 py-3 text-center">{dBadge(nc.statusD1)}</td>
+                        <td className="px-3 py-3 text-center">{dBadge(nc.statusD5)}</td>
+                        <td className="px-3 py-3 text-center">{dBadge(nc.statusD7)}</td>
+                        <td className="px-3 py-3">
+                          <div className="flex items-center gap-1 justify-end">
+                            <button
+                              onClick={() => { setEditItem(nc); setIsModalOpen(true); }}
+                              className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-blue-600 transition-colors"
+                              title="Editar"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(nc.id)}
+                              disabled={deletingId === nc.id}
+                              className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors disabled:opacity-50"
+                              title="Excluir"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

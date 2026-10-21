@@ -210,9 +210,9 @@ export type NCSource =
   | 'Outro';
 export type NCStatus =
   | 'Aberta'
-  | 'Em Investigação'
-  | 'Em Andamento'
-  | 'Concluída';
+  | 'Em tratamento'
+  | 'Aguardando verificação'
+  | 'Encerrada';
 
 export type NCEffectiveness = 'Eficaz' | 'Não Eficaz';
 
