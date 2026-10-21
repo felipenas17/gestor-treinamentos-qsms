@@ -1083,8 +1083,9 @@ export function NCCAPAScreen({ items, onSave, onDelete }: NCCAPAScreenProps) {
   }, [items]);
 
   // ─── Clariant subsets ─────────────────────────────────────────────────────
-  const clariantItems  = useMemo(() => items.filter((i) => i.client === 'Clariant'), [items]);
-  const clariantAtivas = useMemo(() => clariantItems.filter((i) => i.status !== 'Encerrada'), [clariantItems]);
+  const clariantItems    = useMemo(() => items.filter((i) => i.client === 'Clariant'), [items]);
+  const clariantAtivas   = useMemo(() => clariantItems.filter((i) => i.status !== 'Encerrada'), [clariantItems]);
+  const nonClariantItems = useMemo(() => items.filter((i) => i.client !== 'Clariant'), [items]);
 
   const endCustomers = useMemo(() => {
     const s = new Set(clariantItems.map((i) => i.endCustomer).filter(Boolean) as string[]);
@@ -1099,13 +1100,13 @@ export function NCCAPAScreen({ items, onSave, onDelete }: NCCAPAScreenProps) {
   // ─── Filtered lists ───────────────────────────────────────────────────────
   const q = search.toLowerCase();
 
-  const filteredAll = useMemo(() => items.filter((item) => {
+  const filteredAll = useMemo(() => nonClariantItems.filter((item) => {
     if (filterStatus !== 'Todos' && item.status !== filterStatus) return false;
     if (filterPrazo === 'No Prazo' && item.statusD1 !== 'No Prazo') return false;
     if (filterPrazo === 'Fora do Prazo' && item.statusD1 !== 'Fora do Prazo' && item.statusD7 !== 'Fora do Prazo') return false;
     if (q && !item.title.toLowerCase().includes(q) && !item.code.toLowerCase().includes(q) && !(item.client ?? '').toLowerCase().includes(q)) return false;
     return true;
-  }), [items, filterStatus, filterPrazo, q]);
+  }), [nonClariantItems, filterStatus, filterPrazo, q]);
 
   const filteredClariant = useMemo(() => clariantItems.filter((item) => {
     if (filterCliente !== 'Todos' && item.endCustomer !== filterCliente) return false;
@@ -1215,8 +1216,8 @@ export function NCCAPAScreen({ items, onSave, onDelete }: NCCAPAScreenProps) {
       <div className="border-b border-slate-200">
         <div className="flex items-center">
           {([
-            { id: 'todos',    label: 'Todos os Clientes', count: items.length,          active: 'border-blue-600 text-blue-700',   badge: 'bg-blue-100 text-blue-700' },
-            { id: 'clariant', label: '◆ Clariant',        count: clariantAtivas.length, active: 'border-orange-500 text-orange-700', badge: 'bg-orange-100 text-orange-700' },
+            { id: 'todos',    label: 'Todos os Clientes', count: nonClariantItems.length, active: 'border-blue-600 text-blue-700',   badge: 'bg-blue-100 text-blue-700' },
+            { id: 'clariant', label: '◆ Clariant',        count: clariantItems.length,    active: 'border-orange-500 text-orange-700', badge: 'bg-orange-100 text-orange-700' },
           ] as const).map((tab) => (
             <button
               key={tab.id}
