@@ -4,7 +4,7 @@ import React, { useState, useMemo, useCallback } from 'react';
 import {
   AlertTriangle, Plus, CheckCircle2, Clock, XCircle,
   ChevronDown, ChevronUp, Search, Filter, Edit2, Trash2,
-  AlertOctagon, Info, TrendingUp, X, Save, ChevronRight,
+  AlertOctagon, Info, TrendingUp, X, Save, ChevronRight, Download,
 } from 'lucide-react';
 import {
   NonConformity, NCType, NCSeverity, NCSource, NCStatus,
@@ -1425,6 +1425,7 @@ export function NCCAPAScreen({ items, onSave, onDelete }: NCCAPAScreenProps) {
                       <th className="text-center px-3 py-3 w-14">D1</th>
                       <th className="text-center px-3 py-3 w-14">D5</th>
                       <th className="text-center px-3 py-3 w-14">D7</th>
+                      <th className="text-center px-3 py-3 w-20">Tratativa</th>
                       <th className="px-3 py-3 w-16"></th>
                     </tr>
                   </thead>
@@ -1445,6 +1446,22 @@ export function NCCAPAScreen({ items, onSave, onDelete }: NCCAPAScreenProps) {
                         <td className="px-3 py-3 text-center">{dBadge(nc.statusD1)}</td>
                         <td className="px-3 py-3 text-center">{dBadge(nc.statusD5)}</td>
                         <td className="px-3 py-3 text-center">{dBadge(nc.statusD7)}</td>
+                        <td className="px-3 py-3 text-center">
+                          {nc.tratativaFileUrl ? (
+                            <a
+                              href={nc.tratativaFileUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-orange-100 hover:bg-orange-200 text-orange-700 text-[10px] font-semibold transition-colors"
+                              title="Baixar tratativa DOCX"
+                            >
+                              <Download className="w-3 h-3" />
+                              DOCX
+                            </a>
+                          ) : (
+                            <span className="text-[10px] text-slate-300">—</span>
+                          )}
+                        </td>
                         <td className="px-3 py-3">
                           <div className="flex items-center gap-1 justify-end">
                             <button

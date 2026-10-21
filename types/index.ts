@@ -316,6 +316,9 @@ export interface NonConformity {
   statusD1?: string | null;
   statusD5?: string | null;
   statusD7?: string | null;
+
+  // URL do DOCX de tratativa (Clariant)
+  tratativaFileUrl?: string | null;
 }
 
 // ─── ROI — Registro de Ocorrência Interna ────────────────────────────────────

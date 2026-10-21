@@ -686,6 +686,7 @@ export default function GestorTreinamentosApp() {
             statusD1: nc.status_d1 ?? null,
             statusD5: nc.status_d5 ?? null,
             statusD7: nc.status_d7 ?? null,
+            tratativaFileUrl: nc.tratativa_file_url ?? null,
           })));
         }
 
@@ -1636,6 +1637,7 @@ export default function GestorTreinamentosApp() {
                     statusD1: nc.status_d1 ?? null,
                     statusD5: nc.status_d5 ?? null,
                     statusD7: nc.status_d7 ?? null,
+                    tratativaFileUrl: nc.tratativa_file_url ?? null,
                   })));
                 }
                 showToast('Score atualizado ✓');

@@ -968,6 +968,9 @@ export interface NonConformityRow {
   status_d1?: string | null;
   status_d5?: string | null;
   status_d7?: string | null;
+
+  // URL do DOCX de tratativa (Clariant)
+  tratativa_file_url?: string | null;
 }
 
 export async function fetchNonConformities(): Promise<NonConformityRow[]> {
