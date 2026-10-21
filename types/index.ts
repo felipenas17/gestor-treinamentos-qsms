@@ -299,6 +299,23 @@ export interface NonConformity {
   notes?: string | null;
   createdAt: string;
   statusHistory?: NCStatusHistoryEntry[];
+
+  // Cliente (geral)
+  client?: string | null;
+
+  // Campos específicos Clariant
+  qnsNumber?: string | null;
+  endCustomer?: string | null;
+  chemicalProduct?: string | null;
+  originLocation?: string | null;
+
+  // Controle de prazo D1 / D5 / D7 (Clariant)
+  responseD1?: string | null;
+  responseD5?: string | null;
+  responseD7?: string | null;
+  statusD1?: string | null;
+  statusD5?: string | null;
+  statusD7?: string | null;
 }
 
 // ─── ROI — Registro de Ocorrência Interna ────────────────────────────────────

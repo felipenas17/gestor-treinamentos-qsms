@@ -951,6 +951,23 @@ export interface NonConformityRow {
   created_at: string;
   // JSONB column — array of {status, changedAt, note?} entries
   status_history: Array<{ status: string; changedAt: string; note?: string }> | null;
+
+  // Cliente (geral)
+  client?: string | null;
+
+  // Campos específicos Clariant
+  qns_number?: string | null;
+  end_customer?: string | null;
+  chemical_product?: string | null;
+  origin_location?: string | null;
+
+  // Controle de prazo D1 / D5 / D7
+  response_d1?: string | null;
+  response_d5?: string | null;
+  response_d7?: string | null;
+  status_d1?: string | null;
+  status_d5?: string | null;
+  status_d7?: string | null;
 }
 
 export async function fetchNonConformities(): Promise<NonConformityRow[]> {

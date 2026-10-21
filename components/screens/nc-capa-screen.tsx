@@ -128,6 +128,20 @@ type NCFormData = {
   // Extras
   notes: string;
   preventiveAction: string;
+  // Cliente (geral)
+  client: string;
+  // Campos específicos Clariant
+  qnsNumber: string;
+  endCustomer: string;
+  chemicalProduct: string;
+  originLocation: string;
+  // D1 / D5 / D7
+  responseD1: string;
+  responseD5: string;
+  responseD7: string;
+  statusD1: string;
+  statusD5: string;
+  statusD7: string;
 };
 
 function emptyForm(): NCFormData {
@@ -150,6 +164,10 @@ function emptyForm(): NCFormData {
     effectiveness: '', effectivenessDate: '', qsmsResponsible: '',
     effectivenessCheck: '',
     notes: '', preventiveAction: '',
+    client: '',
+    qnsNumber: '', endCustomer: '', chemicalProduct: '', originLocation: '',
+    responseD1: '', responseD5: '', responseD7: '',
+    statusD1: '', statusD5: '', statusD7: '',
   };
 }
 
@@ -205,6 +223,17 @@ function formFromNC(nc: NonConformity): NCFormData {
     effectivenessCheck: nc.effectivenessCheck ?? '',
     notes: nc.notes ?? '',
     preventiveAction: nc.preventiveAction ?? '',
+    client: nc.client ?? '',
+    qnsNumber: nc.qnsNumber ?? '',
+    endCustomer: nc.endCustomer ?? '',
+    chemicalProduct: nc.chemicalProduct ?? '',
+    originLocation: nc.originLocation ?? '',
+    responseD1: nc.responseD1 ?? '',
+    responseD5: nc.responseD5 ?? '',
+    responseD7: nc.responseD7 ?? '',
+    statusD1: nc.statusD1 ?? '',
+    statusD5: nc.statusD5 ?? '',
+    statusD7: nc.statusD7 ?? '',
   };
 }
 
@@ -449,6 +478,17 @@ function NCModal({ initial, onSave, onClose }: NCModalProps) {
                 />
               </div>
 
+              {/* Cliente */}
+              <div>
+                <label className={labelCls}>Cliente</label>
+                <input
+                  className={inputCls}
+                  placeholder="Ex: Clariant, Shell, Petrobras, Prio…"
+                  value={form.client}
+                  onChange={(e) => set('client', e.target.value)}
+                />
+              </div>
+
               {/* Responsável e Prazo */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -470,6 +510,139 @@ function NCModal({ initial, onSave, onClose }: NCModalProps) {
                   />
                 </div>
               </div>
+
+              {/* ── Controle D1 / D5 / D7 ── */}
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+                <p className={sectionTitle}>⏱ Controle de Prazo D1 / D5 / D7</p>
+                <div className="grid grid-cols-3 gap-3">
+                  {/* D1 */}
+                  <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-600">D1 — 1 dia</span>
+                      {(() => {
+                        const d1Status = form.statusD1 || (form.responseD1 && form.detectedDate
+                          ? (() => {
+                              const open = new Date(form.detectedDate);
+                              const resp = new Date(form.responseD1);
+                              const diff = Math.round((resp.getTime() - open.getTime()) / 86400000);
+                              return diff <= 1 ? 'No Prazo' : 'Fora do Prazo';
+                            })()
+                          : form.detectedDate
+                            ? (() => {
+                                const open = new Date(form.detectedDate);
+                                const today = new Date();
+                                const diff = Math.round((today.getTime() - open.getTime()) / 86400000);
+                                return diff > 1 ? 'Fora do Prazo' : 'Pendente';
+                              })()
+                            : 'Pendente');
+                        const color = d1Status === 'No Prazo' ? 'bg-emerald-100 text-emerald-700' : d1Status === 'Fora do Prazo' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700';
+                        return <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${color}`}>{d1Status}</span>;
+                      })()}
+                    </div>
+                    <label className="block text-[10px] text-slate-500">Retorno D1</label>
+                    <input type="date" className={inputCls + ' text-xs py-1'} value={form.responseD1} onChange={(e) => set('responseD1', e.target.value)} />
+                  </div>
+                  {/* D5 */}
+                  <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-600">D5 — 5 dias</span>
+                      {(() => {
+                        const d5Status = form.statusD5 || (form.responseD5 && form.detectedDate
+                          ? (() => {
+                              const open = new Date(form.detectedDate);
+                              const resp = new Date(form.responseD5);
+                              const diff = Math.round((resp.getTime() - open.getTime()) / 86400000);
+                              return diff <= 5 ? 'No Prazo' : 'Fora do Prazo';
+                            })()
+                          : form.detectedDate
+                            ? (() => {
+                                const open = new Date(form.detectedDate);
+                                const today = new Date();
+                                const diff = Math.round((today.getTime() - open.getTime()) / 86400000);
+                                return diff > 5 ? 'Fora do Prazo' : 'Pendente';
+                              })()
+                            : 'Pendente');
+                        const color = d5Status === 'No Prazo' ? 'bg-emerald-100 text-emerald-700' : d5Status === 'Fora do Prazo' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700';
+                        return <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${color}`}>{d5Status}</span>;
+                      })()}
+                    </div>
+                    <label className="block text-[10px] text-slate-500">Retorno D5</label>
+                    <input type="date" className={inputCls + ' text-xs py-1'} value={form.responseD5} onChange={(e) => set('responseD5', e.target.value)} />
+                  </div>
+                  {/* D7 */}
+                  <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-600">D7 — 7 dias</span>
+                      {(() => {
+                        const d7Status = form.statusD7 || (form.responseD7 && form.detectedDate
+                          ? (() => {
+                              const open = new Date(form.detectedDate);
+                              const resp = new Date(form.responseD7);
+                              const diff = Math.round((resp.getTime() - open.getTime()) / 86400000);
+                              return diff <= 7 ? 'No Prazo' : 'Fora do Prazo';
+                            })()
+                          : form.detectedDate
+                            ? (() => {
+                                const open = new Date(form.detectedDate);
+                                const today = new Date();
+                                const diff = Math.round((today.getTime() - open.getTime()) / 86400000);
+                                return diff > 7 ? 'Fora do Prazo' : 'Pendente';
+                              })()
+                            : 'Pendente');
+                        const color = d7Status === 'No Prazo' ? 'bg-emerald-100 text-emerald-700' : d7Status === 'Fora do Prazo' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700';
+                        return <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${color}`}>{d7Status}</span>;
+                      })()}
+                    </div>
+                    <label className="block text-[10px] text-slate-500">Retorno D7</label>
+                    <input type="date" className={inputCls + ' text-xs py-1'} value={form.responseD7} onChange={(e) => set('responseD7', e.target.value)} />
+                  </div>
+                </div>
+              </div>
+
+              {/* ── Bloco Clariant (visível quando cliente = Clariant) ── */}
+              {form.client.toLowerCase().includes('clariant') && (
+                <div className="rounded-xl border border-violet-200 bg-violet-50 p-4 space-y-3">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-violet-500 mb-3">🔬 Campos Específicos Clariant</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className={labelCls}>Nº QNS (Clariant)</label>
+                      <input
+                        className={inputCls}
+                        placeholder="QNS-XXXXX"
+                        value={form.qnsNumber}
+                        onChange={(e) => set('qnsNumber', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Cliente Final</label>
+                      <input
+                        className={inputCls}
+                        placeholder="Shell, Petrobras, Prio…"
+                        value={form.endCustomer}
+                        onChange={(e) => set('endCustomer', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Produto Químico</label>
+                      <input
+                        className={inputCls}
+                        placeholder="Nome do produto químico"
+                        value={form.chemicalProduct}
+                        onChange={(e) => set('chemicalProduct', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Local de Origem</label>
+                      <input
+                        className={inputCls}
+                        placeholder="Local onde ocorreu"
+                        value={form.originLocation}
+                        onChange={(e) => set('originLocation', e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
             </>
           )}
 

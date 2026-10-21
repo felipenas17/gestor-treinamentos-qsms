@@ -675,6 +675,17 @@ export default function GestorTreinamentosApp() {
             notes: nc.notes ?? null,
             createdAt: nc.created_at,
             statusHistory: (nc.status_history ?? []) as NCStatusHistoryEntry[],
+            client: nc.client ?? null,
+            qnsNumber: nc.qns_number ?? null,
+            endCustomer: nc.end_customer ?? null,
+            chemicalProduct: nc.chemical_product ?? null,
+            originLocation: nc.origin_location ?? null,
+            responseD1: nc.response_d1 ?? null,
+            responseD5: nc.response_d5 ?? null,
+            responseD7: nc.response_d7 ?? null,
+            statusD1: nc.status_d1 ?? null,
+            statusD5: nc.status_d5 ?? null,
+            statusD7: nc.status_d7 ?? null,
           })));
         }
 
@@ -1171,6 +1182,17 @@ export default function GestorTreinamentosApp() {
         closed_date: data.status === 'Concluída' ? now.split('T')[0] : null,
         notes: data.notes || null,
         status_history: newHistory,
+        client: data.client || null,
+        qns_number: data.qnsNumber || null,
+        end_customer: data.endCustomer || null,
+        chemical_product: data.chemicalProduct || null,
+        origin_location: data.originLocation || null,
+        response_d1: data.responseD1 || null,
+        response_d5: data.responseD5 || null,
+        response_d7: data.responseD7 || null,
+        status_d1: data.statusD1 || null,
+        status_d5: data.statusD5 || null,
+        status_d7: data.statusD7 || null,
       };
 
       const ok = await updateNonConformity(id, payload);
@@ -1246,6 +1268,17 @@ export default function GestorTreinamentosApp() {
         closed_date: data.status === 'Concluída' ? now.split('T')[0] : null,
         notes: data.notes || null,
         status_history: initialHistory,
+        client: data.client || null,
+        qns_number: data.qnsNumber || null,
+        end_customer: data.endCustomer || null,
+        chemical_product: data.chemicalProduct || null,
+        origin_location: data.originLocation || null,
+        response_d1: data.responseD1 || null,
+        response_d5: data.responseD5 || null,
+        response_d7: data.responseD7 || null,
+        status_d1: data.statusD1 || null,
+        status_d5: data.statusD5 || null,
+        status_d7: data.statusD7 || null,
       };
 
       const newId = await saveNonConformity(payload);
@@ -1305,6 +1338,17 @@ export default function GestorTreinamentosApp() {
         notes: data.notes || null,
         createdAt: now,
         statusHistory: initialHistory,
+        client: data.client || null,
+        qnsNumber: data.qnsNumber || null,
+        endCustomer: data.endCustomer || null,
+        chemicalProduct: data.chemicalProduct || null,
+        originLocation: data.originLocation || null,
+        responseD1: data.responseD1 || null,
+        responseD5: data.responseD5 || null,
+        responseD7: data.responseD7 || null,
+        statusD1: data.statusD1 || null,
+        statusD5: data.statusD5 || null,
+        statusD7: data.statusD7 || null,
       };
       setNonConformities((prev) => [newNC, ...prev]);
       showToast(`NC ${data.code} registrada ✓`);
@@ -1581,6 +1625,17 @@ export default function GestorTreinamentosApp() {
                     notes: nc.notes ?? null,
                     createdAt: nc.created_at,
                     statusHistory: (nc.status_history ?? []) as NCStatusHistoryEntry[],
+                    client: nc.client ?? null,
+                    qnsNumber: nc.qns_number ?? null,
+                    endCustomer: nc.end_customer ?? null,
+                    chemicalProduct: nc.chemical_product ?? null,
+                    originLocation: nc.origin_location ?? null,
+                    responseD1: nc.response_d1 ?? null,
+                    responseD5: nc.response_d5 ?? null,
+                    responseD7: nc.response_d7 ?? null,
+                    statusD1: nc.status_d1 ?? null,
+                    statusD5: nc.status_d5 ?? null,
+                    statusD7: nc.status_d7 ?? null,
                   })));
                 }
                 showToast('Score atualizado ✓');
