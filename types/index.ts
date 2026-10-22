@@ -439,6 +439,7 @@ export interface SstProgram {
   validity_end: string | null;   // YYYY-MM-DD
   notes: string | null;
   folder_ref: string | null;
+  file_url: string | null;       // URL do documento (Supabase Storage ou link externo)
   created_at: string;
   updated_at: string;
   // computed client-side

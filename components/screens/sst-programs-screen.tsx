@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   ShieldCheck,
   FileText,
@@ -17,6 +17,11 @@ import {
   ChevronDown,
   X,
   Save,
+  Upload,
+  ExternalLink,
+  Trash2,
+  FileUp,
+  Pencil,
 } from 'lucide-react';
 import { SstProgram, SstProgramCategory, SstProgramStatus } from '@/types';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
@@ -48,10 +53,19 @@ function formatDate(iso: string | null): string {
 }
 
 function daysLabel(days: number | undefined): string {
-  if (days === undefined) return '—';
+  if (days === undefined) return 'Validade indefinida';
   if (days < 0) return `Vencido há ${Math.abs(days)} dias`;
   if (days === 0) return 'Vence hoje';
   return `Vence em ${days} dias`;
+}
+
+function fileNameFromUrl(url: string): string {
+  try {
+    const parts = new URL(url).pathname.split('/');
+    return decodeURIComponent(parts[parts.length - 1]);
+  } catch {
+    return url;
+  }
 }
 
 const CATEGORY_ICONS: Record<SstProgramCategory, React.ElementType> = {
@@ -70,31 +84,35 @@ const CATEGORY_COLORS: Record<SstProgramCategory, string> = {
 
 const STATUS_META: Record<
   SstProgramStatus,
-  { icon: React.ElementType; cls: string; dotCls: string }
+  { icon: React.ElementType; cls: string; dotCls: string; barCls: string }
 > = {
   Vigente: {
     icon: CheckCircle2,
     cls: 'text-emerald-700 bg-emerald-50 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800',
     dotCls: 'bg-emerald-500',
+    barCls: 'bg-emerald-500',
   },
   Vencendo: {
     icon: Clock,
     cls: 'text-amber-700 bg-amber-50 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800',
     dotCls: 'bg-amber-500',
+    barCls: 'bg-amber-500',
   },
   Vencido: {
     icon: AlertTriangle,
     cls: 'text-red-700 bg-red-50 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800',
     dotCls: 'bg-red-500',
+    barCls: 'bg-red-500',
   },
   Indefinido: {
     icon: HelpCircle,
     cls: 'text-slate-600 bg-slate-50 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700',
     dotCls: 'bg-slate-400',
+    barCls: 'bg-slate-400',
   },
 };
 
-// ─── New / Edit modal ────────────────────────────────────────────────────────
+// ─── Modal ────────────────────────────────────────────────────────────────────
 
 interface ProgramFormData {
   name: string;
@@ -105,6 +123,7 @@ interface ProgramFormData {
   validity_end: string;
   notes: string;
   folder_ref: string;
+  file_url: string;
 }
 
 const EMPTY_FORM: ProgramFormData = {
@@ -116,18 +135,21 @@ const EMPTY_FORM: ProgramFormData = {
   validity_end: '',
   notes: '',
   folder_ref: '',
+  file_url: '',
 };
 
 interface ProgramModalProps {
   isOpen: boolean;
   initial: SstProgram | null;
   onClose: () => void;
-  onSave: (data: ProgramFormData, id?: string) => Promise<void>;
+  onSave: (data: ProgramFormData, file: File | null, id?: string) => Promise<void>;
 }
 
 function ProgramModal({ isOpen, initial, onClose, onSave }: ProgramModalProps) {
   const [form, setForm] = useState<ProgramFormData>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [fileToUpload, setFileToUpload] = useState<File | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
@@ -141,10 +163,12 @@ function ProgramModal({ isOpen, initial, onClose, onSave }: ProgramModalProps) {
         validity_end: initial.validity_end ?? '',
         notes: initial.notes ?? '',
         folder_ref: initial.folder_ref ?? '',
+        file_url: initial.file_url ?? '',
       });
     } else {
       setForm(EMPTY_FORM);
     }
+    setFileToUpload(null);
   }, [initial, isOpen]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
@@ -153,23 +177,31 @@ function ProgramModal({ isOpen, initial, onClose, onSave }: ProgramModalProps) {
   const set = (k: keyof ProgramFormData, v: string) =>
     setForm((prev) => ({ ...prev, [k]: v }));
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0] ?? null;
+    setFileToUpload(f);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
-    await onSave(form, initial?.id);
+    await onSave(form, fileToUpload, initial?.id);
     setSaving(false);
   };
 
   const InputCls =
     'w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400';
 
+  const hasExistingFile = !!form.file_url;
+  const pendingFile = fileToUpload;
+
   return (
     <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="w-full max-w-xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+      <div className="w-full max-w-xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden max-h-[90vh] flex flex-col">
         {/* header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 shrink-0">
           <h2 className="text-base font-semibold text-slate-800 dark:text-slate-100">
-            {initial ? 'Editar Programa SST' : 'Novo Programa SST'}
+            {initial ? `Editar — ${initial.name}` : 'Novo Programa SST'}
           </h2>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700">
             <X className="w-4 h-4 text-slate-500" />
@@ -177,7 +209,7 @@ function ProgramModal({ isOpen, initial, onClose, onSave }: ProgramModalProps) {
         </div>
 
         {/* body */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto">
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Sigla / Código *</label>
@@ -217,6 +249,56 @@ function ProgramModal({ isOpen, initial, onClose, onSave }: ProgramModalProps) {
             </div>
           </div>
 
+          {/* ── Documento ───────────────────────────────────────────────── */}
+          <div>
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Documento</label>
+
+            {/* arquivo existente */}
+            {hasExistingFile && !pendingFile && (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 mb-2">
+                <FileText className="w-4 h-4 text-blue-500 shrink-0" />
+                <span className="flex-1 text-xs text-blue-700 dark:text-blue-300 truncate">{fileNameFromUrl(form.file_url)}</span>
+                <a href={form.file_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 dark:text-blue-400">
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+                <button type="button" onClick={() => set('file_url', '')} className="text-red-500 hover:text-red-700">
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+
+            {/* arquivo selecionado para upload */}
+            {pendingFile && (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 mb-2">
+                <Upload className="w-4 h-4 text-emerald-500 shrink-0" />
+                <span className="flex-1 text-xs text-emerald-700 dark:text-emerald-300 truncate">{pendingFile.name}</span>
+                <span className="text-[10px] text-emerald-600">Pronto para enviar</span>
+                <button type="button" onClick={() => { setFileToUpload(null); if (fileRef.current) fileRef.current.value = ''; }} className="text-red-500 hover:text-red-700">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+
+            {/* input de upload */}
+            {!pendingFile && (
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 border-dashed border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-blue-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors text-xs font-medium"
+              >
+                <FileUp className="w-4 h-4" />
+                {hasExistingFile ? 'Substituir documento' : 'Anexar documento (PDF, DOCX, imagem)'}
+              </button>
+            )}
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+          </div>
+
           <div>
             <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Referência de Pasta</label>
             <input value={form.folder_ref} onChange={(e) => set('folder_ref', e.target.value)} placeholder="ex: 1. PGR/2026 - 2027" className={InputCls} />
@@ -232,7 +314,7 @@ function ProgramModal({ isOpen, initial, onClose, onSave }: ProgramModalProps) {
               Cancelar
             </button>
             <button type="submit" disabled={saving} className="px-5 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-2 disabled:opacity-60">
-              <Save className="w-4 h-4" />
+              {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
               {saving ? 'Salvando…' : 'Salvar'}
             </button>
           </div>
@@ -242,7 +324,7 @@ function ProgramModal({ isOpen, initial, onClose, onSave }: ProgramModalProps) {
   );
 }
 
-// ─── Main screen ─────────────────────────────────────────────────────────────
+// ─── Main screen ──────────────────────────────────────────────────────────────
 
 interface SstProgramsScreenProps {
   onToast?: (msg: string, type?: 'success' | 'error') => void;
@@ -256,12 +338,9 @@ export function SstProgramsScreen({ onToast }: SstProgramsScreenProps) {
   const [filterCategory, setFilterCategory] = useState<SstProgramCategory | 'Todos'>('Todos');
   const [filterStatus, setFilterStatus] = useState<SstProgramStatus | 'Todos'>('Todos');
 
-  // ── fetch ────────────────────────────────────────────────────────────────
+  // ── fetch ─────────────────────────────────────────────────────────────────
   const fetchPrograms = async () => {
-    if (!isSupabaseConfigured || !supabase) {
-      setLoading(false);
-      return;
-    }
+    if (!isSupabaseConfigured || !supabase) { setLoading(false); return; }
     setLoading(true);
     const { data, error } = await supabase
       .from('sst_programs')
@@ -278,16 +357,16 @@ export function SstProgramsScreen({ onToast }: SstProgramsScreenProps) {
 
   useEffect(() => { fetchPrograms(); }, []); // eslint-disable-line react-hooks/exhaustive-deps, react-hooks/set-state-in-effect
 
-  // ── summary counts ───────────────────────────────────────────────────────
-  const counts = useMemo(() => {
-    const vigente  = programs.filter((p) => p.status === 'Vigente').length;
-    const vencendo = programs.filter((p) => p.status === 'Vencendo').length;
-    const vencido  = programs.filter((p) => p.status === 'Vencido').length;
-    const indef    = programs.filter((p) => p.status === 'Indefinido').length;
-    return { vigente, vencendo, vencido, indef, total: programs.length };
-  }, [programs]);
+  // ── summary counts ────────────────────────────────────────────────────────
+  const counts = useMemo(() => ({
+    total:    programs.length,
+    vigente:  programs.filter((p) => p.status === 'Vigente').length,
+    vencendo: programs.filter((p) => p.status === 'Vencendo').length,
+    vencido:  programs.filter((p) => p.status === 'Vencido').length,
+    comDoc:   programs.filter((p) => !!p.file_url).length,
+  }), [programs]);
 
-  // ── filtered list ────────────────────────────────────────────────────────
+  // ── filtered list ─────────────────────────────────────────────────────────
   const filtered = useMemo(() =>
     programs.filter((p) => {
       if (filterCategory !== 'Todos' && p.category !== filterCategory) return false;
@@ -296,19 +375,45 @@ export function SstProgramsScreen({ onToast }: SstProgramsScreenProps) {
     }),
   [programs, filterCategory, filterStatus]);
 
-  // ── save handler ─────────────────────────────────────────────────────────
-  const handleSave = async (data: ProgramFormData, id?: string) => {
+  // ── save (with optional file upload) ─────────────────────────────────────
+  const handleSave = async (data: ProgramFormData, file: File | null, id?: string) => {
     if (!supabase) return;
+
+    let fileUrl = data.file_url || null;
+
+    // Upload novo arquivo
+    if (file) {
+      const ext  = file.name.split('.').pop() ?? 'bin';
+      const slug = data.name.replace(/\s+/g, '-').toLowerCase();
+      const path = `${slug}-${Date.now()}.${ext}`;
+
+      const { error: upErr } = await supabase.storage
+        .from('sst-documents')
+        .upload(path, file, { upsert: true });
+
+      if (upErr) {
+        onToast?.('Erro ao enviar arquivo: ' + upErr.message, 'error');
+        return;
+      }
+
+      const { data: urlData } = supabase.storage
+        .from('sst-documents')
+        .getPublicUrl(path);
+
+      fileUrl = urlData?.publicUrl ?? null;
+    }
+
     const payload = {
-      name: data.name,
-      full_name: data.full_name,
-      category: data.category,
-      responsible: data.responsible || null,
+      name:           data.name,
+      full_name:      data.full_name,
+      category:       data.category,
+      responsible:    data.responsible    || null,
       validity_start: data.validity_start || null,
-      validity_end: data.validity_end || null,
-      notes: data.notes || null,
-      folder_ref: data.folder_ref || null,
-      updated_at: new Date().toISOString(),
+      validity_end:   data.validity_end   || null,
+      notes:          data.notes          || null,
+      folder_ref:     data.folder_ref     || null,
+      file_url:       fileUrl,
+      updated_at:     new Date().toISOString(),
     };
 
     if (id) {
@@ -326,22 +431,20 @@ export function SstProgramsScreen({ onToast }: SstProgramsScreenProps) {
     fetchPrograms();
   };
 
-  // ── render ───────────────────────────────────────────────────────────────
+  // ── render ────────────────────────────────────────────────────────────────
   return (
     <div className="p-6 space-y-5 max-w-screen-xl mx-auto">
-      {/* ── Header ─────────────────────────────────────────────────────── */}
+
+      {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100">Programas SST</h1>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-            Controle de validade e gestão dos programas de Saúde, Segurança e Trabalho
+            Documentos, laudos e programas de Saúde, Segurança e Trabalho
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={fetchPrograms}
-            className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
-          >
+          <button onClick={fetchPrograms} className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">
             <RefreshCw className="w-3.5 h-3.5" /> Atualizar
           </button>
           <button
@@ -353,17 +456,17 @@ export function SstProgramsScreen({ onToast }: SstProgramsScreenProps) {
         </div>
       </div>
 
-      {/* ── Summary cards ──────────────────────────────────────────────── */}
+      {/* Summary cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: 'Total', value: counts.total, icon: ShieldCheck, cls: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-900/20' },
-          { label: 'Vigente', value: counts.vigente, icon: CheckCircle2, cls: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-900/20' },
-          { label: 'Vencendo', value: counts.vencendo, icon: Clock, cls: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-900/20' },
-          { label: 'Vencido', value: counts.vencido, icon: AlertTriangle, cls: 'text-red-600', bg: 'bg-red-50 dark:bg-red-900/20' },
+          { label: 'Total',    value: counts.total,    icon: ShieldCheck,   cls: 'text-blue-600',    bg: 'bg-blue-50 dark:bg-blue-900/20'    },
+          { label: 'Vigente',  value: counts.vigente,  icon: CheckCircle2,  cls: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-900/20' },
+          { label: 'Vencendo', value: counts.vencendo, icon: Clock,         cls: 'text-amber-600',   bg: 'bg-amber-50 dark:bg-amber-900/20'   },
+          { label: 'Vencido',  value: counts.vencido,  icon: AlertTriangle, cls: 'text-red-600',     bg: 'bg-red-50 dark:bg-red-900/20'       },
         ].map(({ label, value, icon: Icon, cls, bg }) => (
           <div key={label} className={`rounded-2xl border border-slate-200 dark:border-slate-800 p-4 flex items-center gap-3 ${bg}`}>
             <div className={`w-9 h-9 rounded-xl flex items-center justify-center bg-white dark:bg-slate-900 shadow-sm ${cls}`}>
-              <Icon className="w-4.5 h-4.5" />
+              <Icon className="w-4 h-4" />
             </div>
             <div>
               <p className="text-2xl font-bold text-slate-800 dark:text-slate-100 leading-none">{value}</p>
@@ -373,7 +476,7 @@ export function SstProgramsScreen({ onToast }: SstProgramsScreenProps) {
         ))}
       </div>
 
-      {/* ── Filters ────────────────────────────────────────────────────── */}
+      {/* Filters */}
       <div className="flex flex-wrap gap-2 items-center">
         <span className="text-xs text-slate-500 dark:text-slate-400">Categoria:</span>
         {(['Todos', 'Programa', 'Laudo', 'Plano', 'Controle'] as const).map((c) => (
@@ -404,9 +507,14 @@ export function SstProgramsScreen({ onToast }: SstProgramsScreenProps) {
             {s}
           </button>
         ))}
+        {counts.comDoc < counts.total && (
+          <span className="ml-auto text-xs text-slate-400 dark:text-slate-500">
+            {counts.comDoc}/{counts.total} com documento
+          </span>
+        )}
       </div>
 
-      {/* ── Program cards ──────────────────────────────────────────────── */}
+      {/* Program cards */}
       {loading ? (
         <div className="flex items-center justify-center py-16 text-slate-400 text-sm gap-2">
           <RefreshCw className="w-4 h-4 animate-spin" /> Carregando…
@@ -414,23 +522,24 @@ export function SstProgramsScreen({ onToast }: SstProgramsScreenProps) {
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 gap-3 text-slate-400">
           <ShieldCheck className="w-10 h-10 opacity-30" />
-          <p className="text-sm">Nenhum programa encontrado para os filtros selecionados.</p>
+          <p className="text-sm">Nenhum programa para os filtros selecionados.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {filtered.map((p) => {
-            const status = p.status ?? 'Indefinido';
-            const meta = STATUS_META[status];
-            const StatusIcon = meta.icon;
+            const status  = p.status ?? 'Indefinido';
+            const meta    = STATUS_META[status];
             const CatIcon = CATEGORY_ICONS[p.category];
-            const catCls = CATEGORY_COLORS[p.category];
+            const catCls  = CATEGORY_COLORS[p.category];
+            const StatusIcon = meta.icon;
+            const hasDoc  = !!p.file_url;
 
             return (
               <div
                 key={p.id}
-                className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 flex flex-col gap-3 hover:shadow-md transition-shadow group"
+                className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 flex flex-col gap-3 hover:shadow-md transition-shadow"
               >
-                {/* top row */}
+                {/* top row: category icon + name + status badge */}
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
                     <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${catCls}`}>
@@ -441,7 +550,6 @@ export function SstProgramsScreen({ onToast }: SstProgramsScreenProps) {
                       <span className={`inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${catCls}`}>{p.category}</span>
                     </div>
                   </div>
-                  {/* status badge */}
                   <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-lg border shrink-0 ${meta.cls}`}>
                     <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${meta.dotCls}`} />
                     {status}
@@ -461,7 +569,7 @@ export function SstProgramsScreen({ onToast }: SstProgramsScreenProps) {
                   </span>
                 </div>
 
-                {/* days label */}
+                {/* days badge */}
                 {p.validity_end && (
                   <div className={`flex items-center gap-1.5 text-xs font-medium rounded-lg px-2.5 py-1.5 ${meta.cls} border`}>
                     <StatusIcon className="w-3.5 h-3.5 shrink-0" />
@@ -482,20 +590,42 @@ export function SstProgramsScreen({ onToast }: SstProgramsScreenProps) {
                   <p className="text-[11px] text-slate-500 dark:text-slate-500 italic leading-snug">{p.notes}</p>
                 )}
 
-                {/* edit button (visible on hover) */}
-                <button
-                  onClick={() => { setEditTarget(p); setModalOpen(true); }}
-                  className="mt-auto w-full py-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 rounded-lg border border-slate-100 dark:border-slate-800 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 dark:hover:bg-blue-950/40 dark:hover:text-blue-400 dark:hover:border-blue-800 transition-all opacity-0 group-hover:opacity-100"
-                >
-                  Editar
-                </button>
+                {/* actions: Abrir documento + Editar */}
+                <div className="mt-auto flex gap-2 pt-1">
+                  {hasDoc ? (
+                    <a
+                      href={p.file_url!}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      Abrir documento
+                    </a>
+                  ) : (
+                    <button
+                      onClick={() => { setEditTarget(p); setModalOpen(true); }}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-amber-50 hover:text-amber-700 dark:hover:bg-amber-950/30 dark:hover:text-amber-400 border border-slate-200 dark:border-slate-700 hover:border-amber-200 dark:hover:border-amber-800 rounded-lg transition-colors"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      Anexar documento
+                    </button>
+                  )}
+                  <button
+                    onClick={() => { setEditTarget(p); setModalOpen(true); }}
+                    title="Editar"
+                    className="w-9 flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 text-slate-400 hover:text-blue-600 hover:border-blue-300 dark:hover:text-blue-400 dark:hover:border-blue-800 transition-colors"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
             );
           })}
         </div>
       )}
 
-      {/* ── Timeline / alerts for near-expiry ────────────────────────── */}
+      {/* Painel de atenção */}
       {programs.some((p) => p.status === 'Vencendo' || p.status === 'Vencido') && (
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 space-y-3">
           <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-2">
@@ -507,7 +637,7 @@ export function SstProgramsScreen({ onToast }: SstProgramsScreenProps) {
               .filter((p) => p.status === 'Vencido' || p.status === 'Vencendo')
               .sort((a, b) => (a.daysUntilExpiry ?? 999) - (b.daysUntilExpiry ?? 999))
               .map((p) => {
-                const meta = STATUS_META[p.status ?? 'Indefinido'];
+                const meta    = STATUS_META[p.status ?? 'Indefinido'];
                 const CatIcon = CATEGORY_ICONS[p.category];
                 return (
                   <div
@@ -522,6 +652,17 @@ export function SstProgramsScreen({ onToast }: SstProgramsScreenProps) {
                     <span className={`text-xs font-semibold px-2.5 py-1 rounded-lg border shrink-0 ${meta.cls}`}>
                       {daysLabel(p.daysUntilExpiry)}
                     </span>
+                    {p.file_url && (
+                      <a
+                        href={p.file_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-500 hover:text-blue-700 shrink-0"
+                        title="Abrir documento"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                      </a>
+                    )}
                   </div>
                 );
               })}
