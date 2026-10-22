@@ -81,24 +81,32 @@ function CertificatePreview({ cert, onClose }: { cert: CertificateRecord; onClos
               </div>
             </div>
             {cert.programContent && cert.programContent.length > 0 && (
-              <div style={{width:'297mm',height:'210mm',position:'relative',fontFamily:'Arial,sans-serif',overflow:'hidden'}}>
+              <div style={{width:'297mm',height:'210mm',position:'relative',fontFamily:'Arial,sans-serif',overflow:'hidden',marginTop:'4px'}}>
                 <img src={CERT_BG} style={{position:'absolute',inset:0,width:'100%',height:'100%',objectFit:'cover'}} alt=""/>
-                {/* Company header — same as page 1 */}
-                <div style={{position:'absolute',top:'12mm',right:'12mm',textAlign:'right',fontSize:'7.5px',color:'#111'}}>Tiger Rentank do Brasil Equipamentos Industriais LTDA<br/>CNPJ: 09.488.992/0002-01</div>
-                {/* Content area — left margin avoids Tiger logo strip */}
-                <div style={{position:'absolute',top:'20mm',left:'68mm',right:'8mm',bottom:'8mm',padding:'0 12mm',display:'flex',flexDirection:'column'}}>
-                  <div style={{fontSize:'16px',fontWeight:800,color:'#111',marginBottom:'2mm',letterSpacing:'1px'}}>CONTEÚDO PROGRAMÁTICO</div>
-                  <div style={{width:'40mm',height:'1px',background:'#2563eb',marginBottom:'4mm'}}/>
-                  <div style={{fontSize:'8.5px',color:'#444',marginBottom:'4mm',display:'flex',gap:'8mm'}}>
+                {/* Company header — mirrors page 1 exactly */}
+                <div style={{position:'absolute',top:'12mm',right:'12mm',textAlign:'right',fontSize:'7.5px',color:'#111'}}>
+                  Tiger Rentank do Brasil Equipamentos Industriais LTDA<br/>CNPJ: 09.488.992/0002-01
+                </div>
+                {/* Content area — same left/top/right/bottom as page 1 */}
+                <div style={{position:'absolute',top:'22mm',left:'68mm',right:'8mm',bottom:'8mm',padding:'0 12mm',display:'flex',flexDirection:'column'}}>
+                  {/* Title block — sized to match page 1 visual weight */}
+                  <div style={{marginBottom:'5mm'}}>
+                    <div style={{fontSize:'13px',fontWeight:900,color:'#111',letterSpacing:'2px',textTransform:'uppercase'}}>Conteúdo Programático</div>
+                    <div style={{width:'36mm',height:'2px',background:'#2563eb',marginTop:'2mm'}}/>
+                  </div>
+                  {/* Meta row */}
+                  <div style={{fontSize:'8px',color:'#444',marginBottom:'4mm',display:'flex',flexWrap:'wrap',gap:'6mm',paddingBottom:'2mm',borderBottom:'1px solid rgba(0,0,0,0.08)'}}>
                     <span>Treinamento: <strong>{cert.trainingName}</strong></span>
                     <span>Carga Horária: <strong>{cert.hours}h</strong></span>
                   </div>
-                  <ul style={{fontSize:'9.5px',lineHeight:'2.0',color:'#111',paddingLeft:'5mm',flex:1}}>
+                  {/* Items list — flex:1 fills remaining height, overflow clips to page */}
+                  <ul style={{fontSize:'9px',lineHeight:'1.85',color:'#111',paddingLeft:'5mm',flex:1,overflow:'hidden'}}>
                     {cert.programContent.map((item,i)=>(
-                      <li key={i} style={{borderBottom:'1px solid rgba(0,0,0,0.06)',paddingBottom:'1mm'}}>{item}</li>
+                      <li key={i} style={{paddingBottom:'1.5mm',marginBottom:'0.5mm',borderBottom:'1px solid rgba(0,0,0,0.05)'}}>{item}</li>
                     ))}
                   </ul>
-                  <div style={{marginTop:'auto',paddingTop:'4mm',fontSize:'7px',color:'#888',textAlign:'center',borderTop:'1px solid rgba(0,0,0,0.1)'}}>
+                  {/* Footer — pinned to bottom */}
+                  <div style={{paddingTop:'3mm',fontSize:'6.5px',color:'#888',textAlign:'center',borderTop:'1px solid rgba(0,0,0,0.1)'}}>
                     Código: {cert.certificateHash} · Concluído em: {cert.completionDate}
                   </div>
                 </div>

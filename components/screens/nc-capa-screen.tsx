@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useRef } from 'react';
 import {
   AlertTriangle, Plus, CheckCircle2, Clock, XCircle,
   ChevronDown, ChevronUp, Search, Filter, Edit2, Trash2,
   AlertOctagon, Info, TrendingUp, X, Save, ChevronRight, Download,
+  FileDown, Printer,
 } from 'lucide-react';
 import {
   NonConformity, NCType, NCSeverity, NCSource, NCStatus,
@@ -1045,6 +1046,308 @@ function NCModal({ initial, onSave, onClose }: NCModalProps) {
   );
 }
 
+// ─── NC Print Modal ───────────────────────────────────────────────────────────
+
+function NCPrintModal({ nc, onClose }: { nc: NonConformity; onClose: () => void }) {
+  const printRef = useRef<HTMLDivElement>(null);
+
+  const handlePrint = () => {
+    const w = window.open('', '_blank');
+    if (!w) return;
+    const content = printRef.current?.innerHTML || '';
+    const styles = `
+      @page { size: A4 portrait; margin: 0 }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { font-family: Arial, sans-serif; font-size: 9px; color: #111; background: white; }
+      .page { width: 210mm; min-height: 297mm; padding: 12mm 15mm; }
+      .hdr { border-bottom: 2px solid #1e3a8a; padding-bottom: 4mm; margin-bottom: 4mm; display: flex; justify-content: space-between; align-items: flex-end; }
+      .logo { font-size: 14px; font-weight: 900; color: #1e3a8a; letter-spacing: 1px; }
+      .logo-sub { font-size: 7px; color: #555; font-weight: normal; }
+      .nc-id { text-align: right; }
+      .nc-code { font-size: 13px; font-weight: 800; color: #1e3a8a; }
+      .nc-title { font-size: 11px; font-weight: bold; margin-top: 2mm; }
+      .section { margin-top: 5mm; }
+      .sec-title { background: #1e3a8a; color: white; font-size: 7.5px; font-weight: bold; padding: 1.5mm 3mm; letter-spacing: 0.5px; margin-bottom: 3mm; }
+      .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 2mm 6mm; }
+      .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 2mm 6mm; }
+      .field { }
+      .lbl { font-size: 6.5px; color: #666; font-weight: bold; text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 0.5mm; }
+      .val { font-size: 9px; color: #111; border-bottom: 1px solid #ddd; padding-bottom: 1mm; min-height: 5mm; }
+      .val-block { font-size: 9px; color: #111; border: 1px solid #e5e7eb; border-radius: 2px; padding: 1.5mm 2mm; white-space: pre-wrap; margin-bottom: 1mm; background: #fafafa; }
+      .full { grid-column: 1 / -1; }
+      .highlight { background: #eff6ff; border-left: 3px solid #2563eb; padding: 2mm 3mm; margin-top: 2mm; border-radius: 1px; }
+      .highlight .lbl { color: #1e40af; }
+      .why-row { display: flex; gap: 3mm; align-items: flex-start; padding: 1.5mm 0; border-bottom: 1px solid #f0f0f0; }
+      .why-n { font-size: 7.5px; font-weight: 800; color: #1e3a8a; min-width: 5mm; }
+      .why-t { font-size: 8.5px; font-weight: bold; color: #555; min-width: 20mm; }
+      .why-v { font-size: 9px; color: #111; flex: 1; }
+      .sig-area { margin-top: 12mm; display: grid; grid-template-columns: 1fr 1fr; gap: 10mm; }
+      .sig-box { border-top: 1px solid #333; padding-top: 3mm; text-align: center; }
+      .sig-space { height: 14mm; }
+      .sig-name { font-size: 8px; font-weight: bold; }
+      .sig-role { font-size: 7px; color: #666; margin-top: 1mm; }
+      .footer { margin-top: 6mm; border-top: 1px solid #ddd; padding-top: 3mm; text-align: center; font-size: 6.5px; color: #888; }
+      .cb-row { display: flex; gap: 4mm; flex-wrap: wrap; }
+      .cb { display: flex; align-items: center; gap: 1mm; font-size: 8.5px; }
+      .cb-box { width: 3mm; height: 3mm; border: 1px solid #333; display: inline-block; background: #eef2ff; }
+      @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+    `;
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>NC ${nc.code || nc.title}</title><style>${styles}</style></head><body>${content}</body></html>`);
+    w.document.close();
+    setTimeout(() => { w.print(); }, 600);
+  };
+
+  const fmtD = (d?: string | null) => {
+    if (!d) return '—';
+    const p = d.split('-');
+    return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : d;
+  };
+  const v = (s?: string | null) => s || '—';
+
+  const hasIshikawa = [nc.ishikawaManpower, nc.ishikawaEnvironment, nc.ishikawaMaterials, nc.ishikawaMachinery, nc.ishikawaMeasurement, nc.ishikawaMethods].some(Boolean);
+  const has5Por = [nc.why1, nc.why2, nc.why3, nc.why4, nc.why5].some(Boolean);
+  const has5W2H = [nc.w2h_what, nc.w2h_why, nc.w2h_where, nc.w2h_when, nc.w2h_who, nc.w2h_how, nc.w2h_howMuch].some(Boolean);
+  const hasCapa = nc.correctiveAction || nc.actionResponsible || nc.actionDeadline || nc.actionImplemented;
+  const hasEficacia = nc.effectiveness || nc.effectivenessCheck || nc.qsmsResponsible;
+
+  const whyItems = [
+    [nc.why1, 'Por quê 1'],
+    [nc.why2, 'Por quê 2'],
+    [nc.why3, 'Por quê 3'],
+    [nc.why4, 'Por quê 4'],
+    [nc.why5, 'Por quê 5'],
+  ].filter(([v]) => v) as [string, string][];
+
+  const w2hItems = [
+    ['O quê (What)', nc.w2h_what],
+    ['Por quê (Why)', nc.w2h_why],
+    ['Onde (Where)', nc.w2h_where],
+    ['Quando (When)', nc.w2h_when],
+    ['Quem (Who)', nc.w2h_who],
+    ['Como (How)', nc.w2h_how],
+    ['Quanto custa', nc.w2h_howMuch],
+  ].filter(([, val]) => val) as [string, string][];
+
+  const ishikawaItems = [
+    ['Mão de Obra', nc.ishikawaManpower],
+    ['Meio Ambiente', nc.ishikawaEnvironment],
+    ['Materiais', nc.ishikawaMaterials],
+    ['Máquinas', nc.ishikawaMachinery],
+    ['Medição', nc.ishikawaMeasurement],
+    ['Métodos', nc.ishikawaMethods],
+  ].filter(([, val]) => val) as [string, string][];
+
+  return (
+    <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl h-[92vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200 flex-shrink-0">
+          <div>
+            <p className="text-sm font-semibold text-slate-800">Ficha NC/CAPA — {nc.code || 'S/N'}</p>
+            <p className="text-xs text-slate-400 mt-0.5 line-clamp-1">{nc.title}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handlePrint}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              Imprimir / PDF
+            </button>
+            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100">
+              <X className="w-4 h-4 text-slate-500" />
+            </button>
+          </div>
+        </div>
+
+        {/* Preview area */}
+        <div className="flex-1 overflow-auto bg-slate-100 p-4">
+          <div ref={printRef}>
+            <div className="page" style={{ background: 'white', boxShadow: '0 2px 8px rgba(0,0,0,0.12)', borderRadius: '2px' }}>
+
+              {/* Header */}
+              <div className="hdr">
+                <div>
+                  <div className="logo">Tiger Rentank</div>
+                  <div className="logo-sub">do Brasil Equipamentos Industriais LTDA · CNPJ 09.488.992/0002-01</div>
+                </div>
+                <div className="nc-id">
+                  <div className="nc-code">{nc.code || 'NC S/N'}</div>
+                  <div style={{ fontSize: '6.5px', color: '#888', marginTop: '1mm' }}>Ficha de Não Conformidade / CAPA</div>
+                  <div style={{ fontSize: '6.5px', color: '#888' }}>Abertura: {fmtD(nc.detectedDate)} · Prazo: {fmtD(nc.deadline)}</div>
+                </div>
+              </div>
+
+              <div className="nc-title">{nc.title}</div>
+
+              {/* 1. Identificação */}
+              <div className="section">
+                <div className="sec-title">1. IDENTIFICAÇÃO</div>
+                <div className="grid3">
+                  <div className="field"><div className="lbl">Tipo</div><div className="val">{nc.type}</div></div>
+                  <div className="field"><div className="lbl">Severidade</div><div className="val">{nc.severity}</div></div>
+                  <div className="field"><div className="lbl">Status</div><div className="val">{nc.status}</div></div>
+                  <div className="field"><div className="lbl">Fonte</div><div className="val">{v(nc.source)}</div></div>
+                  <div className="field"><div className="lbl">Responsável</div><div className="val">{v(nc.responsible)}</div></div>
+                  <div className="field"><div className="lbl">Setor</div><div className="val">{v(nc.sector)}</div></div>
+                  {nc.client && <div className="field"><div className="lbl">Cliente</div><div className="val">{nc.client}</div></div>}
+                  {nc.origin && <div className="field full"><div className="lbl">Origem</div><div className="val">{nc.origin}</div></div>}
+                </div>
+                {(nc.itemQualidade || nc.itemAmbiental || nc.itemSSO) && (
+                  <div style={{ marginTop: '2mm' }}>
+                    <div className="lbl">Itens da Ocorrência</div>
+                    <div className="cb-row" style={{ marginTop: '1mm' }}>
+                      {nc.itemQualidade && <span className="cb"><span className="cb-box" />Qualidade</span>}
+                      {nc.itemAmbiental && <span className="cb"><span className="cb-box" />Ambiental</span>}
+                      {nc.itemSSO && <span className="cb"><span className="cb-box" />SSO</span>}
+                    </div>
+                  </div>
+                )}
+                {nc.description && (
+                  <div style={{ marginTop: '2mm' }}>
+                    <div className="lbl">Descrição</div>
+                    <div className="val-block">{nc.description}</div>
+                  </div>
+                )}
+                {nc.immediateAction && (
+                  <div style={{ marginTop: '2mm' }}>
+                    <div className="lbl">Ação Imediata</div>
+                    <div className="val-block">{nc.immediateAction}</div>
+                  </div>
+                )}
+              </div>
+
+              {/* 2. 5 Porquês */}
+              {has5Por && (
+                <div className="section">
+                  <div className="sec-title">2. ANÁLISE — 5 PORQUÊS</div>
+                  {whyItems.map(([text, label], i) => (
+                    <div key={i} className="why-row">
+                      <span className="why-n">{i + 1}°</span>
+                      <span className="why-t">{label}</span>
+                      <span className="why-v">{text}</span>
+                    </div>
+                  ))}
+                  {nc.rootCauseIdentified && (
+                    <div className="highlight" style={{ marginTop: '3mm' }}>
+                      <div className="lbl">Causa Raiz Identificada</div>
+                      <div style={{ fontSize: '9px', marginTop: '1mm' }}>{nc.rootCauseIdentified}</div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 3. Ishikawa */}
+              {hasIshikawa && (
+                <div className="section">
+                  <div className="sec-title">3. DIAGRAMA DE ISHIKAWA — 6M</div>
+                  <div className="grid2">
+                    {ishikawaItems.map(([label, val]) => (
+                      <div key={label} className="field">
+                        <div className="lbl">{label}</div>
+                        <div className="val-block">{val}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 4. 5W2H */}
+              {has5W2H && (
+                <div className="section">
+                  <div className="sec-title">4. PLANO 5W2H</div>
+                  <div className="grid2">
+                    {w2hItems.map(([label, val]) => (
+                      <div key={label} className="field">
+                        <div className="lbl">{label}</div>
+                        <div className="val-block">{val}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 5. CAPA */}
+              {hasCapa && (
+                <div className="section">
+                  <div className="sec-title">5. PLANO DE AÇÃO (CAPA)</div>
+                  <div className="grid2">
+                    {nc.correctiveAction && (
+                      <div className="field full">
+                        <div className="lbl">Ação Corretiva / Preventiva</div>
+                        <div className="val-block">{nc.correctiveAction}</div>
+                      </div>
+                    )}
+                    <div className="field"><div className="lbl">Responsável pela Ação</div><div className="val">{v(nc.actionResponsible)}</div></div>
+                    <div className="field"><div className="lbl">Prazo da Ação</div><div className="val">{fmtD(nc.actionDeadline)}</div></div>
+                    {nc.actionImplemented && (
+                      <div className="field full">
+                        <div className="lbl">Ação Implementada</div>
+                        <div className="val-block">{nc.actionImplemented}</div>
+                      </div>
+                    )}
+                    {nc.implementationDate && <div className="field"><div className="lbl">Data de Implementação</div><div className="val">{fmtD(nc.implementationDate)}</div></div>}
+                  </div>
+                </div>
+              )}
+
+              {/* 6. Verificação de Eficácia */}
+              {hasEficacia && (
+                <div className="section">
+                  <div className="sec-title">6. VERIFICAÇÃO DE EFICÁCIA</div>
+                  <div className="grid3">
+                    <div className="field"><div className="lbl">Resultado</div><div className="val">{v(nc.effectiveness)}</div></div>
+                    <div className="field"><div className="lbl">Data da Verificação</div><div className="val">{fmtD(nc.effectivenessDate)}</div></div>
+                    <div className="field"><div className="lbl">Responsável QSMS</div><div className="val">{v(nc.qsmsResponsible)}</div></div>
+                    {nc.effectivenessCheck && (
+                      <div className="field full">
+                        <div className="lbl">Verificação</div>
+                        <div className="val-block">{nc.effectivenessCheck}</div>
+                      </div>
+                    )}
+                  </div>
+                  {nc.closedDate && (
+                    <div style={{ marginTop: '2mm' }}>
+                      <div className="lbl">Data de Encerramento</div>
+                      <div className="val" style={{ maxWidth: '60mm' }}>{fmtD(nc.closedDate)}</div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 7. Observações */}
+              {nc.notes && (
+                <div className="section">
+                  <div className="sec-title">7. OBSERVAÇÕES</div>
+                  <div className="val-block">{nc.notes}</div>
+                </div>
+              )}
+
+              {/* Assinaturas */}
+              <div className="sig-area">
+                <div className="sig-box">
+                  <div className="sig-space" />
+                  <div className="sig-name">{nc.responsible || '________________________________'}</div>
+                  <div className="sig-role">Responsável pela NC</div>
+                </div>
+                <div className="sig-box">
+                  <div className="sig-space" />
+                  <div className="sig-name">{nc.qsmsResponsible || '________________________________'}</div>
+                  <div className="sig-role">Responsável QSMS</div>
+                </div>
+              </div>
+
+              <div className="footer">
+                Tiger Rentank do Brasil Equipamentos Industriais LTDA &nbsp;·&nbsp; {nc.code || 'Ficha NC/CAPA'} &nbsp;·&nbsp; Gerado em {new Date().toLocaleDateString('pt-BR')}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 interface NCCAPAScreenProps {
@@ -1063,6 +1366,7 @@ export function NCCAPAScreen({ items, onSave, onDelete }: NCCAPAScreenProps) {
   const [isModalOpen, setIsModalOpen]   = useState(false);
   const [editItem, setEditItem]         = useState<NonConformity | null>(null);
   const [deletingId, setDeletingId]     = useState<string | null>(null);
+  const [printNC, setPrintNC]           = useState<NonConformity | null>(null);
 
   // ─── Stats ────────────────────────────────────────────────────────────────
   const stats = useMemo(() => {
@@ -1110,6 +1414,7 @@ export function NCCAPAScreen({ items, onSave, onDelete }: NCCAPAScreenProps) {
   }), [nonClariantItems, filterStatus, filterPrazo, q]);
 
   const filteredClariant = useMemo(() => clariantItems.filter((item) => {
+    if (filterStatus !== 'Todos' && item.status !== filterStatus) return false;
     if (filterCliente !== 'Todos' && item.endCustomer !== filterCliente) return false;
     if (filterPrazo === 'No Prazo' && item.statusD1 !== 'No Prazo') return false;
     if (filterPrazo === 'Fora do Prazo' && item.statusD1 !== 'Fora do Prazo' && item.statusD7 !== 'Fora do Prazo') return false;
@@ -1118,7 +1423,7 @@ export function NCCAPAScreen({ items, onSave, onDelete }: NCCAPAScreenProps) {
           && !(item.chemicalProduct ?? '').toLowerCase().includes(q)
           && !(item.originLocation ?? '').toLowerCase().includes(q)) return false;
     return true;
-  }), [clariantItems, filterCliente, filterPrazo, q]);
+  }), [clariantItems, filterStatus, filterCliente, filterPrazo, q]);
 
   // ─── Handlers ─────────────────────────────────────────────────────────────
   const handleSave = async (data: NCFormData) => {
@@ -1325,6 +1630,13 @@ export function NCCAPAScreen({ items, onSave, onDelete }: NCCAPAScreenProps) {
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-1 justify-end">
                             <button
+                              onClick={() => setPrintNC(nc)}
+                              className="p-1.5 rounded-lg hover:bg-green-50 text-slate-400 hover:text-green-600 transition-colors"
+                              title="Gerar PDF"
+                            >
+                              <FileDown className="w-3.5 h-3.5" />
+                            </button>
+                            <button
                               onClick={() => { setEditItem(nc); setIsModalOpen(true); }}
                               className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-blue-600 transition-colors"
                               title="Editar"
@@ -1466,6 +1778,13 @@ export function NCCAPAScreen({ items, onSave, onDelete }: NCCAPAScreenProps) {
                         <td className="px-3 py-3">
                           <div className="flex items-center gap-1 justify-end">
                             <button
+                              onClick={() => setPrintNC(nc)}
+                              className="p-1.5 rounded-lg hover:bg-green-50 text-slate-400 hover:text-green-600 transition-colors"
+                              title="Gerar PDF"
+                            >
+                              <FileDown className="w-3.5 h-3.5" />
+                            </button>
+                            <button
                               onClick={() => { setEditItem(nc); setIsModalOpen(true); }}
                               className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-blue-600 transition-colors"
                               title="Editar"
@@ -1492,12 +1811,20 @@ export function NCCAPAScreen({ items, onSave, onDelete }: NCCAPAScreenProps) {
         </div>
       )}
 
-      {/* Modal */}
+      {/* Modal edição */}
       {isModalOpen && (
         <NCModal
           initial={editItem}
           onSave={handleSave}
           onClose={() => { setIsModalOpen(false); setEditItem(null); }}
+        />
+      )}
+
+      {/* Modal PDF */}
+      {printNC && (
+        <NCPrintModal
+          nc={printNC}
+          onClose={() => setPrintNC(null)}
         />
       )}
     </div>
