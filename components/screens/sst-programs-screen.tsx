@@ -561,10 +561,15 @@ export function SstProgramsScreen({ onToast }: SstProgramsScreenProps) {
     comDoc:   programs.filter((p) => !!p.file_url).length,
   }), [programs]);
 
-  // ── clientes únicos para filtro ───────────────────────────────────────────
+  // ── clientes únicos para filtro (deduplicados por texto normalizado) ───────
   const clientOptions = useMemo(() => {
-    const set = new Set(programs.map((p) => p.client).filter(Boolean) as string[]);
-    return Array.from(set).sort();
+    const seen = new Map<string, string>(); // key=normalizado, value=original
+    for (const p of programs) {
+      if (!p.client) continue;
+      const normalized = p.client.trim().toLowerCase();
+      if (!seen.has(normalized)) seen.set(normalized, p.client.trim());
+    }
+    return Array.from(seen.values()).sort((a, b) => a.localeCompare(b, 'pt-BR'));
   }, [programs]);
 
   // ── filtered list ─────────────────────────────────────────────────────────
@@ -572,7 +577,7 @@ export function SstProgramsScreen({ onToast }: SstProgramsScreenProps) {
     programs.filter((p) => {
       if (filterCategory !== 'Todos' && p.category !== filterCategory) return false;
       if (filterStatus   !== 'Todos' && p.status   !== filterStatus)   return false;
-      if (filterClient   !== 'Todos' && p.client   !== filterClient)   return false;
+      if (filterClient   !== 'Todos' && p.client?.trim().toLowerCase() !== filterClient.trim().toLowerCase()) return false;
       return true;
     }),
   [programs, filterCategory, filterStatus, filterClient]);
@@ -748,60 +753,66 @@ export function SstProgramsScreen({ onToast }: SstProgramsScreenProps) {
       </div>
 
       {/* Filters */}
-      <div className="space-y-2">
-        <div className="flex flex-wrap gap-2 items-center">
-          <span className="text-xs text-slate-500 dark:text-slate-400">Categoria:</span>
-          {(['Todos', 'Programa', 'Laudo', 'Plano', 'Controle'] as const).map((c) => (
-            <button
-              key={c}
-              onClick={() => setFilterCategory(c)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
-                filterCategory === c
-                  ? 'bg-blue-600 text-white border-blue-600'
-                  : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
-              }`}
-            >
-              {c}
-            </button>
-          ))}
-          <span className="text-xs text-slate-400 mx-1">|</span>
-          <span className="text-xs text-slate-500 dark:text-slate-400">Status:</span>
-          {(['Todos', 'Vigente', 'Vencendo', 'Vencido', 'Indefinido'] as const).map((s) => (
-            <button
-              key={s}
-              onClick={() => setFilterStatus(s)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
-                filterStatus === s
-                  ? 'bg-blue-600 text-white border-blue-600'
-                  : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
-              }`}
-            >
-              {s}
-            </button>
-          ))}
-        </div>
-        {clientOptions.length > 0 && (
-          <div className="flex flex-wrap gap-2 items-center">
-            <span className="text-xs text-slate-500 dark:text-slate-400">Cliente:</span>
-            {(['Todos', ...clientOptions]).map((cl) => (
-              <button
-                key={cl}
-                onClick={() => setFilterClient(cl)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
-                  filterClient === cl
-                    ? 'bg-indigo-600 text-white border-indigo-600'
-                    : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
-                }`}
-              >
-                {cl}
-              </button>
+      <div className="flex flex-wrap gap-3 items-center">
+        {/* Categoria */}
+        <div className="flex items-center gap-1.5">
+          <label className="text-xs font-medium text-slate-500 dark:text-slate-400 whitespace-nowrap">Categoria</label>
+          <select
+            value={filterCategory}
+            onChange={(e) => setFilterCategory(e.target.value as SstProgramCategory | 'Todos')}
+            className="text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 px-2.5 py-1.5 pr-7 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-colors"
+          >
+            {(['Todos', 'Programa', 'Laudo', 'Plano', 'Controle'] as const).map((c) => (
+              <option key={c} value={c}>{c}</option>
             ))}
-            {counts.comDoc < counts.total && (
-              <span className="ml-auto text-xs text-slate-400 dark:text-slate-500">
-                {counts.comDoc}/{counts.total} com documento
-              </span>
-            )}
+          </select>
+        </div>
+
+        {/* Status */}
+        <div className="flex items-center gap-1.5">
+          <label className="text-xs font-medium text-slate-500 dark:text-slate-400 whitespace-nowrap">Status</label>
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value as SstProgramStatus | 'Todos')}
+            className="text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 px-2.5 py-1.5 pr-7 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-colors"
+          >
+            {(['Todos', 'Vigente', 'Vencendo', 'Vencido', 'Indefinido'] as const).map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Cliente */}
+        {clientOptions.length > 0 && (
+          <div className="flex items-center gap-1.5">
+            <label className="text-xs font-medium text-slate-500 dark:text-slate-400 whitespace-nowrap">Cliente</label>
+            <select
+              value={filterClient}
+              onChange={(e) => setFilterClient(e.target.value)}
+              className="text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 px-2.5 py-1.5 pr-7 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-colors"
+            >
+              <option value="Todos">Todos</option>
+              {clientOptions.map((cl) => (
+                <option key={cl} value={cl}>{cl}</option>
+              ))}
+            </select>
           </div>
+        )}
+
+        {/* Limpar filtros */}
+        {(filterCategory !== 'Todos' || filterStatus !== 'Todos' || filterClient !== 'Todos') && (
+          <button
+            onClick={() => { setFilterCategory('Todos'); setFilterStatus('Todos'); setFilterClient('Todos'); }}
+            className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 underline underline-offset-2 transition-colors"
+          >
+            Limpar filtros
+          </button>
+        )}
+
+        {counts.comDoc < counts.total && (
+          <span className="ml-auto text-xs text-slate-400 dark:text-slate-500">
+            {counts.comDoc}/{counts.total} com documento
+          </span>
         )}
       </div>
 
