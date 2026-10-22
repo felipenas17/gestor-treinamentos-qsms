@@ -28,6 +28,7 @@ import { NCDashboardScreen } from '@/components/screens/nc-dashboard-screen';
 import { ComplianceScoreScreen } from '@/components/screens/compliance-score-screen';
 import { ManagementReportScreen } from '@/components/screens/management-report-screen';
 import { AuditScreen } from '@/components/screens/audit-screen';
+import { SstProgramsScreen } from '@/components/screens/sst-programs-screen';
 // import { ImportDocumentModal } from '@/components/modals/import-document-modal'; // modal não ativo
 
 import {
@@ -1668,6 +1669,9 @@ export default function GestorTreinamentosApp() {
               nonConformities={nonConformities}
               complianceScore={complianceScore}
             />
+          )}
+          {currentTab === 'programas-sst' && (
+            <SstProgramsScreen onToast={showToast} />
           )}
         </main>
       </div>

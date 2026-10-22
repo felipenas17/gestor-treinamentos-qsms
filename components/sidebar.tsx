@@ -110,6 +110,14 @@ const MODULES: Module[] = [
           { id: 'matriz',       label: 'Matriz & Colaboradores', sublabel: 'Conformidade de Equipes', icon: Users           },
         ],
       },
+      {
+        id: 'programas-sst',
+        label: 'Programas SST',
+        icon: ShieldCheck,
+        items: [
+          { id: 'programas-sst', label: 'Programas SST', sublabel: 'Documentos e Laudos', icon: FileText },
+        ],
+      },
     ],
   },
 ];

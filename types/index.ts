@@ -423,3 +423,25 @@ export interface GlobalComplianceScore {
   generatedAt: string;
   alerts?: AlertItem[];
 }
+
+// ─── Programas SST ────────────────────────────────────────────────────────────
+
+export type SstProgramCategory = 'Programa' | 'Laudo' | 'Plano' | 'Controle';
+export type SstProgramStatus = 'Vigente' | 'Vencendo' | 'Vencido' | 'Indefinido';
+
+export interface SstProgram {
+  id: string;
+  name: string;
+  full_name: string;
+  category: SstProgramCategory;
+  responsible: string | null;
+  validity_start: string | null; // YYYY-MM-DD
+  validity_end: string | null;   // YYYY-MM-DD
+  notes: string | null;
+  folder_ref: string | null;
+  created_at: string;
+  updated_at: string;
+  // computed client-side
+  status?: SstProgramStatus;
+  daysUntilExpiry?: number;
+}
