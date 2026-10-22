@@ -1409,7 +1409,7 @@ function guessAttachType(file: File): NCAttachmentType {
 
 function NCTrativasModal({ nc, onClose }: { nc: NonConformity; onClose: () => void }) {
   const [attachments, setAttachments] = useState<NCAttachment[]>([]);
-  const [loading, setLoading]         = useState(true);
+  const [loading, setLoading]         = useState(true); // inicia true, sem chamar no effect
   const [uploading, setUploading]     = useState(false);
   const [uploadErr, setUploadErr]     = useState<string | null>(null);
   const [notes, setNotes]             = useState('');
@@ -1419,7 +1419,6 @@ function NCTrativasModal({ nc, onClose }: { nc: NonConformity; onClose: () => vo
 
   useEffect(() => {
     let mounted = true;
-    setLoading(true);
     fetchNCAttachments(nc.id).then((data) => {
       if (mounted) {
         setAttachments(data ?? []);
@@ -1548,7 +1547,7 @@ function NCTrativasModal({ nc, onClose }: { nc: NonConformity; onClose: () => vo
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-slate-800 truncate">{att.filename}</p>
                     <p className="text-xs text-slate-400">{ATTACH_TYPE_LABEL[att.type]} · {fmtDate(att.createdAt)}</p>
-                    {att.notes && <p className="text-xs text-slate-600 mt-0.5 italic">"{att.notes}"</p>}
+                    {att.notes && <p className="text-xs text-slate-600 mt-0.5 italic">&ldquo;{att.notes}&rdquo;</p>}
                   </div>
                   {/* Actions */}
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
