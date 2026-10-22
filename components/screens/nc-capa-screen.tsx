@@ -1237,24 +1237,24 @@ function NCPrintModal({ nc, onClose }: { nc: NonConformity; onClose: () => void 
 
                   {/* Follow-up colunas */}
                   <tr>
-                    <td colSpan={2} style={C({ width:'55%' })}><span style={LBL}>AÇÃO IMPLEMENTADA</span>{v(nc.actionImplemented)}</td>
-                    <td style={C({ width:'22%' })}><span style={LBL}>DATA DA IMPLEMENTAÇÃO</span>{fmtD(nc.implementationDate)}</td>
+                    <td style={C({ width:'55%' })}><span style={LBL}>AÇÃO IMPLEMENTADA</span>{v(nc.actionImplemented)}</td>
+                    <td style={C({ width:'25%' })}><span style={LBL}>DATA DA IMPLEMENTAÇÃO</span>{fmtD(nc.implementationDate)}</td>
                     <td style={C()}><span style={LBL}>STATUS</span>{v(nc.followUpStatus)}</td>
                   </tr>
 
                   {/* Eficácia header */}
-                  <tr><td colSpan={4} style={SUB}>EFICÁCIA DA AÇÃO CORRETIVA/PREVENTIVA – EVIDÊNCIA OBJETIVA</td></tr>
+                  <tr><td colSpan={3} style={SUB}>EFICÁCIA DA AÇÃO CORRETIVA/PREVENTIVA – EVIDÊNCIA OBJETIVA</td></tr>
 
                   {/* Verificação */}
                   <tr>
-                    <td colSpan={4} style={C({ minHeight:'10mm', whiteSpace:'pre-wrap' })}>
+                    <td colSpan={3} style={C({ minHeight:'10mm', whiteSpace:'pre-wrap' })}>
                       <span style={LBL}>Verificação da eficácia:</span>{v(nc.effectivenessCheck)}
                     </td>
                   </tr>
 
                   {/* Ação eficaz checkboxes */}
                   <tr>
-                    <td colSpan={4} style={C()}>
+                    <td colSpan={3} style={C()}>
                       {ck(nc.effectiveness === 'Eficaz')}Ação Eficaz
                       &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
                       {ck(nc.effectiveness === 'Não Eficaz')}Ação Não Eficaz
@@ -1264,7 +1264,7 @@ function NCPrintModal({ nc, onClose }: { nc: NonConformity; onClose: () => void 
                   {/* Data encerramento / RESP */}
                   <tr>
                     <td style={C({ minHeight:'8mm' })}>&nbsp;</td>
-                    <td colSpan={2} style={C()}>
+                    <td style={C()}>
                       <span style={{ fontWeight:'bold' }}>Data de encerramento/Eficácia: </span>
                       {fmtD(nc.effectivenessDate || nc.closedDate)}
                     </td>
@@ -1275,7 +1275,7 @@ function NCPrintModal({ nc, onClose }: { nc: NonConformity; onClose: () => void 
 
                   {/* Responsável pelo preenchimento */}
                   <tr>
-                    <td colSpan={4} style={C()}>
+                    <td colSpan={3} style={C()}>
                       <span style={{ fontWeight:'bold' }}>RESPONSÁVEL PELO PREENCHIMENTO: </span>{v(nc.responsible)}
                     </td>
                   </tr>
