@@ -1119,6 +1119,12 @@ export default function GestorTreinamentosApp() {
   }, []);
 
   // ─── NC / CAPA handlers ──────────────────────────────────────────────────────
+  // Garante que w2h_when seja sempre YYYY-MM-DD ou null (coluna DATE no Supabase)
+  const sanitizeDateField = (val: string | null | undefined): string | null => {
+    if (!val) return null;
+    return /^\d{4}-\d{2}-\d{2}$/.test(val) ? val : null;
+  };
+
   const handleSaveNC = useCallback(async (data: NCFormData, id?: string) => {
     const now = new Date().toISOString();
 
@@ -1170,7 +1176,7 @@ export default function GestorTreinamentosApp() {
         w2h_what: data.w2h_what || null,
         w2h_why: data.w2h_why || null,
         w2h_where: data.w2h_where || null,
-        w2h_when: data.w2h_when || null,
+        w2h_when: sanitizeDateField(data.w2h_when),
         w2h_who: data.w2h_who || null,
         w2h_how: data.w2h_how || null,
         w2h_how_much: data.w2h_howMuch || null,
@@ -1256,7 +1262,7 @@ export default function GestorTreinamentosApp() {
         w2h_what: data.w2h_what || null,
         w2h_why: data.w2h_why || null,
         w2h_where: data.w2h_where || null,
-        w2h_when: data.w2h_when || null,
+        w2h_when: sanitizeDateField(data.w2h_when),
         w2h_who: data.w2h_who || null,
         w2h_how: data.w2h_how || null,
         w2h_how_much: data.w2h_howMuch || null,

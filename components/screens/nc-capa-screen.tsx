@@ -859,17 +859,18 @@ function NCModal({ initial, onSave, onClose }: NCModalProps) {
                 <p className={sectionTitle}>5W2H — Plano de Ação</p>
                 <div className="grid grid-cols-2 gap-3">
                   {([
-                    { field: 'w2h_what'    as const, label: 'O quê?',           placeholder: 'O que será feito?' },
-                    { field: 'w2h_why'     as const, label: 'Por quê?',         placeholder: 'Por que será feito?' },
-                    { field: 'w2h_where'   as const, label: 'Onde?',            placeholder: 'Onde será executado?' },
-                    { field: 'w2h_when'    as const, label: 'Quando?',          placeholder: 'Quando será concluído?' },
-                    { field: 'w2h_who'     as const, label: 'Quem?',            placeholder: 'Quem será responsável?' },
-                    { field: 'w2h_how'     as const, label: 'Como?',            placeholder: 'Como será executado?' },
-                    { field: 'w2h_howMuch' as const, label: 'Quanto custa?',    placeholder: 'Recursos necessários…' },
-                  ]).map(({ field, label, placeholder }) => (
+                    { field: 'w2h_what'    as const, label: 'O quê?',           placeholder: 'O que será feito?',      inputType: 'text' },
+                    { field: 'w2h_why'     as const, label: 'Por quê?',         placeholder: 'Por que será feito?',    inputType: 'text' },
+                    { field: 'w2h_where'   as const, label: 'Onde?',            placeholder: 'Onde será executado?',   inputType: 'text' },
+                    { field: 'w2h_when'    as const, label: 'Quando?',          placeholder: '',                       inputType: 'date' },
+                    { field: 'w2h_who'     as const, label: 'Quem?',            placeholder: 'Quem será responsável?', inputType: 'text' },
+                    { field: 'w2h_how'     as const, label: 'Como?',            placeholder: 'Como será executado?',   inputType: 'text' },
+                    { field: 'w2h_howMuch' as const, label: 'Quanto custa?',    placeholder: 'Recursos necessários…',  inputType: 'text' },
+                  ]).map(({ field, label, placeholder, inputType }) => (
                     <div key={field} className={field === 'w2h_howMuch' ? 'col-span-2' : ''}>
                       <label className={labelCls}>{label}</label>
                       <input
+                        type={inputType}
                         className={inputCls}
                         placeholder={placeholder}
                         value={form[field] as string}
