@@ -426,6 +426,16 @@ export interface GlobalComplianceScore {
 
 // ─── Programas SST ────────────────────────────────────────────────────────────
 
+export interface SstProgramHistoryEntry {
+  id: string;
+  program_id: string;
+  event: 'create' | 'update';
+  changes: Record<string, { from: string | null; to: string | null }> | null;
+  note: string | null;
+  changed_at: string;
+  created_at: string;
+}
+
 export type SstProgramCategory = 'Programa' | 'Laudo' | 'Plano' | 'Controle';
 export type SstProgramStatus = 'Vigente' | 'Vencendo' | 'Vencido' | 'Indefinido';
 

@@ -22,8 +22,9 @@ import {
   Trash2,
   FileUp,
   Pencil,
+  History,
 } from 'lucide-react';
-import { SstProgram, SstProgramCategory, SstProgramStatus } from '@/types';
+import { SstProgram, SstProgramCategory, SstProgramStatus, SstProgramHistoryEntry } from '@/types';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
@@ -110,6 +111,21 @@ const STATUS_META: Record<
     dotCls: 'bg-slate-400',
     barCls: 'bg-slate-400',
   },
+};
+
+// ─── Field label map (para histórico) ────────────────────────────────────────
+
+const FIELD_LABELS: Record<string, string> = {
+  name:           'Sigla / Código',
+  full_name:      'Nome Completo',
+  category:       'Categoria',
+  client:         'Cliente / Unidade',
+  responsible:    'Responsável',
+  validity_start: 'Início de Validade',
+  validity_end:   'Fim de Validade',
+  notes:          'Observações',
+  folder_ref:     'Referência de Pasta',
+  file_url:       'Documento',
 };
 
 // ─── Modal ────────────────────────────────────────────────────────────────────
@@ -332,6 +348,167 @@ function ProgramModal({ isOpen, initial, onClose, onSave }: ProgramModalProps) {
   );
 }
 
+// ─── HistoryModal ─────────────────────────────────────────────────────────────
+
+interface HistoryModalProps {
+  isOpen: boolean;
+  programId: string | null;
+  programName: string;
+  onClose: () => void;
+}
+
+function HistoryModal({ isOpen, programId, programName, onClose }: HistoryModalProps) {
+  const [entries, setEntries] = useState<SstProgramHistoryEntry[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    if (!isOpen || !programId || !supabase) return;
+    setLoading(true);
+    supabase
+      .from('sst_program_history')
+      .select('*')
+      .eq('program_id', programId)
+      .order('changed_at', { ascending: false })
+      .then(({ data, error }) => {
+        if (!error) setEntries(data ?? []);
+        setLoading(false);
+      });
+  }, [isOpen, programId]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  if (!isOpen) return null;
+
+  const formatDateTime = (iso: string) => {
+    const d = new Date(iso);
+    return (
+      d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }) +
+      ' às ' +
+      d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+    );
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden max-h-[80vh] flex flex-col">
+        {/* header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 shrink-0">
+          <div className="flex items-center gap-2">
+            <History className="w-4 h-4 text-purple-500" />
+            <h2 className="text-base font-semibold text-slate-800 dark:text-slate-100">
+              Histórico — {programName}
+            </h2>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700">
+            <X className="w-4 h-4 text-slate-500" />
+          </button>
+        </div>
+
+        {/* body */}
+        <div className="overflow-y-auto p-6">
+          {loading ? (
+            <div className="flex items-center justify-center py-10 text-slate-400 gap-2 text-sm">
+              <RefreshCw className="w-4 h-4 animate-spin" /> Carregando…
+            </div>
+          ) : entries.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 gap-2 text-slate-400">
+              <History className="w-8 h-8 opacity-30" />
+              <p className="text-sm">Nenhum histórico registrado ainda.</p>
+            </div>
+          ) : (
+            <div className="relative">
+              {/* linha vertical da timeline */}
+              <div className="absolute left-3.5 top-0 bottom-0 w-px bg-slate-200 dark:bg-slate-700" />
+              <div className="space-y-5">
+                {entries.map((entry) => {
+                  const isCreate = entry.event === 'create';
+                  return (
+                    <div key={entry.id} className="flex gap-4 relative">
+                      {/* dot da timeline */}
+                      <div
+                        className={`w-7 h-7 rounded-full shrink-0 flex items-center justify-center z-10 ${
+                          isCreate
+                            ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400'
+                            : 'bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400'
+                        }`}
+                      >
+                        {isCreate ? <Plus className="w-3 h-3" /> : <Pencil className="w-3 h-3" />}
+                      </div>
+
+                      <div className="flex-1 min-w-0 pb-1">
+                        {/* tipo + data */}
+                        <div className="flex items-center gap-2 flex-wrap mb-2">
+                          <span
+                            className={`text-xs font-semibold px-2 py-0.5 rounded-md ${
+                              isCreate
+                                ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300'
+                                : 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300'
+                            }`}
+                          >
+                            {isCreate ? 'Cadastro inicial' : 'Atualização'}
+                          </span>
+                          <span className="text-[11px] text-slate-400 dark:text-slate-500">
+                            {formatDateTime(entry.changed_at)}
+                          </span>
+                        </div>
+
+                        {/* campos alterados */}
+                        {entry.changes && Object.keys(entry.changes).length > 0 && (
+                          <div className="space-y-1.5">
+                            {Object.entries(entry.changes).map(([field, { from, to }]) => {
+                              const label = FIELD_LABELS[field] ?? field;
+                              const toDisplay =
+                                field === 'file_url' && to ? 'Documento anexado' : (to ?? '—');
+                              const fromDisplay =
+                                field === 'file_url' && from ? 'Documento anterior' : (from ?? '—');
+                              if (isCreate && !to) return null; // pula campos vazios no cadastro
+                              return (
+                                <div
+                                  key={field}
+                                  className="text-xs text-slate-600 dark:text-slate-400 rounded-lg bg-slate-50 dark:bg-slate-800 px-3 py-1.5"
+                                >
+                                  <span className="font-medium text-slate-700 dark:text-slate-300">
+                                    {label}:
+                                  </span>
+                                  {isCreate ? (
+                                    <span className="ml-1 text-emerald-700 dark:text-emerald-300">
+                                      {toDisplay}
+                                    </span>
+                                  ) : (
+                                    <>
+                                      <span className="ml-1 line-through text-red-400 dark:text-red-500">
+                                        {fromDisplay}
+                                      </span>
+                                      <span className="mx-1 text-slate-400">→</span>
+                                      <span className="text-emerald-700 dark:text-emerald-300">
+                                        {toDisplay}
+                                      </span>
+                                    </>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {entry.note && (
+                          <p className="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400 italic">
+                            {entry.note}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
 interface SstProgramsScreenProps {
@@ -346,6 +523,8 @@ export function SstProgramsScreen({ onToast }: SstProgramsScreenProps) {
   const [filterCategory, setFilterCategory] = useState<SstProgramCategory | 'Todos'>('Todos');
   const [filterStatus, setFilterStatus] = useState<SstProgramStatus | 'Todos'>('Todos');
   const [filterClient, setFilterClient] = useState<string>('Todos');
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyTarget, setHistoryTarget] = useState<{ id: string; name: string } | null>(null);
 
   // ── fetch ─────────────────────────────────────────────────────────────────
   const fetchPrograms = async () => {
@@ -438,12 +617,74 @@ export function SstProgramsScreen({ onToast }: SstProgramsScreenProps) {
     };
 
     if (id) {
+      const oldProgram = editTarget; // captura antes de resetar o estado
       const { error } = await supabase.from('sst_programs').update(payload).eq('id', id);
       if (error) { onToast?.('Erro ao atualizar: ' + error.message, 'error'); return; }
+
+      // ── registra apenas os campos que mudaram ──────────────────────────────
+      if (oldProgram) {
+        const newValues: Record<string, string | null> = {
+          name:           payload.name,
+          full_name:      payload.full_name,
+          category:       payload.category,
+          client:         payload.client         ?? null,
+          responsible:    payload.responsible    ?? null,
+          validity_start: payload.validity_start ?? null,
+          validity_end:   payload.validity_end   ?? null,
+          notes:          payload.notes          ?? null,
+          folder_ref:     payload.folder_ref     ?? null,
+          file_url:       fileUrl,
+        };
+        const changedFields: Record<string, { from: string | null; to: string | null }> = {};
+        for (const [field, newVal] of Object.entries(newValues)) {
+          const oldVal = (oldProgram as unknown as Record<string, string | null>)[field] ?? null;
+          if (oldVal !== newVal) {
+            changedFields[field] = { from: oldVal, to: newVal };
+          }
+        }
+        if (Object.keys(changedFields).length > 0) {
+          await supabase.from('sst_program_history').insert({
+            program_id: id,
+            event:      'update',
+            changes:    changedFields,
+          });
+        }
+      }
+
       onToast?.(`${data.name} atualizado ✓`);
     } else {
-      const { error } = await supabase.from('sst_programs').insert(payload);
+      const { data: inserted, error } = await supabase
+        .from('sst_programs')
+        .insert(payload)
+        .select('id')
+        .single();
       if (error) { onToast?.('Erro ao criar: ' + error.message, 'error'); return; }
+
+      // ── registra o cadastro inicial com todos os campos preenchidos ─────────
+      if (inserted?.id) {
+        const initialValues: Record<string, string | null> = {
+          name:           payload.name,
+          full_name:      payload.full_name,
+          category:       payload.category,
+          client:         payload.client         ?? null,
+          responsible:    payload.responsible    ?? null,
+          validity_start: payload.validity_start ?? null,
+          validity_end:   payload.validity_end   ?? null,
+          notes:          payload.notes          ?? null,
+          folder_ref:     payload.folder_ref     ?? null,
+          file_url:       fileUrl,
+        };
+        const initialChanges: Record<string, { from: string | null; to: string | null }> = {};
+        for (const [k, v] of Object.entries(initialValues)) {
+          if (v !== null && v !== '') initialChanges[k] = { from: null, to: v };
+        }
+        await supabase.from('sst_program_history').insert({
+          program_id: inserted.id,
+          event:      'create',
+          changes:    initialChanges,
+        });
+      }
+
       onToast?.(`${data.name} cadastrado ✓`);
     }
 
@@ -666,6 +907,13 @@ export function SstProgramsScreen({ onToast }: SstProgramsScreenProps) {
                   >
                     <Pencil className="w-3.5 h-3.5" />
                   </button>
+                  <button
+                    onClick={() => { setHistoryTarget({ id: p.id, name: p.name }); setHistoryOpen(true); }}
+                    title="Histórico de mudanças"
+                    className="w-9 flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 text-slate-400 hover:text-purple-600 hover:border-purple-300 dark:hover:text-purple-400 dark:hover:border-purple-800 transition-colors"
+                  >
+                    <History className="w-3.5 h-3.5" />
+                  </button>
                 </div>
               </div>
             );
@@ -720,12 +968,20 @@ export function SstProgramsScreen({ onToast }: SstProgramsScreenProps) {
         </div>
       )}
 
-      {/* Modal */}
+      {/* Modal edição */}
       <ProgramModal
         isOpen={modalOpen}
         initial={editTarget}
         onClose={() => { setModalOpen(false); setEditTarget(null); }}
         onSave={handleSave}
+      />
+
+      {/* Modal histórico */}
+      <HistoryModal
+        isOpen={historyOpen}
+        programId={historyTarget?.id ?? null}
+        programName={historyTarget?.name ?? ''}
+        onClose={() => { setHistoryOpen(false); setHistoryTarget(null); }}
       />
     </div>
   );
