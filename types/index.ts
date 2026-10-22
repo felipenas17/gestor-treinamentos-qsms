@@ -432,6 +432,7 @@ export interface SstProgramHistoryEntry {
   event: 'create' | 'update';
   changes: Record<string, { from: string | null; to: string | null }> | null;
   note: string | null;
+  changed_by: string | null;
   changed_at: string;
   created_at: string;
 }

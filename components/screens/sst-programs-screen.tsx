@@ -437,7 +437,7 @@ function HistoryModal({ isOpen, programId, programName, onClose }: HistoryModalP
 
                       <div className="flex-1 min-w-0 pb-1">
                         {/* tipo + data */}
-                        <div className="flex items-center gap-2 flex-wrap mb-2">
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
                           <span
                             className={`text-xs font-semibold px-2 py-0.5 rounded-md ${
                               isCreate
@@ -449,6 +449,13 @@ function HistoryModal({ isOpen, programId, programName, onClose }: HistoryModalP
                           </span>
                           <span className="text-[11px] text-slate-400 dark:text-slate-500">
                             {formatDateTime(entry.changed_at)}
+                          </span>
+                        </div>
+                        {/* quem alterou */}
+                        <div className="flex items-center gap-1 mb-2">
+                          <span className="text-[11px] text-slate-400 dark:text-slate-500">por</span>
+                          <span className="text-[11px] font-medium text-slate-600 dark:text-slate-300">
+                            {entry.changed_by ?? 'Sistema'}
                           </span>
                         </div>
 
@@ -644,9 +651,10 @@ export function SstProgramsScreen({ onToast }: SstProgramsScreenProps) {
         }
         if (Object.keys(changedFields).length > 0) {
           await supabase.from('sst_program_history').insert({
-            program_id: id,
-            event:      'update',
-            changes:    changedFields,
+            program_id:  id,
+            event:       'update',
+            changes:     changedFields,
+            changed_by:  'Sistema', // TODO: substituir pelo usuário logado
           });
         }
       }
@@ -679,9 +687,10 @@ export function SstProgramsScreen({ onToast }: SstProgramsScreenProps) {
           if (v !== null && v !== '') initialChanges[k] = { from: null, to: v };
         }
         await supabase.from('sst_program_history').insert({
-          program_id: inserted.id,
-          event:      'create',
-          changes:    initialChanges,
+          program_id:  inserted.id,
+          event:       'create',
+          changes:     initialChanges,
+          changed_by:  'Sistema', // TODO: substituir pelo usuário logado
         });
       }
 

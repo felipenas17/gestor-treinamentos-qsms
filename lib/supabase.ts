@@ -669,6 +669,7 @@ export interface RevisionHistoryEntry {
   revision_date: string | null;
   responsible: string | null;
   notes: string | null;
+  changed_by: string | null;
   created_at: string;
 }
 
@@ -679,6 +680,7 @@ export async function saveRevisionHistory(data: {
   revisionDate?: string | null;
   responsible?: string | null;
   notes?: string;
+  changedBy?: string | null;
 }) {
   if (!supabase) return false;
   const { error } = await supabase.from('procedure_revision_history').insert({
@@ -688,6 +690,7 @@ export async function saveRevisionHistory(data: {
     revision_date: data.revisionDate || null,
     responsible: data.responsible || null,
     notes: data.notes || null,
+    changed_by: data.changedBy ?? 'Sistema',
   });
   if (error) { console.error('saveRevisionHistory:', error); return false; }
   return true;
