@@ -1298,7 +1298,7 @@ export function NCCAPAScreen({ items, onSave, onDelete }: NCCAPAScreenProps) {
                   <tbody className="divide-y divide-slate-100">
                     {filteredAll.map((nc, idx) => (
                       <tr key={nc.id} className="hover:bg-slate-50/60 transition-colors">
-                        <td className="px-4 py-3 text-xs font-mono text-slate-400">{rowNum(idx)}</td>
+                        <td className="px-4 py-3 text-xs font-mono text-slate-400">{rowNum(filteredAll.length - 1 - idx)}</td>
                         <td className="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">{fmtDate(nc.detectedDate)}</td>
                         <td className="px-4 py-3">
                           <span className="text-xs font-medium text-slate-700">{nc.client || '—'}</span>
@@ -1433,7 +1433,7 @@ export function NCCAPAScreen({ items, onSave, onDelete }: NCCAPAScreenProps) {
                   <tbody className="divide-y divide-slate-100">
                     {filteredClariant.map((nc, idx) => (
                       <tr key={nc.id} className="hover:bg-orange-50/30 transition-colors">
-                        <td className="px-3 py-3 text-xs font-mono text-slate-400">{rowNum(idx)}</td>
+                        <td className="px-3 py-3 text-xs font-mono text-slate-400">{rowNum(filteredClariant.length - 1 - idx)}</td>
                         <td className="px-3 py-3">
                           <span className="text-xs font-mono font-medium text-slate-700">{nc.qnsNumber || '—'}</span>
                         </td>
