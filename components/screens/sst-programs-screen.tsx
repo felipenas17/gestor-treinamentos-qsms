@@ -118,6 +118,7 @@ interface ProgramFormData {
   name: string;
   full_name: string;
   category: SstProgramCategory;
+  client: string;
   responsible: string;
   validity_start: string;
   validity_end: string;
@@ -130,6 +131,7 @@ const EMPTY_FORM: ProgramFormData = {
   name: '',
   full_name: '',
   category: 'Programa',
+  client: '',
   responsible: '',
   validity_start: '',
   validity_end: '',
@@ -158,6 +160,7 @@ function ProgramModal({ isOpen, initial, onClose, onSave }: ProgramModalProps) {
         name: initial.name,
         full_name: initial.full_name,
         category: initial.category,
+        client: initial.client ?? '',
         responsible: initial.responsible ?? '',
         validity_start: initial.validity_start ?? '',
         validity_end: initial.validity_end ?? '',
@@ -231,6 +234,11 @@ function ProgramModal({ isOpen, initial, onClose, onSave }: ProgramModalProps) {
           <div>
             <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Nome Completo *</label>
             <input required value={form.full_name} onChange={(e) => set('full_name', e.target.value)} placeholder="ex: Programa de Gerenciamento de Riscos" className={InputCls} />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Cliente / Unidade</label>
+            <input value={form.client} onChange={(e) => set('client', e.target.value)} placeholder="ex: Petrobras, Clariant, PRIO, MODEC…" className={InputCls} />
           </div>
 
           <div>
@@ -337,6 +345,7 @@ export function SstProgramsScreen({ onToast }: SstProgramsScreenProps) {
   const [editTarget, setEditTarget] = useState<SstProgram | null>(null);
   const [filterCategory, setFilterCategory] = useState<SstProgramCategory | 'Todos'>('Todos');
   const [filterStatus, setFilterStatus] = useState<SstProgramStatus | 'Todos'>('Todos');
+  const [filterClient, setFilterClient] = useState<string>('Todos');
 
   // ── fetch ─────────────────────────────────────────────────────────────────
   const fetchPrograms = async () => {
@@ -366,14 +375,21 @@ export function SstProgramsScreen({ onToast }: SstProgramsScreenProps) {
     comDoc:   programs.filter((p) => !!p.file_url).length,
   }), [programs]);
 
+  // ── clientes únicos para filtro ───────────────────────────────────────────
+  const clientOptions = useMemo(() => {
+    const set = new Set(programs.map((p) => p.client).filter(Boolean) as string[]);
+    return Array.from(set).sort();
+  }, [programs]);
+
   // ── filtered list ─────────────────────────────────────────────────────────
   const filtered = useMemo(() =>
     programs.filter((p) => {
       if (filterCategory !== 'Todos' && p.category !== filterCategory) return false;
       if (filterStatus   !== 'Todos' && p.status   !== filterStatus)   return false;
+      if (filterClient   !== 'Todos' && p.client   !== filterClient)   return false;
       return true;
     }),
-  [programs, filterCategory, filterStatus]);
+  [programs, filterCategory, filterStatus, filterClient]);
 
   // ── save (with optional file upload) ─────────────────────────────────────
   const handleSave = async (data: ProgramFormData, file: File | null, id?: string) => {
@@ -407,6 +423,7 @@ export function SstProgramsScreen({ onToast }: SstProgramsScreenProps) {
       name:           data.name,
       full_name:      data.full_name,
       category:       data.category,
+      client:         data.client         || null,
       responsible:    data.responsible    || null,
       validity_start: data.validity_start || null,
       validity_end:   data.validity_end   || null,
@@ -477,40 +494,60 @@ export function SstProgramsScreen({ onToast }: SstProgramsScreenProps) {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-2 items-center">
-        <span className="text-xs text-slate-500 dark:text-slate-400">Categoria:</span>
-        {(['Todos', 'Programa', 'Laudo', 'Plano', 'Controle'] as const).map((c) => (
-          <button
-            key={c}
-            onClick={() => setFilterCategory(c)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
-              filterCategory === c
-                ? 'bg-blue-600 text-white border-blue-600'
-                : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
-            }`}
-          >
-            {c}
-          </button>
-        ))}
-        <span className="text-xs text-slate-400 mx-1">|</span>
-        <span className="text-xs text-slate-500 dark:text-slate-400">Status:</span>
-        {(['Todos', 'Vigente', 'Vencendo', 'Vencido', 'Indefinido'] as const).map((s) => (
-          <button
-            key={s}
-            onClick={() => setFilterStatus(s)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
-              filterStatus === s
-                ? 'bg-blue-600 text-white border-blue-600'
-                : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
-            }`}
-          >
-            {s}
-          </button>
-        ))}
-        {counts.comDoc < counts.total && (
-          <span className="ml-auto text-xs text-slate-400 dark:text-slate-500">
-            {counts.comDoc}/{counts.total} com documento
-          </span>
+      <div className="space-y-2">
+        <div className="flex flex-wrap gap-2 items-center">
+          <span className="text-xs text-slate-500 dark:text-slate-400">Categoria:</span>
+          {(['Todos', 'Programa', 'Laudo', 'Plano', 'Controle'] as const).map((c) => (
+            <button
+              key={c}
+              onClick={() => setFilterCategory(c)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
+                filterCategory === c
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+              }`}
+            >
+              {c}
+            </button>
+          ))}
+          <span className="text-xs text-slate-400 mx-1">|</span>
+          <span className="text-xs text-slate-500 dark:text-slate-400">Status:</span>
+          {(['Todos', 'Vigente', 'Vencendo', 'Vencido', 'Indefinido'] as const).map((s) => (
+            <button
+              key={s}
+              onClick={() => setFilterStatus(s)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
+                filterStatus === s
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+              }`}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+        {clientOptions.length > 0 && (
+          <div className="flex flex-wrap gap-2 items-center">
+            <span className="text-xs text-slate-500 dark:text-slate-400">Cliente:</span>
+            {(['Todos', ...clientOptions]).map((cl) => (
+              <button
+                key={cl}
+                onClick={() => setFilterClient(cl)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
+                  filterClient === cl
+                    ? 'bg-indigo-600 text-white border-indigo-600'
+                    : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                }`}
+              >
+                {cl}
+              </button>
+            ))}
+            {counts.comDoc < counts.total && (
+              <span className="ml-auto text-xs text-slate-400 dark:text-slate-500">
+                {counts.comDoc}/{counts.total} com documento
+              </span>
+            )}
+          </div>
         )}
       </div>
 
@@ -558,6 +595,13 @@ export function SstProgramsScreen({ onToast }: SstProgramsScreenProps) {
 
                 {/* full name */}
                 <p className="text-xs text-slate-600 dark:text-slate-400 leading-snug">{p.full_name}</p>
+
+                {/* client badge */}
+                {p.client && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-900">
+                    {p.client}
+                  </span>
+                )}
 
                 {/* validity */}
                 <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
@@ -646,7 +690,9 @@ export function SstProgramsScreen({ onToast }: SstProgramsScreenProps) {
                   >
                     <CatIcon className="w-4 h-4 text-slate-400 shrink-0" />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-800 dark:text-slate-100 truncate">{p.name}</p>
+                      <p className="text-sm font-medium text-slate-800 dark:text-slate-100 truncate">
+                        {p.name}{p.client ? ` — ${p.client}` : ''}
+                      </p>
                       <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{p.full_name}</p>
                     </div>
                     <span className={`text-xs font-semibold px-2.5 py-1 rounded-lg border shrink-0 ${meta.cls}`}>

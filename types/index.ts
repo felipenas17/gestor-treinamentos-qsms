@@ -434,6 +434,7 @@ export interface SstProgram {
   name: string;
   full_name: string;
   category: SstProgramCategory;
+  client: string | null;          // Cliente / Unidade (ex: Petrobras, Clariant)
   responsible: string | null;
   validity_start: string | null; // YYYY-MM-DD
   validity_end: string | null;   // YYYY-MM-DD
