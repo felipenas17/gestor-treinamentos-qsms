@@ -1140,3 +1140,74 @@ export async function addDocControlRenewal(data: {
 
   return { error: null };
 }
+
+// ─── NC Attachments (tratativas) ─────────────────────────────────────────────
+
+import type { NCAttachment, NCAttachmentType } from '@/types';
+
+export async function fetchNCAttachments(ncId: string): Promise<NCAttachment[] | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from('nc_attachments')
+    .select('*')
+    .eq('nc_id', ncId)
+    .order('created_at', { ascending: true });
+  if (error) { console.error('fetchNCAttachments:', error); return null; }
+  return (data ?? []).map((r: Record<string, unknown>) => ({
+    id: r.id as string,
+    ncId: r.nc_id as string,
+    type: r.type as NCAttachmentType,
+    url: r.url as string,
+    filename: r.filename as string,
+    notes: r.notes as string | null,
+    createdAt: r.created_at as string,
+  }));
+}
+
+export async function addNCAttachment(
+  ncId: string,
+  file: File,
+  type: NCAttachmentType,
+  notes: string
+): Promise<{ error: string | null; attachment?: NCAttachment }> {
+  if (!supabase) return { error: 'Supabase não configurado' };
+
+  const ext = file.name.split('.').pop() || 'bin';
+  const uid = crypto.randomUUID();
+  const path = `${ncId}/${uid}.${ext}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from('nc-attachments')
+    .upload(path, file, { upsert: false, contentType: file.type || 'application/octet-stream' });
+  if (uploadError) return { error: uploadError.message };
+
+  const { data: urlData } = supabase.storage.from('nc-attachments').getPublicUrl(path);
+  const url = urlData.publicUrl;
+
+  const { data, error: insErr } = await supabase
+    .from('nc_attachments')
+    .insert({ nc_id: ncId, type, url, filename: file.name, notes: notes || null })
+    .select()
+    .single();
+  if (insErr) return { error: insErr.message };
+
+  return {
+    error: null,
+    attachment: {
+      id: (data as Record<string, unknown>).id as string,
+      ncId: (data as Record<string, unknown>).nc_id as string,
+      type: (data as Record<string, unknown>).type as NCAttachmentType,
+      url: (data as Record<string, unknown>).url as string,
+      filename: (data as Record<string, unknown>).filename as string,
+      notes: (data as Record<string, unknown>).notes as string | null,
+      createdAt: (data as Record<string, unknown>).created_at as string,
+    },
+  };
+}
+
+export async function deleteNCAttachment(id: string): Promise<{ error: string | null }> {
+  if (!supabase) return { error: 'Supabase não configurado' };
+  const { error } = await supabase.from('nc_attachments').delete().eq('id', id);
+  if (error) return { error: error.message };
+  return { error: null };
+}

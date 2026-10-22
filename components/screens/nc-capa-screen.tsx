@@ -1,16 +1,18 @@
 'use client';
 
-import React, { useState, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import {
   AlertTriangle, Plus, CheckCircle2, Clock, XCircle,
   ChevronDown, ChevronUp, Search, Filter, Edit2, Trash2,
   AlertOctagon, Info, TrendingUp, X, Save, ChevronRight, Download,
-  FileDown, Printer,
+  FileDown, Printer, Paperclip, Image as ImageIcon, FileText, Mail,
+  Upload, Eye, Loader2,
 } from 'lucide-react';
 import {
   NonConformity, NCType, NCSeverity, NCSource, NCStatus,
-  NCEffectiveness, NCStatusHistoryEntry,
+  NCEffectiveness, NCStatusHistoryEntry, NCAttachment, NCAttachmentType,
 } from '@/types';
+import { fetchNCAttachments, addNCAttachment, deleteNCAttachment } from '@/lib/supabase';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -1378,6 +1380,251 @@ function NCPrintModal({ nc, onClose }: { nc: NonConformity; onClose: () => void 
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
+// ─── NCTrativasModal ──────────────────────────────────────────────────────────
+
+const ATTACH_TYPE_LABEL: Record<NCAttachmentType, string> = {
+  image:    'Imagem',
+  email:    'E-mail',
+  pdf:      'PDF',
+  document: 'Documento',
+  other:    'Outro',
+};
+
+const ATTACH_TYPE_ICON: Record<NCAttachmentType, React.ReactNode> = {
+  image:    <ImageIcon className="w-4 h-4" />,
+  email:    <Mail className="w-4 h-4" />,
+  pdf:      <FileText className="w-4 h-4 text-red-500" />,
+  document: <FileText className="w-4 h-4 text-blue-500" />,
+  other:    <Paperclip className="w-4 h-4" />,
+};
+
+function guessAttachType(file: File): NCAttachmentType {
+  const mt = file.type.toLowerCase();
+  if (mt.startsWith('image/')) return 'image';
+  if (mt === 'application/pdf') return 'pdf';
+  if (mt.includes('word') || mt.includes('document')) return 'document';
+  if (mt.includes('mail') || mt.includes('rfc822') || file.name.endsWith('.eml') || file.name.endsWith('.msg')) return 'email';
+  return 'other';
+}
+
+function NCTrativasModal({ nc, onClose }: { nc: NonConformity; onClose: () => void }) {
+  const [attachments, setAttachments] = useState<NCAttachment[]>([]);
+  const [loading, setLoading]         = useState(true);
+  const [uploading, setUploading]     = useState(false);
+  const [uploadErr, setUploadErr]     = useState<string | null>(null);
+  const [notes, setNotes]             = useState('');
+  const [deletingId, setDeletingId]   = useState<string | null>(null);
+  const [preview, setPreview]         = useState<NCAttachment | null>(null);
+  const fileInputRef                  = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    setLoading(true);
+    fetchNCAttachments(nc.id).then((data) => {
+      if (mounted) {
+        setAttachments(data ?? []);
+        setLoading(false);
+      }
+    });
+    return () => { mounted = false; };
+  }, [nc.id]);
+
+  async function handleUpload(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    setUploading(true);
+    setUploadErr(null);
+    for (const file of Array.from(files)) {
+      const type = guessAttachType(file);
+      const result = await addNCAttachment(nc.id, file, type, notes);
+      if (result.error) {
+        setUploadErr(result.error);
+        break;
+      }
+      if (result.attachment) {
+        setAttachments((prev) => [...prev, result.attachment!]);
+      }
+    }
+    setNotes('');
+    setUploading(false);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }
+
+  async function handleDelete(id: string) {
+    setDeletingId(id);
+    const { error } = await deleteNCAttachment(id);
+    if (!error) setAttachments((prev) => prev.filter((a) => a.id !== id));
+    setDeletingId(null);
+  }
+
+  const fmtDate = (d: string) =>
+    new Date(d).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-orange-50">
+          <div>
+            <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
+              <Paperclip className="w-4 h-4 text-orange-500" />
+              Tratativas — {nc.qnsNumber || nc.code}
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">{nc.title}</p>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-lg hover:bg-orange-100 text-slate-400 hover:text-slate-700 transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-5">
+
+          {/* Upload area */}
+          <div className="border-2 border-dashed border-orange-200 rounded-xl p-4 bg-orange-50/40">
+            <div className="flex flex-col gap-2">
+              <p className="text-xs font-semibold text-slate-600 uppercase tracking-wider">Adicionar anexo</p>
+              <textarea
+                className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-orange-400/40 bg-white"
+                rows={2}
+                placeholder="Observação / nota sobre o arquivo (opcional)"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+              />
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold transition-colors disabled:opacity-60"
+                >
+                  {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                  {uploading ? 'Enviando…' : 'Selecionar arquivo(s)'}
+                </button>
+                <span className="text-xs text-slate-400">Imagens, PDF, e-mail (.eml), Word…</span>
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                className="hidden"
+                accept="image/*,.pdf,.doc,.docx,.eml,.msg,.txt"
+                onChange={(e) => handleUpload(e.target.files)}
+              />
+              {uploadErr && (
+                <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">{uploadErr}</p>
+              )}
+            </div>
+          </div>
+
+          {/* List */}
+          {loading ? (
+            <div className="flex items-center justify-center py-10">
+              <Loader2 className="w-6 h-6 text-orange-400 animate-spin" />
+            </div>
+          ) : attachments.length === 0 ? (
+            <div className="text-center py-10 text-slate-400">
+              <Paperclip className="w-10 h-10 mx-auto mb-3 opacity-25" />
+              <p className="text-sm">Nenhum anexo ainda. Use o botão acima para adicionar.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                {attachments.length} anexo{attachments.length !== 1 ? 's' : ''}
+              </p>
+              {attachments.map((att) => (
+                <div key={att.id} className="flex items-start gap-3 p-3 rounded-xl border border-slate-200 bg-white hover:border-orange-200 transition-colors group">
+                  {/* Thumbnail / icon */}
+                  <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 bg-slate-100 flex items-center justify-center">
+                    {att.type === 'image' ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={att.url} alt={att.filename} className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-slate-400">{ATTACH_TYPE_ICON[att.type]}</span>
+                    )}
+                  </div>
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-slate-800 truncate">{att.filename}</p>
+                    <p className="text-xs text-slate-400">{ATTACH_TYPE_LABEL[att.type]} · {fmtDate(att.createdAt)}</p>
+                    {att.notes && <p className="text-xs text-slate-600 mt-0.5 italic">"{att.notes}"</p>}
+                  </div>
+                  {/* Actions */}
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {att.type === 'image' && (
+                      <button
+                        onClick={() => setPreview(att)}
+                        className="p-1.5 rounded-lg hover:bg-orange-50 text-slate-400 hover:text-orange-600 transition-colors"
+                        title="Visualizar"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                    )}
+                    <a
+                      href={att.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-1.5 rounded-lg hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition-colors"
+                      title="Abrir / baixar"
+                    >
+                      <Download className="w-4 h-4" />
+                    </a>
+                    <button
+                      onClick={() => handleDelete(att.id)}
+                      disabled={deletingId === att.id}
+                      className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors disabled:opacity-50"
+                      title="Remover"
+                    >
+                      {deletingId === att.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-3 border-t border-slate-200 bg-slate-50 flex justify-end">
+          <button
+            onClick={onClose}
+            className="px-5 py-2 rounded-lg bg-slate-700 hover:bg-slate-800 text-white text-sm font-semibold transition-colors"
+          >
+            Fechar
+          </button>
+        </div>
+      </div>
+
+      {/* Image preview overlay */}
+      {preview && (
+        <div
+          className="fixed inset-0 z-60 flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setPreview(null)}
+        >
+          <div className="relative max-w-4xl max-h-full">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={preview.url}
+              alt={preview.filename}
+              className="max-w-full max-h-[85vh] rounded-xl shadow-2xl object-contain"
+            />
+            <button
+              onClick={() => setPreview(null)}
+              className="absolute top-2 right-2 p-2 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <p className="text-center text-white text-sm mt-2 opacity-75">{preview.filename}</p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── NCCAPAScreen ─────────────────────────────────────────────────────────────
+
 interface NCCAPAScreenProps {
   items: NonConformity[];
   onSave: (data: NCFormData, id?: string) => Promise<void>;
@@ -1395,6 +1642,7 @@ export function NCCAPAScreen({ items, onSave, onDelete }: NCCAPAScreenProps) {
   const [editItem, setEditItem]         = useState<NonConformity | null>(null);
   const [deletingId, setDeletingId]     = useState<string | null>(null);
   const [printNC, setPrintNC]           = useState<NonConformity | null>(null);
+  const [trativasNC, setTrativasNC]     = useState<NonConformity | null>(null);
 
   // ─── Stats ────────────────────────────────────────────────────────────────
   const stats = useMemo(() => {
@@ -1775,7 +2023,14 @@ export function NCCAPAScreen({ items, onSave, onDelete }: NCCAPAScreenProps) {
                       <tr key={nc.id} className="hover:bg-orange-50/30 transition-colors">
                         <td className="px-3 py-3 text-xs font-mono text-slate-400">{rowNum(filteredClariant.length - 1 - idx)}</td>
                         <td className="px-3 py-3">
-                          <span className="text-xs font-mono font-medium text-slate-700">{nc.qnsNumber || '—'}</span>
+                          <button
+                            onClick={() => setTrativasNC(nc)}
+                            className="text-xs font-mono font-medium text-orange-600 hover:text-orange-800 hover:underline underline-offset-2 transition-colors flex items-center gap-1"
+                            title="Ver / adicionar tratativas"
+                          >
+                            {nc.qnsNumber || '—'}
+                            <Paperclip className="w-3 h-3 opacity-60" />
+                          </button>
                         </td>
                         <td className="px-3 py-3 text-xs text-slate-500 whitespace-nowrap">{fmtDate(nc.detectedDate)}</td>
                         <td className="px-3 py-3 text-xs font-medium text-slate-700">{nc.endCustomer || '—'}</td>
@@ -1788,20 +2043,14 @@ export function NCCAPAScreen({ items, onSave, onDelete }: NCCAPAScreenProps) {
                         <td className="px-3 py-3 text-center">{dBadge(nc.statusD5)}</td>
                         <td className="px-3 py-3 text-center">{dBadge(nc.statusD7)}</td>
                         <td className="px-3 py-3 text-center">
-                          {nc.tratativaFileUrl ? (
-                            <a
-                              href={nc.tratativaFileUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-orange-100 hover:bg-orange-200 text-orange-700 text-[10px] font-semibold transition-colors"
-                              title="Baixar tratativa DOCX"
-                            >
-                              <Download className="w-3 h-3" />
-                              DOCX
-                            </a>
-                          ) : (
-                            <span className="text-[10px] text-slate-300">—</span>
-                          )}
+                          <button
+                            onClick={() => setTrativasNC(nc)}
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-orange-100 hover:bg-orange-200 text-orange-700 text-[10px] font-semibold transition-colors"
+                            title="Ver / adicionar tratativas"
+                          >
+                            <Paperclip className="w-3 h-3" />
+                            Ver
+                          </button>
                         </td>
                         <td className="px-3 py-3">
                           <div className="flex items-center gap-1 justify-end">
@@ -1853,6 +2102,14 @@ export function NCCAPAScreen({ items, onSave, onDelete }: NCCAPAScreenProps) {
         <NCPrintModal
           nc={printNC}
           onClose={() => setPrintNC(null)}
+        />
+      )}
+
+      {/* Modal Tratativas */}
+      {trativasNC && (
+        <NCTrativasModal
+          nc={trativasNC}
+          onClose={() => setTrativasNC(null)}
         />
       )}
     </div>

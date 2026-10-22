@@ -321,6 +321,20 @@ export interface NonConformity {
   tratativaFileUrl?: string | null;
 }
 
+// ─── NC Attachment (tratativas) ──────────────────────────────────────────────
+
+export type NCAttachmentType = 'image' | 'email' | 'pdf' | 'document' | 'other';
+
+export interface NCAttachment {
+  id: string;
+  ncId: string;
+  type: NCAttachmentType;
+  url: string;
+  filename: string;
+  notes?: string | null;
+  createdAt: string;
+}
+
 // ─── ROI — Registro de Ocorrência Interna ────────────────────────────────────
 
 export type ROISite = 'RDO' | 'MC' | 'CLIENTE';
