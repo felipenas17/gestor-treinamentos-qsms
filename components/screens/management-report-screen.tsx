@@ -6,6 +6,7 @@ import {
   ShieldCheck, AlertTriangle, CheckCircle2, XCircle, Clock,
   Calendar, Building2, Loader2,
 } from 'lucide-react';
+
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import {
@@ -319,26 +320,96 @@ export function ManagementReportScreen({
           </div>
         </div>
 
-        {/* ── Score Global ── */}
-        <div className={`rounded-2xl border p-5 ${scoreBg(complianceScore.overall)}`}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <ShieldCheck className={`w-8 h-8 ${scoreColor(complianceScore.overall)}`} />
-              <div>
-                <p className="text-xs text-slate-500 font-medium uppercase tracking-wide">Score de Conformidade Global</p>
-                <p className={`text-4xl font-bold ${scoreColor(complianceScore.overall)}`}>
-                  {Math.round(complianceScore.overall)}%
-                </p>
-              </div>
-            </div>
-            <div className="grid grid-cols-3 gap-3 text-center">
-              {complianceScore.modules.map((m) => (
-                <div key={m.module} className="bg-white/70 rounded-xl px-4 py-3">
-                  <p className="text-xs text-slate-500 mb-0.5 truncate">{m.module.split(' ')[0]}</p>
-                  <p className={`text-lg font-bold ${scoreColor(m.score)}`}>{Math.round(m.score)}%</p>
+        {/* ── Score Global + Alertas ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+
+          {/* Gauge circular */}
+          <div className={`lg:col-span-2 rounded-2xl border p-5 flex flex-col items-center justify-center gap-4 ${scoreBg(complianceScore.overall)}`}>
+            {(() => {
+              const score = Math.round(complianceScore.overall);
+              const R = 54;
+              const circ = 2 * Math.PI * R;
+              const dash = circ - (score / 100) * circ;
+              const col = score >= 80 ? '#10b981' : score >= 60 ? '#f59e0b' : '#ef4444';
+              return (
+                <div className="flex flex-col items-center gap-3">
+                  <svg width="140" height="140" viewBox="0 0 140 140">
+                    <circle cx="70" cy="70" r={R} fill="none" stroke="#e2e8f0" strokeWidth="12" />
+                    <circle
+                      cx="70" cy="70" r={R} fill="none"
+                      stroke={col} strokeWidth="12"
+                      strokeDasharray={circ}
+                      strokeDashoffset={dash}
+                      strokeLinecap="round"
+                      transform="rotate(-90 70 70)"
+                      style={{ transition: 'stroke-dashoffset 0.8s ease' }}
+                    />
+                    <text x="70" y="65" textAnchor="middle" dominantBaseline="middle" fontSize="26" fontWeight="700" fill={col}>{score}%</text>
+                    <text x="70" y="85" textAnchor="middle" dominantBaseline="middle" fontSize="11" fill="#64748b">conformidade</text>
+                  </svg>
+                  <div className="grid grid-cols-3 gap-2 w-full">
+                    {complianceScore.modules.map((m) => (
+                      <div key={m.module} className="bg-white/70 dark:bg-slate-800/60 rounded-xl px-2 py-2 text-center">
+                        <p className="text-[10px] text-slate-500 truncate">{m.module.split(' ')[0]}</p>
+                        <p className={`text-sm font-bold ${scoreColor(Math.round(m.score))}`}>{Math.round(m.score)}%</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              ))}
+              );
+            })()}
+          </div>
+
+          {/* Painel de alertas críticos */}
+          <div className="lg:col-span-3 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-500" />
+                <p className="text-sm font-bold text-slate-700 dark:text-slate-200">Alertas Críticos</p>
+              </div>
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                (complianceScore.alerts ?? []).length === 0
+                  ? 'bg-emerald-100 text-emerald-700'
+                  : 'bg-amber-100 text-amber-700'
+              }`}>
+                {(complianceScore.alerts ?? []).length} item(s)
+              </span>
             </div>
+            {(complianceScore.alerts ?? []).length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <CheckCircle2 className="w-9 h-9 text-emerald-400 mb-2" />
+                <p className="text-sm text-slate-400">Nenhum alerta crítico</p>
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                {(complianceScore.alerts ?? []).slice(0, 8).map((alert) => (
+                  <div key={alert.id} className="flex items-start gap-2.5 p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700/50">
+                    {alert.severity === 'expired'
+                      ? <XCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                      : alert.severity === 'critical'
+                      ? <AlertTriangle className="w-4 h-4 text-orange-500 shrink-0 mt-0.5" />
+                      : <Clock className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                    }
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">{alert.module}</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                          alert.severity === 'expired' ? 'bg-red-100 text-red-600' :
+                          alert.severity === 'critical' ? 'bg-orange-100 text-orange-600' :
+                          'bg-amber-100 text-amber-600'
+                        }`}>
+                          {alert.daysUntilExpiry < 0 ? `${Math.abs(alert.daysUntilExpiry)}d vencido` : `${alert.daysUntilExpiry}d restantes`}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-600 dark:text-slate-300 truncate mt-0.5">{alert.label}</p>
+                    </div>
+                  </div>
+                ))}
+                {(complianceScore.alerts ?? []).length > 8 && (
+                  <p className="text-xs text-slate-400 text-center pt-1">+ {(complianceScore.alerts ?? []).length - 8} alertas adicionais</p>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

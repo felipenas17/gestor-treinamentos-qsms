@@ -16,7 +16,6 @@ import {
   ShieldCheck,
   AlertTriangle,
   BarChart3,
-  Home,
 } from 'lucide-react';
 
 interface NavItem {
@@ -70,8 +69,7 @@ const MODULES: Module[] = [
     label: 'Visão Geral',
     icon: BarChart3,
     items: [
-      { id: 'home',     label: 'Início',       sublabel: 'Painel Geral',        icon: Home    },
-      { id: 'relatorio', label: 'Relatório',   sublabel: 'Visão Consolidada',   icon: BarChart3 },
+      { id: 'relatorio', label: 'Painel Geral', sublabel: 'Visão Consolidada', icon: BarChart3 },
     ],
   },
   {

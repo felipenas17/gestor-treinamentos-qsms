@@ -28,7 +28,6 @@ import { NCDashboardScreen } from '@/components/screens/nc-dashboard-screen';
 import { ComplianceScoreScreen } from '@/components/screens/compliance-score-screen';
 import { ManagementReportScreen } from '@/components/screens/management-report-screen';
 import { AuditScreen } from '@/components/screens/audit-screen';
-import { HomeScreen } from '@/components/screens/home-screen';
 // import { ImportDocumentModal } from '@/components/modals/import-document-modal'; // modal não ativo
 
 import {
@@ -77,7 +76,7 @@ import { CertificateRecord } from '@/components/screens/certificates-screen';
 import { CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 
 export default function GestorTreinamentosApp() {
-  const [currentTab, setCurrentTab] = useState('home');
+  const [currentTab, setCurrentTab] = useState('relatorio');
   const [isLoading, setIsLoading] = useState(isSupabaseConfigured);
 
   // Core reactive data states (inicia com mock, substitui com Supabase quando disponível)
@@ -1423,17 +1422,6 @@ export default function GestorTreinamentosApp() {
         )}
 
         <main className="flex-1 pb-12">
-          {currentTab === 'home' && (
-            <HomeScreen
-              complianceScore={complianceScore}
-              records={records}
-              nonConformities={nonConformities}
-              documents={documents}
-              obligations={obligations}
-              normativeCerts={normativeCerts}
-              onNavigate={setCurrentTab}
-            />
-          )}
           {currentTab === 'dashboard' && (
             <DashboardScreen
               metrics={adjustedMetrics}
