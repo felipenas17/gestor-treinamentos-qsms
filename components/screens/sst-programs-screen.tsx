@@ -400,7 +400,11 @@ export function SstProgramsScreen({ onToast }: SstProgramsScreenProps) {
     // Upload novo arquivo
     if (file) {
       const ext  = file.name.split('.').pop() ?? 'bin';
-      const slug = data.name.replace(/\s+/g, '-').toLowerCase();
+      const slug = data.name
+        .normalize('NFD').replace(/[̀-ͯ]/g, '') // remove acentos
+        .replace(/[^a-zA-Z0-9]+/g, '-')                   // só alfanumérico
+        .replace(/-+/g, '-').replace(/^-|-$/g, '')         // normaliza hifens
+        .toLowerCase();
       const path = `${slug}-${Date.now()}.${ext}`;
 
       const { error: upErr } = await supabase.storage
