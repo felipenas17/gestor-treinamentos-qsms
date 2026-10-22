@@ -228,7 +228,7 @@ export function Sidebar({ currentTab, onSelectTab }: SidebarProps) {
   };
 
   return (
-    <aside className="w-72 bg-[#0c1222] border-r border-slate-800 text-slate-300 flex flex-col shrink-0 min-h-screen select-none">
+    <aside className="w-72 bg-[#0c1222] border-r border-slate-800 text-slate-300 flex flex-col shrink-0 h-full overflow-y-auto select-none">
 
       {/* Brand Header */}
       <div className="p-5 border-b border-slate-800/80 bg-[#090e1a]">

@@ -1403,13 +1403,13 @@ export default function GestorTreinamentosApp() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] text-slate-800 flex font-sans antialiased">
+    <div className="h-screen bg-[#f8fafc] text-slate-800 flex font-sans antialiased overflow-hidden">
       <Sidebar
         currentTab={currentTab}
         onSelectTab={setCurrentTab}
       />
 
-      <div className="flex-1 flex flex-col min-w-0 min-h-screen overflow-x-hidden">
+      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto overflow-x-hidden">
         <Header
           currentTab={currentTab}
           isSupabaseConnected={isSupabaseConfigured}
