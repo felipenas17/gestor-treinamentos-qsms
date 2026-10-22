@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
-  AlertTriangle, CheckCircle2, Clock, BarChart2,
+  AlertTriangle, CheckCircle2, Clock,
   TrendingUp, Layers, MapPin, Activity, Loader2,
   RefreshCw, FileWarning, Wrench,
 } from 'lucide-react';
@@ -275,12 +275,15 @@ function LegendItem({ color, label, value, total }: { color: string; label: stri
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
+type TabId = 'nc' | 'roi' | 'comparison';
+
 export function NCDashboardScreen() {
   const [ncs, setNcs] = useState<NonConformityRow[]>([]);
   const [rois, setRois] = useState<ROIRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabId>('nc');
 
   const loadData = useCallback(async (showRefresh = false) => {
     try {
@@ -417,271 +420,404 @@ export function NCDashboardScreen() {
     label, value, color: SITE_COLORS[label] ?? '#94a3b8',
   }));
 
+  const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
+    { id: 'nc',         label: 'Não Conformidade', icon: <FileWarning className="w-3.5 h-3.5" /> },
+    { id: 'roi',        label: 'ROI',              icon: <Wrench className="w-3.5 h-3.5" /> },
+    { id: 'comparison', label: 'ROI vs NC',         icon: <Activity className="w-3.5 h-3.5" /> },
+  ];
+
   return (
     <div className="flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-900">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 px-6 py-3 flex items-center justify-between">
-        <div>
-          <h2 className="text-base font-semibold text-slate-800 dark:text-white">Dashboard RNC × ROI</h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            {stats.totalNC} não conformidades · {stats.totalROI} registros de ocorrência
-          </p>
+      <div className="sticky top-0 z-10 bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 px-4 md:px-6 py-3">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h2 className="text-base font-semibold text-slate-800 dark:text-white">Dashboard RNC × ROI</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              {stats.totalNC} não conformidades · {stats.totalROI} registros de ocorrência
+            </p>
+          </div>
+          <button
+            onClick={() => loadData(true)}
+            disabled={refreshing}
+            className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-1.5 transition-colors"
+          >
+            <RefreshCw className={`w-3 h-3 ${refreshing ? 'animate-spin' : ''}`} />
+            Atualizar
+          </button>
         </div>
-        <button
-          onClick={() => loadData(true)}
-          disabled={refreshing}
-          className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-1.5 transition-colors"
-        >
-          <RefreshCw className={`w-3 h-3 ${refreshing ? 'animate-spin' : ''}`} />
-          Atualizar
-        </button>
+
+        {/* Tab switcher */}
+        <div className="flex gap-1">
+          {TABS.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                activeTab === tab.id
+                  ? 'bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm border border-slate-200 dark:border-slate-600'
+                  : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-white/60 dark:hover:bg-slate-800/60'
+              }`}
+            >
+              {tab.icon}
+              {tab.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="p-4 md:p-6 space-y-6">
 
-        {/* ── KPI Row ── */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-          <KpiTile
-            label="Total de RNCs"
-            value={stats.totalNC}
-            icon={<FileWarning className="w-5 h-5 text-white" />}
-            color="bg-violet-500"
-          />
-          <KpiTile
-            label="Abertas"
-            value={stats.abertas}
-            icon={<AlertTriangle className="w-5 h-5 text-white" />}
-            color="bg-red-500"
-            sub={stats.totalNC ? `${Math.round(stats.abertas / stats.totalNC * 100)}% do total` : undefined}
-          />
-          <KpiTile
-            label="Em Andamento"
-            value={stats.emAndamento}
-            icon={<Clock className="w-5 h-5 text-white" />}
-            color="bg-amber-500"
-          />
-          <KpiTile
-            label="Concluídas"
-            value={stats.concluidas}
-            icon={<CheckCircle2 className="w-5 h-5 text-white" />}
-            color="bg-emerald-500"
-            sub={stats.totalNC ? `${Math.round(stats.concluidas / stats.totalNC * 100)}% de efetividade` : undefined}
-          />
-          <KpiTile
-            label="Críticas"
-            value={stats.criticas}
-            icon={<AlertTriangle className="w-5 h-5 text-white" />}
-            color="bg-rose-600"
-          />
-          <KpiTile
-            label="Total de ROIs"
-            value={stats.totalROI}
-            icon={<Wrench className="w-5 h-5 text-white" />}
-            color="bg-sky-500"
-          />
-        </div>
-
-        {/* ── Tendência RNC × ROI (últimos 6 meses) ── */}
-        <Card title="Tendência Mensal — RNC × ROI (últimos 6 meses)">
-          <div className="flex gap-4 mb-3">
-            <div className="flex items-center gap-1.5 text-xs text-slate-500">
-              <span className="w-3 h-1.5 rounded-full inline-block" style={{ background: CHART_BLUE }} />
-              RNCs
+        {/* ══════════════════════════════════════════════════════
+            TAB 1 — Não Conformidade
+        ══════════════════════════════════════════════════════ */}
+        {activeTab === 'nc' && (
+          <>
+            {/* KPI Row — NC only */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+              <KpiTile
+                label="Total de RNCs"
+                value={stats.totalNC}
+                icon={<FileWarning className="w-5 h-5 text-white" />}
+                color="bg-violet-500"
+              />
+              <KpiTile
+                label="Abertas"
+                value={stats.abertas}
+                icon={<AlertTriangle className="w-5 h-5 text-white" />}
+                color="bg-red-500"
+                sub={stats.totalNC ? `${Math.round(stats.abertas / stats.totalNC * 100)}% do total` : undefined}
+              />
+              <KpiTile
+                label="Em Andamento"
+                value={stats.emAndamento}
+                icon={<Clock className="w-5 h-5 text-white" />}
+                color="bg-amber-500"
+              />
+              <KpiTile
+                label="Concluídas"
+                value={stats.concluidas}
+                icon={<CheckCircle2 className="w-5 h-5 text-white" />}
+                color="bg-emerald-500"
+                sub={stats.totalNC ? `${Math.round(stats.concluidas / stats.totalNC * 100)}% de efetividade` : undefined}
+              />
+              <KpiTile
+                label="Críticas"
+                value={stats.criticas}
+                icon={<AlertTriangle className="w-5 h-5 text-white" />}
+                color="bg-rose-600"
+              />
             </div>
-            <div className="flex items-center gap-1.5 text-xs text-slate-500">
-              <span className="w-3 h-1.5 rounded-full inline-block" style={{ background: CHART_PURPLE }} />
-              ROIs
-            </div>
-          </div>
-          <LineChart
-            series={[
-              { label: 'RNCs', values: stats.ncMonthly, color: CHART_BLUE },
-              { label: 'ROIs', values: stats.roiMonthly, color: CHART_PURPLE },
-            ]}
-            labels={stats.monthLabels}
-            height={110}
-          />
-        </Card>
 
-        {/* ── NC breakdown row ── */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Tendência mensal NC */}
+            <Card title="Tendência Mensal — RNCs (últimos 6 meses)">
+              <LineChart
+                series={[{ label: 'RNCs', values: stats.ncMonthly, color: CHART_BLUE }]}
+                labels={stats.monthLabels}
+                height={110}
+              />
+            </Card>
 
-          {/* Status */}
-          <Card title="RNCs por Status">
-            <div className="flex items-center gap-4">
-              <DonutChart data={statusData} size={110} />
-              <div className="flex-1 space-y-2">
-                {statusData.sort((a, b) => b.value - a.value).map(d => (
-                  <LegendItem key={d.label} color={d.color} label={d.label}
-                    value={d.value} total={stats.totalNC} />
-                ))}
-              </div>
-            </div>
-          </Card>
-
-          {/* Severidade */}
-          <Card title="RNCs por Severidade">
-            <div className="flex items-center gap-4">
-              <DonutChart data={severityData} size={110} />
-              <div className="flex-1 space-y-2">
-                {severityData.sort((a, b) => b.value - a.value).map(d => (
-                  <LegendItem key={d.label} color={d.color} label={d.label}
-                    value={d.value} total={stats.totalNC} />
-                ))}
-              </div>
-            </div>
-          </Card>
-
-          {/* Tipo */}
-          <Card title="RNCs por Tipo">
-            <div className="flex items-center gap-4">
-              <DonutChart data={typeData} size={110} />
-              <div className="flex-1 space-y-2">
-                {typeData.sort((a, b) => b.value - a.value).map(d => (
-                  <LegendItem key={d.label} color={d.color} label={d.label}
-                    value={d.value} total={stats.totalNC} />
-                ))}
-              </div>
-            </div>
-          </Card>
-        </div>
-
-        {/* ── Top Setores (NC) + ROI por Site ── */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-          {/* Top setores NC */}
-          <Card title="Top Setores — RNCs">
-            {stats.topSectors.length === 0
-              ? <p className="text-xs text-slate-400 text-center py-3">Sem dados de setor</p>
-              : (
-                <div className="space-y-2">
-                  {stats.topSectors.map(([label, value]) => {
-                    const pct = stats.totalNC ? Math.round((value / stats.totalNC) * 100) : 0;
-                    return (
-                      <div key={label} className="flex items-center gap-2">
-                        <div className="w-28 text-xs text-slate-600 dark:text-slate-300 truncate">{label}</div>
-                        <div className="flex-1 bg-slate-100 dark:bg-slate-700 rounded-full h-2 overflow-hidden">
-                          <div className="h-full rounded-full bg-violet-500" style={{ width: `${pct}%` }} />
-                        </div>
-                        <div className="text-xs text-slate-500 w-10 text-right">{value}</div>
-                      </div>
-                    );
-                  })}
+            {/* NC breakdown row */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card title="RNCs por Status">
+                <div className="flex items-center gap-4">
+                  <DonutChart data={statusData} size={110} />
+                  <div className="flex-1 space-y-2">
+                    {statusData.sort((a, b) => b.value - a.value).map(d => (
+                      <LegendItem key={d.label} color={d.color} label={d.label}
+                        value={d.value} total={stats.totalNC} />
+                    ))}
+                  </div>
                 </div>
-              )
-            }
-          </Card>
+              </Card>
 
-          {/* ROI por site */}
-          <Card title="ROIs por Site">
-            <div className="flex items-center gap-4">
-              <DonutChart data={siteData} size={110} />
-              <div className="flex-1 space-y-2">
-                {siteData.sort((a, b) => b.value - a.value).map(d => (
-                  <LegendItem key={d.label} color={d.color} label={d.label}
-                    value={d.value} total={stats.totalROI} />
-                ))}
-                {!siteData.length && (
-                  <p className="text-xs text-slate-400">Sem dados</p>
-                )}
-              </div>
-            </div>
-          </Card>
-        </div>
-
-        {/* ── ROI Tipo breakdown (barras) + Top Temas ROI ── */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-          {/* Tipos de ROI */}
-          <Card title="ROIs por Tipo de Ocorrência">
-            <BarChart
-              data={stats.roiByTipo.map((d, i) => ({
-                ...d,
-                color: ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#ef4444', '#0ea5e9'][i],
-              }))}
-              height={110}
-            />
-          </Card>
-
-          {/* Top Temas ROI */}
-          <Card title="Top Temas — ROI">
-            {stats.topROITemas.length === 0
-              ? <p className="text-xs text-slate-400 text-center py-3">Sem dados de tema</p>
-              : (
-                <div className="space-y-2">
-                  {stats.topROITemas.map(([label, value]) => {
-                    const pct = stats.totalROI ? Math.round((value / stats.totalROI) * 100) : 0;
-                    return (
-                      <div key={label} className="flex items-center gap-2">
-                        <div className="w-28 text-xs text-slate-600 dark:text-slate-300 truncate">{label}</div>
-                        <div className="flex-1 bg-slate-100 dark:bg-slate-700 rounded-full h-2 overflow-hidden">
-                          <div className="h-full rounded-full bg-sky-500" style={{ width: `${pct}%` }} />
-                        </div>
-                        <div className="text-xs text-slate-500 w-10 text-right">{value}</div>
-                      </div>
-                    );
-                  })}
+              <Card title="RNCs por Severidade">
+                <div className="flex items-center gap-4">
+                  <DonutChart data={severityData} size={110} />
+                  <div className="flex-1 space-y-2">
+                    {severityData.sort((a, b) => b.value - a.value).map(d => (
+                      <LegendItem key={d.label} color={d.color} label={d.label}
+                        value={d.value} total={stats.totalNC} />
+                    ))}
+                  </div>
                 </div>
-              )
-            }
-          </Card>
-        </div>
+              </Card>
 
-        {/* ── Tabela cruzada: últimos 6 meses ── */}
-        <Card title="Resumo Mensal — RNC × ROI">
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-slate-100 dark:border-slate-700">
-                  <th className="text-left py-2 pr-4 text-slate-500 font-medium">Mês</th>
-                  <th className="text-right py-2 px-2 text-violet-600 font-medium">RNCs abertas</th>
-                  <th className="text-right py-2 px-2 text-sky-600 font-medium">ROIs registrados</th>
-                  <th className="text-right py-2 pl-2 text-slate-500 font-medium">Razão ROI/RNC</th>
-                </tr>
-              </thead>
-              <tbody>
-                {stats.ncWithROIMonth.map(row => (
-                  <tr key={row.month} className="border-b border-slate-50 dark:border-slate-700/50">
-                    <td className="py-2 pr-4 text-slate-600 dark:text-slate-300">{formatMonth(row.month)}</td>
-                    <td className="text-right py-2 px-2 font-semibold text-slate-700 dark:text-slate-200">{row.nc}</td>
-                    <td className="text-right py-2 px-2 font-semibold text-slate-700 dark:text-slate-200">{row.roi}</td>
-                    <td className="text-right py-2 pl-2 text-slate-500">
-                      {row.nc ? (row.roi / row.nc).toFixed(1) : '—'}
-                    </td>
-                  </tr>
-                ))}
-                {!stats.ncWithROIMonth.some(r => r.nc || r.roi) && (
-                  <tr>
-                    <td colSpan={4} className="text-center py-4 text-slate-400">Nenhum dado nos últimos 6 meses</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </Card>
+              <Card title="RNCs por Tipo">
+                <div className="flex items-center gap-4">
+                  <DonutChart data={typeData} size={110} />
+                  <div className="flex-1 space-y-2">
+                    {typeData.sort((a, b) => b.value - a.value).map(d => (
+                      <LegendItem key={d.label} color={d.color} label={d.label}
+                        value={d.value} total={stats.totalNC} />
+                    ))}
+                  </div>
+                </div>
+              </Card>
+            </div>
 
-        {/* ── Setores ROI ── */}
-        {Object.keys(stats.byROISetor).filter(k => k !== 'N/A').length > 0 && (
-          <Card title="ROIs por Setor Responsável">
-            <div className="space-y-2">
-              {Object.entries(stats.byROISetor)
-                .filter(([k]) => k !== 'N/A')
-                .sort((a, b) => b[1] - a[1])
-                .slice(0, 8)
-                .map(([label, value]) => {
-                  const pct = stats.totalROI ? Math.round((value / stats.totalROI) * 100) : 0;
-                  return (
-                    <div key={label} className="flex items-center gap-2">
-                      <div className="w-36 text-xs text-slate-600 dark:text-slate-300 truncate">{label}</div>
-                      <div className="flex-1 bg-slate-100 dark:bg-slate-700 rounded-full h-2 overflow-hidden">
-                        <div className="h-full rounded-full bg-indigo-400" style={{ width: `${pct}%` }} />
-                      </div>
-                      <div className="text-xs text-slate-500 w-10 text-right">{value}</div>
+            {/* Top setores NC */}
+            <Card title="Top Setores — RNCs">
+              {stats.topSectors.length === 0
+                ? <p className="text-xs text-slate-400 text-center py-3">Sem dados de setor</p>
+                : (
+                  <div className="space-y-2">
+                    {stats.topSectors.map(([label, value]) => {
+                      const pct = stats.totalNC ? Math.round((value / stats.totalNC) * 100) : 0;
+                      return (
+                        <div key={label} className="flex items-center gap-2">
+                          <div className="w-28 text-xs text-slate-600 dark:text-slate-300 truncate">{label}</div>
+                          <div className="flex-1 bg-slate-100 dark:bg-slate-700 rounded-full h-2 overflow-hidden">
+                            <div className="h-full rounded-full bg-violet-500" style={{ width: `${pct}%` }} />
+                          </div>
+                          <div className="text-xs text-slate-500 w-10 text-right">{value}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )
+              }
+            </Card>
+          </>
+        )}
+
+        {/* ══════════════════════════════════════════════════════
+            TAB 2 — ROI
+        ══════════════════════════════════════════════════════ */}
+        {activeTab === 'roi' && (
+          <>
+            {/* KPI Row — ROI only */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+              <KpiTile
+                label="Total de ROIs"
+                value={stats.totalROI}
+                icon={<Wrench className="w-5 h-5 text-white" />}
+                color="bg-sky-500"
+              />
+              <KpiTile
+                label="Site RDO"
+                value={stats.byROISite['RDO'] ?? 0}
+                icon={<MapPin className="w-5 h-5 text-white" />}
+                color="bg-indigo-500"
+                sub={stats.totalROI ? `${Math.round(((stats.byROISite['RDO'] ?? 0) / stats.totalROI) * 100)}% do total` : undefined}
+              />
+              <KpiTile
+                label="Site MC"
+                value={stats.byROISite['MC'] ?? 0}
+                icon={<MapPin className="w-5 h-5 text-white" />}
+                color="bg-pink-500"
+              />
+              <KpiTile
+                label="Cliente"
+                value={stats.byROISite['CLIENTE'] ?? 0}
+                icon={<Layers className="w-5 h-5 text-white" />}
+                color="bg-teal-500"
+              />
+            </div>
+
+            {/* Tendência mensal ROI */}
+            <Card title="Tendência Mensal — ROIs (últimos 6 meses)">
+              <LineChart
+                series={[{ label: 'ROIs', values: stats.roiMonthly, color: CHART_PURPLE }]}
+                labels={stats.monthLabels}
+                height={110}
+              />
+            </Card>
+
+            {/* ROI breakdown row */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Card title="ROIs por Site">
+                <div className="flex items-center gap-4">
+                  <DonutChart data={siteData} size={110} />
+                  <div className="flex-1 space-y-2">
+                    {siteData.sort((a, b) => b.value - a.value).map(d => (
+                      <LegendItem key={d.label} color={d.color} label={d.label}
+                        value={d.value} total={stats.totalROI} />
+                    ))}
+                    {!siteData.length && <p className="text-xs text-slate-400">Sem dados</p>}
+                  </div>
+                </div>
+              </Card>
+
+              <Card title="ROIs por Tipo de Ocorrência">
+                <BarChart
+                  data={stats.roiByTipo.map((d, i) => ({
+                    ...d,
+                    color: ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#ef4444', '#0ea5e9'][i],
+                  }))}
+                  height={110}
+                />
+              </Card>
+            </div>
+
+            {/* Top temas + setores */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Card title="Top Temas — ROI">
+                {stats.topROITemas.length === 0
+                  ? <p className="text-xs text-slate-400 text-center py-3">Sem dados de tema</p>
+                  : (
+                    <div className="space-y-2">
+                      {stats.topROITemas.map(([label, value]) => {
+                        const pct = stats.totalROI ? Math.round((value / stats.totalROI) * 100) : 0;
+                        return (
+                          <div key={label} className="flex items-center gap-2">
+                            <div className="w-28 text-xs text-slate-600 dark:text-slate-300 truncate">{label}</div>
+                            <div className="flex-1 bg-slate-100 dark:bg-slate-700 rounded-full h-2 overflow-hidden">
+                              <div className="h-full rounded-full bg-sky-500" style={{ width: `${pct}%` }} />
+                            </div>
+                            <div className="text-xs text-slate-500 w-10 text-right">{value}</div>
+                          </div>
+                        );
+                      })}
                     </div>
-                  );
-                })}
+                  )
+                }
+              </Card>
+
+              {Object.keys(stats.byROISetor).filter(k => k !== 'N/A').length > 0 && (
+                <Card title="ROIs por Setor Responsável">
+                  <div className="space-y-2">
+                    {Object.entries(stats.byROISetor)
+                      .filter(([k]) => k !== 'N/A')
+                      .sort((a, b) => b[1] - a[1])
+                      .slice(0, 8)
+                      .map(([label, value]) => {
+                        const pct = stats.totalROI ? Math.round((value / stats.totalROI) * 100) : 0;
+                        return (
+                          <div key={label} className="flex items-center gap-2">
+                            <div className="w-36 text-xs text-slate-600 dark:text-slate-300 truncate">{label}</div>
+                            <div className="flex-1 bg-slate-100 dark:bg-slate-700 rounded-full h-2 overflow-hidden">
+                              <div className="h-full rounded-full bg-indigo-400" style={{ width: `${pct}%` }} />
+                            </div>
+                            <div className="text-xs text-slate-500 w-10 text-right">{value}</div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                </Card>
+              )}
             </div>
-          </Card>
+          </>
+        )}
+
+        {/* ══════════════════════════════════════════════════════
+            TAB 3 — ROI vs NC (comparativo)
+        ══════════════════════════════════════════════════════ */}
+        {activeTab === 'comparison' && (
+          <>
+            {/* KPI Row — ambos lado a lado */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <KpiTile
+                label="Total de RNCs"
+                value={stats.totalNC}
+                icon={<FileWarning className="w-5 h-5 text-white" />}
+                color="bg-violet-500"
+              />
+              <KpiTile
+                label="Total de ROIs"
+                value={stats.totalROI}
+                icon={<Wrench className="w-5 h-5 text-white" />}
+                color="bg-sky-500"
+              />
+              <KpiTile
+                label="RNCs Abertas"
+                value={stats.abertas}
+                icon={<AlertTriangle className="w-5 h-5 text-white" />}
+                color="bg-red-500"
+              />
+              <KpiTile
+                label="Razão ROI/RNC"
+                value={stats.totalNC ? (stats.totalROI / stats.totalNC).toFixed(1) : '—'}
+                icon={<TrendingUp className="w-5 h-5 text-white" />}
+                color="bg-amber-500"
+                sub="média geral"
+              />
+            </div>
+
+            {/* Tendência cruzada */}
+            <Card title="Tendência Mensal — RNC × ROI (últimos 6 meses)">
+              <div className="flex gap-4 mb-3">
+                <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                  <span className="w-3 h-1.5 rounded-full inline-block" style={{ background: CHART_BLUE }} />
+                  RNCs
+                </div>
+                <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                  <span className="w-3 h-1.5 rounded-full inline-block" style={{ background: CHART_PURPLE }} />
+                  ROIs
+                </div>
+              </div>
+              <LineChart
+                series={[
+                  { label: 'RNCs', values: stats.ncMonthly, color: CHART_BLUE },
+                  { label: 'ROIs', values: stats.roiMonthly, color: CHART_PURPLE },
+                ]}
+                labels={stats.monthLabels}
+                height={130}
+              />
+            </Card>
+
+            {/* Distribuição lado a lado */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Card title="RNCs — Distribuição por Severidade">
+                <div className="flex items-center gap-4">
+                  <DonutChart data={severityData} size={110} />
+                  <div className="flex-1 space-y-2">
+                    {severityData.sort((a, b) => b.value - a.value).map(d => (
+                      <LegendItem key={d.label} color={d.color} label={d.label}
+                        value={d.value} total={stats.totalNC} />
+                    ))}
+                  </div>
+                </div>
+              </Card>
+
+              <Card title="ROIs — Distribuição por Site">
+                <div className="flex items-center gap-4">
+                  <DonutChart data={siteData} size={110} />
+                  <div className="flex-1 space-y-2">
+                    {siteData.sort((a, b) => b.value - a.value).map(d => (
+                      <LegendItem key={d.label} color={d.color} label={d.label}
+                        value={d.value} total={stats.totalROI} />
+                    ))}
+                    {!siteData.length && <p className="text-xs text-slate-400">Sem dados</p>}
+                  </div>
+                </div>
+              </Card>
+            </div>
+
+            {/* Tabela cruzada: últimos 6 meses */}
+            <Card title="Resumo Mensal — RNC × ROI">
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-100 dark:border-slate-700">
+                      <th className="text-left py-2 pr-4 text-slate-500 font-medium">Mês</th>
+                      <th className="text-right py-2 px-2 text-violet-600 font-medium">RNCs</th>
+                      <th className="text-right py-2 px-2 text-sky-600 font-medium">ROIs</th>
+                      <th className="text-right py-2 pl-2 text-slate-500 font-medium">Razão ROI/RNC</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stats.ncWithROIMonth.map(row => (
+                      <tr key={row.month} className="border-b border-slate-50 dark:border-slate-700/50">
+                        <td className="py-2 pr-4 text-slate-600 dark:text-slate-300">{formatMonth(row.month)}</td>
+                        <td className="text-right py-2 px-2 font-semibold text-violet-700 dark:text-violet-400">{row.nc}</td>
+                        <td className="text-right py-2 px-2 font-semibold text-sky-700 dark:text-sky-400">{row.roi}</td>
+                        <td className="text-right py-2 pl-2 text-slate-500">
+                          {row.nc ? (row.roi / row.nc).toFixed(1) : '—'}
+                        </td>
+                      </tr>
+                    ))}
+                    {!stats.ncWithROIMonth.some(r => r.nc || r.roi) && (
+                      <tr>
+                        <td colSpan={4} className="text-center py-4 text-slate-400">Nenhum dado nos últimos 6 meses</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          </>
         )}
 
       </div>
