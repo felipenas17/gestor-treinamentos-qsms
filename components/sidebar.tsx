@@ -16,6 +16,7 @@ import {
   ShieldCheck,
   AlertTriangle,
   BarChart3,
+  Activity,
 } from 'lucide-react';
 
 interface NavItem {
@@ -116,6 +117,7 @@ const MODULES: Module[] = [
         icon: ShieldCheck,
         items: [
           { id: 'programas-sst', label: 'Programas SST', sublabel: 'Documentos e Laudos', icon: FileText },
+          { id: 'acidentes-indicadores', label: 'TFCA / TFSA', sublabel: 'Indicadores de Acidentes', icon: Activity },
         ],
       },
     ],

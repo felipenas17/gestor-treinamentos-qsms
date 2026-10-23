@@ -458,3 +458,33 @@ export interface SstProgram {
   status?: SstProgramStatus;
   daysUntilExpiry?: number;
 }
+
+// ============================================================
+// TFCA / TFSA — Indicadores de Acidentes (Accident REM)
+// ============================================================
+export type AccidentSite = 'Macaé' | 'RDO' | 'CS' | 'DCX';
+
+export interface AccidentRem {
+  id: string;
+  site: AccidentSite;
+  year: number;
+  month: number;
+  num_func_tr: number;
+  num_func_terceiros: number;
+  hher_tr: number;
+  acidentes_tr: number;
+  acidentes_terceiros: number;
+  sem_afastamento: number;
+  impacto_ambiental: number;
+  perda_material: number;
+  incidente: number;
+  dias_perdidos: number;
+  dias_debitados: number;
+  changed_by: string;
+  created_at: string;
+  updated_at: string;
+  // computed client-side
+  tfca?: number;   // (acidentes_tr × 1_000_000) / hher_tr
+  tfsa?: number;   // (sem_afastamento × 1_000_000) / hher_tr
+  tg?: number;     // ((dias_perdidos + dias_debitados) × 1_000_000) / hher_tr
+}

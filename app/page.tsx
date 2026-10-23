@@ -29,6 +29,7 @@ import { ComplianceScoreScreen } from '@/components/screens/compliance-score-scr
 import { ManagementReportScreen } from '@/components/screens/management-report-screen';
 import { AuditScreen } from '@/components/screens/audit-screen';
 import { SstProgramsScreen } from '@/components/screens/sst-programs-screen';
+import { AccidentIndicatorsScreen } from '@/components/screens/accident-indicators-screen';
 // import { ImportDocumentModal } from '@/components/modals/import-document-modal'; // modal não ativo
 
 import {
@@ -1672,6 +1673,9 @@ export default function GestorTreinamentosApp() {
           )}
           {currentTab === 'programas-sst' && (
             <SstProgramsScreen onToast={showToast} />
+          )}
+          {currentTab === 'acidentes-indicadores' && (
+            <AccidentIndicatorsScreen onToast={showToast} />
           )}
         </main>
       </div>
