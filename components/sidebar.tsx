@@ -17,6 +17,7 @@ import {
   AlertTriangle,
   BarChart3,
   Activity,
+  FileCheck2,
 } from 'lucide-react';
 
 interface NavItem {
@@ -118,6 +119,7 @@ const MODULES: Module[] = [
         items: [
           { id: 'programas-sst', label: 'Programas SST', sublabel: 'Documentos e Laudos', icon: FileText },
           { id: 'acidentes-indicadores', label: 'TFCA / TFSA', sublabel: 'Indicadores de Acidentes', icon: Activity },
+          { id: 'pt-pet', label: 'PT / PET', sublabel: 'Permissões de Trabalho', icon: FileCheck2 },
         ],
       },
     ],

@@ -30,6 +30,7 @@ import { ManagementReportScreen } from '@/components/screens/management-report-s
 import { AuditScreen } from '@/components/screens/audit-screen';
 import { SstProgramsScreen } from '@/components/screens/sst-programs-screen';
 import { AccidentIndicatorsScreen } from '@/components/screens/accident-indicators-screen';
+import { PtPetScreen } from '@/components/screens/pt-pet-screen';
 // import { ImportDocumentModal } from '@/components/modals/import-document-modal'; // modal não ativo
 
 import {
@@ -1676,6 +1677,9 @@ export default function GestorTreinamentosApp() {
           )}
           {currentTab === 'acidentes-indicadores' && (
             <AccidentIndicatorsScreen onToast={showToast} />
+          )}
+          {currentTab === 'pt-pet' && (
+            <PtPetScreen onToast={showToast} />
           )}
         </main>
       </div>

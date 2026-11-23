@@ -488,3 +488,35 @@ export interface AccidentRem {
   tfsa?: number;   // (sem_afastamento × 1_000_000) / hher_tr
   tg?: number;     // ((dias_perdidos + dias_debitados) × 1_000_000) / hher_tr
 }
+
+// ─── PT / PET — Permissões de Trabalho ───────────────────────────────────────
+
+export type WorkPermitTipo    = 'PT' | 'PET';
+export type WorkPermitSubtipo = 'altura' | 'confinado' | 'quente' | 'eletrico' | 'icamento';
+export type WorkPermitStatus  = 'emitida' | 'em_execucao' | 'encerrada' | 'cancelada';
+
+export interface WorkPermit {
+  id:                   string;
+  numero:               string;
+  tipo:                 WorkPermitTipo;
+  subtipo:              WorkPermitSubtipo | null;
+  dataEmissao:          string;
+  horaInicio:           string;
+  horaFimPrevista:      string;
+  unidade:              string | null;
+  localTrabalho:        string;
+  descricaoAtividade:   string;
+  empresaExecutante:    string | null;
+  responsavelExecucao:  string;
+  equipe:               string | null;
+  riscos:               string | null;
+  medidasControle:      string | null;
+  episSelecionados:     string | null;
+  autorizadorNome:      string | null;
+  autorizadorFuncao:    string | null;
+  status:               WorkPermitStatus;
+  horaEncerramento:     string | null;
+  observacoes:          string | null;
+  createdAt:            string;
+  updatedAt:            string;
+}
