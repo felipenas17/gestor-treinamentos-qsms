@@ -521,7 +521,7 @@ export function PtPetScreen({ onToast }: Props) {
     setLoading(false);
   }, [onToast]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(); }, [load]); // eslint-disable-line react-hooks/set-state-in-effect
 
   // ── next number ──
   const nextNumber = useCallback(async (tipo: WorkPermitTipo): Promise<string> => {
