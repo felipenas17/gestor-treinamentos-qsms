@@ -510,7 +510,7 @@ export function PtPetScreen({ onToast }: Props) {
 
   // ── load ──
   const load = useCallback(async () => {
-    if (!isSupabaseConfigured) { setLoading(false); return; }
+    if (!supabase) { setLoading(false); return; }
     setLoading(true);
     const { data, error } = await supabase
       .from('work_permits')
@@ -527,6 +527,7 @@ export function PtPetScreen({ onToast }: Props) {
   const nextNumber = useCallback(async (tipo: WorkPermitTipo): Promise<string> => {
     const year = new Date().getFullYear();
     const prefix = `${tipo}-${year}-`;
+    if (!supabase) return `${prefix}001`;
     const { data } = await supabase
       .from('work_permits')
       .select('numero')
@@ -545,6 +546,7 @@ export function PtPetScreen({ onToast }: Props) {
       onToast('Preencha os campos obrigatórios', 'error'); return;
     }
     setSaving(true);
+    if (!supabase) { onToast('Supabase não configurado', 'error'); setSaving(false); return; }
     try {
       const riscosAll = [
         ...form.riscosSelected,
@@ -600,6 +602,7 @@ export function PtPetScreen({ onToast }: Props) {
 
   // ── status transitions ──
   async function handleStatusChange(permit: WorkPermit, action: 'iniciar' | 'encerrar' | 'cancelar') {
+    if (!supabase) { onToast('Supabase não configurado', 'error'); return; }
     const newStatus = action === 'iniciar' ? 'em_execucao' : action === 'encerrar' ? 'encerrada' : 'cancelada';
     const extra = action === 'encerrar' ? { hora_encerramento: new Date().toISOString() } : {};
     const { error } = await supabase.from('work_permits')
