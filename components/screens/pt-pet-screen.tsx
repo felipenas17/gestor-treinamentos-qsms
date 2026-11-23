@@ -1,515 +1,800 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-  FileCheck2,
-  Plus,
-  Printer,
-  Edit2,
-  CheckCircle2,
-  XCircle,
-  PlayCircle,
-  Search,
-  X,
-  Save,
-  AlertTriangle,
-  Clock,
-  ShieldAlert,
-  Zap,
-  Flame,
-  Wind,
-  Anchor,
+  FileCheck2, Plus, Printer, Edit2, CheckCircle2, XCircle,
+  PlayCircle, Search, X, Save, Clock, ShieldAlert, Zap,
+  Flame, Wind, Anchor,
 } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
-import {
-  WorkPermit,
-  WorkPermitTipo,
-  WorkPermitSubtipo,
-  WorkPermitStatus,
-} from '@/types';
+import { WorkPermit, WorkPermitTipo, WorkPermitSubtipo, WorkPermitStatus } from '@/types';
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+// ─── Template constants (FOR-TR-SMS-042) ─────────────────────────────────────
 
-const EPI_OPTIONS = [
-  'Capacete',
-  'Óculos de proteção',
-  'Protetor auricular',
-  'Luvas de proteção',
-  'Calçado de segurança',
-  'Uniforme / macacão',
-  'Cinto de segurança',
-  'Talabarte',
-  'Linha de vida',
-  'Trava-quedas',
-  'Detector de gases (4 gases)',
-  'Máscara respiratória',
-  'Avental de solda',
-  'Protetor facial',
-  'Luvas dielétricas',
-  'Detector de tensão',
-  'Extintor portátil',
+const RISCOS_COL1 = [
+  'Trabalho em Altura',
+  'Queda em Diferença de Nível',
+  'Espaço Confinado',
+  'Produtos Inflamáveis / Combustíveis',
+  'Trabalho com Eletricidade',
+  'Ruído',
+  'Movimentação de Cargas',
+  'Incêndio / Explosão',
+  'Construção Civil / Infra Estrutura',
+  'Choque Elétrico',
+  'Queda de Objetos em Geral',
+  'Presença de Vapores Químicos',
+  'Manipulação de Produtos Químicos',
+  'Movimentação Manual de Cargas',
+  'Utilização de Máquinas / Equipamentos',
 ];
 
+const RISCOS_COL2 = [
+  'Trabalho em Andaimes / Queda',
+  'Utilização de Escadas / Queda',
+  'Radiação Não Ionizante',
+  'Queda de Homem ao Mar',
+  'Exposição a Fumos Metálicos',
+  'Exposição a Poeira Metálica',
+  'Exposição ao Sol',
+  'Exposição à Animais Peçonhentos',
+  'Trabalho a Quente',
+  'Utilização de Ferramentas Rotativas',
+  'Trabalhos Simultâneos',
+  'Utilização de Mangotes / Rompimento',
+  'Vazamento / Derramamento',
+  'Atropelamento',
+  'Emissão de Resíduos',
+];
+
+const RISCOS_COL3 = [
+  'Incompatibilidade Química',
+  'Utilização de Ferramentas Manuais',
+  'Rompimento de Tubulações / Mangotes',
+  'Utilização de Equipamentos Suspensos',
+  'Utilização de Equipamentos Pneumáticos',
+  'Utilização / Contato c/ Equip. Energizados',
+  'Circulação de Pedestres',
+  'Atividades Manuais',
+  'Materiais Espalhados pela Área',
+  'Projeção de Fragmentos',
+];
+
+const ALL_RISCOS = [...RISCOS_COL1, ...RISCOS_COL2, ...RISCOS_COL3];
+
+const EPI_LIST = [
+  'Capacete c/ Jugular',
+  'Bota de Couro c/ Biqueira',
+  'Protetor Auricular Plug ou Concha',
+  'Bota PVC',
+  'Protetor Facial',
+  'Luva para Eletricidade',
+  'Máscara Semi Facial p/ Químicos',
+  'Filtro de Linha ou Ar Mandado',
+  'Luva p/ Químicos',
+  'Colete Salva Vidas',
+  'Luva de Vaqueta',
+  'Luva de Raspa',
+  'Luva Pigmentada',
+  'Avental PVC',
+  'Avental de Raspa',
+  'TYVEK',
+  'Máscara de Solda',
+  'Cinto Tipo Paraquedista',
+  'Talabarte em Y',
+];
+
+const EPC_LIST = [
+  'Balde ou Bacia de Contenção',
+  'Cabos de Aterramento',
+  'Linha de Vida',
+  'Fita Zebrada',
+  'Cones para Sinalização',
+  'Ferramenta Anti Faísca',
+  'Material Absorvente',
+  'Mão Amiga',
+  'Equip. de Combate a Incêndio',
+  'Rádio de Comunicação',
+  'Isolamento de Área',
+  'Ferramentas Isoladas e Adequadas',
+  'Bloqueios / Travamentos',
+];
+
+const MEDIDAS_COL1 = [
+  'Avaliar o Local Antes da Atividade',
+  'Sinalizar e Isolar a Área',
+  'Interromper Atividades Simultâneas',
+  'Utilizar os EPI Determinados nesta PT',
+  'Utilizar os EPC Determinados nesta PT',
+  'Inspecionar os Equipamentos / Ferramentas',
+  'Realizar o Aterramento',
+  'Operadores de Equip. de Movimentação Treinados e Habilitados',
+  'Equip. e Acessórios de Movimentação Compatíveis e em Boas Condições',
+  'Realizar a Abertura da PET',
+  'Para Trab. em Altura: Trabalhador Treinado e Certificado',
+  'Para Trab. em Esp. Confinado: Trabalhador Treinado e Certificado',
+  'Colaboradores com ASO Atualizado',
+  'Desenergizar Sistemas Elétricos',
+  'Somente Profissional Habilitado em Instalações Elétricas',
+  'Não Transportar Cargas Soltas ou Desamarradas',
+  'Inspecionar Condições Gerais das Escadas',
+  'Realizar o Travamento Correto do Andaime',
+  'Consultar a FISPQ do Produto Químico',
+  'Disponibilidade de Chuveiro e Lava Olhos',
+  'Não Realizar Trabalho a Quente Próximo a Inflamáveis',
+  'Verificar as Condições Climáticas (Sol, Chuva e Vento)',
+  'Instalar a Mão Amiga em Mangotes',
+  'Instalar Bandejas de Contenção Abaixo de Conexões',
+];
+
+const MEDIDAS_COL2 = [
+  'Verificar Recipiente para Descarte dos Resíduos',
+  'Manter Equipe de Emergência de Prontidão',
+  'Manter Equip. de Combate a Incêndio Disponível',
+  'Somente Permitir Presença de Pessoas Autorizadas',
+  'Manter Produtos Inflamáveis Distantes de Fontes de Ignição',
+  'Certificar que Colaboradores Possuem Treinamentos',
+  'Não Portar Celular, Tablet ou Outro Eletroeletrônico',
+  'Providenciar a Limpeza do Local Após a Atividade',
+];
+
+const ALL_MEDIDAS = [...MEDIDAS_COL1, ...MEDIDAS_COL2];
+
 const PET_SUBTIPOS: Record<WorkPermitSubtipo, { label: string; icon: React.ElementType; nr: string }> = {
-  altura:    { label: 'Trabalho em Altura',  icon: ShieldAlert, nr: 'NR-35' },
-  confinado: { label: 'Espaço Confinado',    icon: Wind,        nr: 'NR-33' },
-  quente:    { label: 'Trabalho a Quente',   icon: Flame,       nr: 'NR-34' },
-  eletrico:  { label: 'Trabalho Elétrico',   icon: Zap,         nr: 'NR-10' },
-  icamento:  { label: 'Içamento de Cargas',  icon: Anchor,      nr: 'NR-11' },
+  altura:    { label: 'Trabalho em Altura', icon: ShieldAlert, nr: 'NR-35' },
+  confinado: { label: 'Espaço Confinado',   icon: Wind,        nr: 'NR-33' },
+  quente:    { label: 'Trabalho a Quente',  icon: Flame,       nr: 'NR-34' },
+  eletrico:  { label: 'Trabalho Elétrico',  icon: Zap,         nr: 'NR-10' },
+  icamento:  { label: 'Içamento de Cargas', icon: Anchor,      nr: 'NR-11' },
 };
 
 const STATUS_CFG: Record<WorkPermitStatus, { label: string; badgeCls: string }> = {
-  emitida:     { label: 'Emitida',       badgeCls: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300' },
-  em_execucao: { label: 'Em Execução',   badgeCls: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300' },
-  encerrada:   { label: 'Encerrada',     badgeCls: 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300' },
-  cancelada:   { label: 'Cancelada',     badgeCls: 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300' },
+  emitida:     { label: 'Emitida',     badgeCls: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300' },
+  em_execucao: { label: 'Em Execução', badgeCls: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300' },
+  encerrada:   { label: 'Encerrada',   badgeCls: 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300' },
+  cancelada:   { label: 'Cancelada',   badgeCls: 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300' },
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function fmtDate(iso: string | null | undefined): string {
+function fmtDate(iso: string | null | undefined) {
   if (!iso) return '—';
   const [y, m, d] = iso.split('-');
   return `${d}/${m}/${y}`;
 }
 
-function fmtDateTime(iso: string | null | undefined): string {
+function fmtDateTime(iso: string | null | undefined) {
   if (!iso) return '—';
-  const dt = new Date(iso);
-  return dt.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+  return new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 }
 
-function mapRow(r: Record<string, unknown>): WorkPermit {
+function todayISO() {
+  return new Date().toISOString().split('T')[0];
+}
+
+function parseJson<T>(val: string | null | undefined, fallback: T): T {
+  if (!val) return fallback;
+  try { return JSON.parse(val) as T; } catch { return fallback; }
+}
+
+// ─── DB row mapper ────────────────────────────────────────────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mapRow(r: any): WorkPermit {
   return {
-    id:                   r.id as string,
-    numero:               r.numero as string,
-    tipo:                 r.tipo as WorkPermitTipo,
-    subtipo:              (r.subtipo as WorkPermitSubtipo) ?? null,
-    dataEmissao:          r.data_emissao as string,
-    horaInicio:           r.hora_inicio as string,
-    horaFimPrevista:      r.hora_fim_prevista as string,
-    unidade:              (r.unidade as string) ?? null,
-    localTrabalho:        r.local_trabalho as string,
-    descricaoAtividade:   r.descricao_atividade as string,
-    empresaExecutante:    (r.empresa_executante as string) ?? null,
-    responsavelExecucao:  r.responsavel_execucao as string,
-    equipe:               (r.equipe as string) ?? null,
-    riscos:               (r.riscos as string) ?? null,
-    medidasControle:      (r.medidas_controle as string) ?? null,
-    episSelecionados:     (r.epis_selecionados as string) ?? null,
-    autorizadorNome:      (r.autorizador_nome as string) ?? null,
-    autorizadorFuncao:    (r.autorizador_funcao as string) ?? null,
-    status:               r.status as WorkPermitStatus,
-    horaEncerramento:     (r.hora_encerramento as string) ?? null,
-    observacoes:          (r.observacoes as string) ?? null,
-    createdAt:            r.created_at as string,
-    updatedAt:            r.updated_at as string,
+    id:                   r.id,
+    numero:               r.numero,
+    tipo:                 r.tipo,
+    subtipo:              r.subtipo ?? null,
+    dataEmissao:          r.data_emissao,
+    horaInicio:           r.hora_inicio,
+    horaFimPrevista:      r.hora_fim_prevista,
+    unidade:              r.unidade ?? null,
+    localTrabalho:        r.local_trabalho,
+    descricaoAtividade:   r.descricao_atividade,
+    empresaExecutante:    r.empresa_tipo ?? r.empresa_executante ?? null,
+    responsavelExecucao:  r.responsavel_execucao,
+    equipe:               r.envolvidos ?? r.equipe ?? null,
+    riscos:               r.riscos ?? null,
+    medidasControle:      r.medidas_controle ?? null,
+    episSelecionados:     r.epis_selecionados ?? null,
+    autorizadorNome:      r.autorizador_nome ?? null,
+    autorizadorFuncao:    r.autorizador_funcao ?? null,
+    status:               r.status,
+    horaEncerramento:     r.hora_encerramento ?? null,
+    observacoes:          r.observacoes ?? null,
+    createdAt:            r.created_at,
+    updatedAt:            r.updated_at,
   };
 }
 
 // ─── Form state ───────────────────────────────────────────────────────────────
 
-interface FormData {
-  numero:               string;
-  tipo:                 WorkPermitTipo;
-  subtipo:              WorkPermitSubtipo | '';
-  dataEmissao:          string;
-  horaInicio:           string;
-  horaFimPrevista:      string;
-  unidade:              string;
-  localTrabalho:        string;
-  descricaoAtividade:   string;
-  empresaExecutante:    string;
-  responsavelExecucao:  string;
-  equipe:               string;
-  riscos:               string;
-  medidasControle:      string;
-  episSelecionados:     string[];
-  autorizadorNome:      string;
-  autorizadorFuncao:    string;
-  observacoes:          string;
+interface FormState {
+  tipo:                WorkPermitTipo;
+  subtipo:             WorkPermitSubtipo | '';
+  dataEmissao:         string;
+  horaInicio:          string;
+  horaFimPrevista:     string;
+  unidade:             string;
+  empresaTipo:         'Tiger Rentank' | 'Terceiros';
+  localTrabalho:       string;
+  descricaoAtividade:  string;
+  responsavelExecucao: string;
+  autorizadorNome:     string;
+  autorizadorFuncao:   string;
+  riscosSelected:      string[];
+  riscosExtra:         string;
+  episSelected:        string[];
+  epcsSelected:        string[];
+  medidasSelected:     string[];
+  medidasExtra:        string;
+  envolvidos:          string[];  // 8 names
+  qsmsNome:            string;
+  observacoes:         string;
 }
 
-function emptyForm(tipo: WorkPermitTipo = 'PT'): FormData {
+function emptyForm(): FormState {
   return {
-    numero:               '',
-    tipo,
-    subtipo:              '',
-    dataEmissao:          new Date().toISOString().split('T')[0],
-    horaInicio:           '08:00',
-    horaFimPrevista:      '17:00',
-    unidade:              '',
-    localTrabalho:        '',
-    descricaoAtividade:   '',
-    empresaExecutante:    'Tiger Rentank do Brasil',
-    responsavelExecucao:  '',
-    equipe:               '',
-    riscos:               '',
-    medidasControle:      '',
-    episSelecionados:     [],
-    autorizadorNome:      '',
-    autorizadorFuncao:    '',
-    observacoes:          '',
+    tipo: 'PT', subtipo: '', dataEmissao: todayISO(),
+    horaInicio: '', horaFimPrevista: '', unidade: '',
+    empresaTipo: 'Tiger Rentank',
+    localTrabalho: '', descricaoAtividade: '',
+    responsavelExecucao: '', autorizadorNome: '', autorizadorFuncao: '',
+    riscosSelected: [], riscosExtra: '',
+    episSelected: [], epcsSelected: [],
+    medidasSelected: [], medidasExtra: '',
+    envolvidos: ['','','','','','','',''],
+    qsmsNome: '',
+    observacoes: '',
   };
 }
 
-// ─── Props ────────────────────────────────────────────────────────────────────
+function permitToForm(p: WorkPermit): FormState {
+  const riscosArr = parseJson<string[]>(p.riscos, []);
+  const riscosKnown = riscosArr.filter(r => ALL_RISCOS.includes(r));
+  const riscosExtra = riscosArr.filter(r => !ALL_RISCOS.includes(r)).join('\n');
+
+  const medidasArr = parseJson<string[]>(p.medidasControle, []);
+  const medidasKnown = medidasArr.filter(m => ALL_MEDIDAS.includes(m));
+  const medidasExtra = medidasArr.filter(m => !ALL_MEDIDAS.includes(m)).join('\n');
+
+  const episArr = parseJson<string[]>(p.episSelecionados, []);
+  const epcsArr = parseJson<string[]>(
+    // new field stored separately — for now fall back to empty
+    null, []
+  );
+
+  const envolvidosArr = parseJson<{ nome: string }[]>(p.equipe, []);
+  const env = Array.from({ length: 8 }, (_, i) => envolvidosArr[i]?.nome ?? '');
+
+  return {
+    tipo: p.tipo, subtipo: p.subtipo ?? '',
+    dataEmissao: p.dataEmissao, horaInicio: p.horaInicio,
+    horaFimPrevista: p.horaFimPrevista, unidade: p.unidade ?? '',
+    empresaTipo: (p.empresaExecutante === 'Terceiros' ? 'Terceiros' : 'Tiger Rentank'),
+    localTrabalho: p.localTrabalho, descricaoAtividade: p.descricaoAtividade,
+    responsavelExecucao: p.responsavelExecucao,
+    autorizadorNome: p.autorizadorNome ?? '', autorizadorFuncao: p.autorizadorFuncao ?? '',
+    riscosSelected: riscosKnown, riscosExtra,
+    episSelected: episArr, epcsSelected: epcsArr,
+    medidasSelected: medidasKnown, medidasExtra,
+    envolvidos: env,
+    qsmsNome: '',
+    observacoes: p.observacoes ?? '',
+  };
+}
+
+// ─── Print ────────────────────────────────────────────────────────────────────
+
+function doPrint(p: WorkPermit, extraData?: {
+  epcs: string[]; envolvidos: string[]; qsmsNome: string;
+  riscosExtra: string; medidasExtra: string;
+}) {
+  const riscos = parseJson<string[]>(p.riscos, []);
+  const epis   = parseJson<string[]>(p.episSelecionados, []);
+  const medidas = parseJson<string[]>(p.medidasControle, []);
+  const envArr = extraData?.envolvidos ?? parseJson<{ nome: string }[]>(p.equipe, []).map(e => e.nome);
+  const epcs   = extraData?.epcs ?? [];
+  const qsmsNome = extraData?.qsmsNome ?? '';
+
+  function chk(list: string[], item: string) {
+    return list.includes(item) ? '☑' : '☐';
+  }
+
+  function riscoRow(col1: string[], col2: string[], col3: string[]) {
+    const maxLen = Math.max(col1.length, col2.length, col3.length);
+    return Array.from({ length: maxLen }, (_, i) => `
+      <tr>
+        <td>${col1[i] ? `${chk(riscos, col1[i])} ${col1[i]}` : ''}</td>
+        <td>${col2[i] ? `${chk(riscos, col2[i])} ${col2[i]}` : ''}</td>
+        <td>${col3[i] ? `${chk(riscos, col3[i])} ${col3[i]}` : ''}</td>
+      </tr>`).join('');
+  }
+
+  function epiRows() {
+    const half = Math.ceil(EPI_LIST.length / 2);
+    const left = EPI_LIST.slice(0, half);
+    const right = EPI_LIST.slice(half);
+    const maxLen = Math.max(left.length, right.length);
+    return Array.from({ length: maxLen }, (_, i) => `
+      <tr>
+        <td>${left[i] ? `${chk(epis, left[i])} ${left[i]}` : ''}</td>
+        <td>${right[i] ? `${chk(epis, right[i])} ${right[i]}` : ''}</td>
+        <td style="border-left:1pt solid #333">${EPC_LIST[i] ? `${chk(epcs, EPC_LIST[i])} ${EPC_LIST[i]}` : ''}</td>
+      </tr>`).join('');
+  }
+
+  function medidasRows() {
+    const maxLen = Math.max(MEDIDAS_COL1.length, MEDIDAS_COL2.length);
+    return Array.from({ length: maxLen }, (_, i) => `
+      <tr>
+        <td>${MEDIDAS_COL1[i] ? `${chk(medidas, MEDIDAS_COL1[i])} ${MEDIDAS_COL1[i]}` : ''}</td>
+        <td>${MEDIDAS_COL2[i] ? `${chk(medidas, MEDIDAS_COL2[i])} ${MEDIDAS_COL2[i]}` : ''}</td>
+      </tr>`).join('');
+  }
+
+  const extraRiscos = extraData?.riscosExtra ?? '';
+  const extraMedidas = extraData?.medidasExtra ?? '';
+
+  const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>${p.numero}</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: Arial, sans-serif; font-size: 8pt; margin: 0; padding: 10mm; color: #000; }
+  h1 { font-size: 10pt; text-align: center; margin: 0; }
+  .page-break { page-break-before: always; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 4pt; }
+  th, td { border: 0.5pt solid #333; padding: 2pt 3pt; vertical-align: top; font-size: 7.5pt; }
+  th { background: #d9d9d9; font-weight: bold; text-align: left; }
+  .header-table th { text-align: center; vertical-align: middle; }
+  .section-title { background: #bfbfbf; font-weight: bold; font-size: 8pt; text-align: center; padding: 2pt; border: 0.5pt solid #333; margin-bottom: 0; }
+  .label { font-weight: bold; font-size: 7pt; color: #333; }
+  .sig-line { border-bottom: 0.5pt solid #333; height: 18pt; }
+  .sig-label { font-size: 6.5pt; text-align: center; }
+  @media print {
+    body { margin: 0; padding: 8mm; }
+    @page { size: A4; margin: 8mm; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ══ CABEÇALHO ══ -->
+<table class="header-table">
+  <tr>
+    <td style="width:25%;text-align:center;font-weight:bold;font-size:9pt;">TIGER RENTANK<br>DO BRASIL</td>
+    <td style="text-align:center;font-weight:bold;font-size:11pt;">PERMISSÃO PARA TRABALHO — ${p.tipo}${p.subtipo ? ` (${PET_SUBTIPOS[p.subtipo as WorkPermitSubtipo]?.label ?? p.subtipo})` : ''}</td>
+    <td style="width:22%;font-size:7pt;">
+      FOR-TR-SMS-042<br>Revisão: 02<br>Data: 20/11/2020<br>Página: 1/2
+    </td>
+  </tr>
+</table>
+
+<!-- ══ ABERTURA / ENCERRAMENTO ══ -->
+<table>
+  <tr>
+    <th colspan="4" style="background:#bfbfbf;">ABERTURA</th>
+    <th colspan="2" style="background:#bfbfbf;">ENCERRAMENTO</th>
+  </tr>
+  <tr>
+    <td><span class="label">Nº PT:</span><br>${p.numero}</td>
+    <td><span class="label">Data:</span><br>${fmtDate(p.dataEmissao)}</td>
+    <td><span class="label">Hora Início:</span><br>${p.horaInicio}</td>
+    <td><span class="label">Hora Final Prevista:</span><br>${p.horaFimPrevista}</td>
+    <td><span class="label">Data:</span><br>${p.horaEncerramento ? fmtDateTime(p.horaEncerramento).split(' ')[0] : '___________'}</td>
+    <td><span class="label">Hora:</span><br>${p.horaEncerramento ? fmtDateTime(p.horaEncerramento).split(' ')[1] : '___________'}</td>
+  </tr>
+  <tr>
+    <td colspan="2"><span class="label">Empresa:</span><br>${p.empresaExecutante ?? 'Tiger Rentank'}</td>
+    <td colspan="2"><span class="label">Unidade / Base:</span><br>${p.unidade ?? ''}</td>
+    <td colspan="2"><span class="label">Responsável pela Atividade:</span><br>${p.responsavelExecucao}</td>
+  </tr>
+  <tr>
+    <td colspan="6"><span class="label">Área / Local da Atividade:</span><br>${p.localTrabalho}</td>
+  </tr>
+  <tr>
+    <td colspan="6"><span class="label">Descrição da Atividade:</span><br>${p.descricaoAtividade}</td>
+  </tr>
+</table>
+
+<!-- ══ RISCOS ══ -->
+<div class="section-title">ASPECTOS E IMPACTOS / PERIGOS E RISCOS</div>
+<table>
+  <tr>
+    <th style="width:34%">Riscos</th>
+    <th style="width:33%">Riscos</th>
+    <th style="width:33%">Riscos</th>
+  </tr>
+  ${riscoRow(RISCOS_COL1, RISCOS_COL2, RISCOS_COL3)}
+  ${extraRiscos ? `<tr><td colspan="3"><span class="label">Outros:</span> ${extraRiscos}</td></tr>` : ''}
+</table>
+
+<!-- ══ EQUIPAMENTOS ══ -->
+<div class="section-title">EQUIPAMENTOS DE PROTEÇÃO</div>
+<table>
+  <tr>
+    <th colspan="2" style="text-align:center;">EQUIPAMENTO DE PROTEÇÃO INDIVIDUAL — EPI</th>
+    <th style="text-align:center;border-left:1pt solid #333">EQUIPAMENTO DE PROTEÇÃO COLETIVA — EPC</th>
+  </tr>
+  ${epiRows()}
+</table>
+
+<!-- ══ PÁGINA 2 ══ -->
+<div class="page-break"></div>
+
+<!-- Cabeçalho p2 -->
+<table class="header-table">
+  <tr>
+    <td style="width:25%;text-align:center;font-weight:bold;font-size:9pt;">TIGER RENTANK<br>DO BRASIL</td>
+    <td style="text-align:center;font-weight:bold;font-size:11pt;">PERMISSÃO PARA TRABALHO — ${p.tipo}</td>
+    <td style="width:22%;font-size:7pt;">
+      FOR-TR-SMS-042<br>Revisão: 02<br>Data: 20/11/2020<br>Página: 2/2
+    </td>
+  </tr>
+</table>
+
+<!-- ══ MEDIDAS ══ -->
+<div class="section-title">MEDIDAS DE SEGURANÇA / PREVENTIVAS</div>
+<table>
+  <tr>
+    <th style="width:60%">Medidas</th>
+    <th style="width:40%">Medidas</th>
+  </tr>
+  ${medidasRows()}
+  ${extraMedidas ? `<tr><td colspan="2"><span class="label">Outras:</span> ${extraMedidas}</td></tr>` : ''}
+</table>
+
+<!-- ══ ENVOLVIDOS ══ -->
+<div class="section-title">ENVOLVIDOS NA ATIVIDADE</div>
+<table>
+  <tr>
+    <th style="width:5%">Nº</th><th style="width:35%">Nome</th><th style="width:10%">Assinatura</th>
+    <th style="width:5%">Nº</th><th style="width:35%">Nome</th><th style="width:10%">Assinatura</th>
+  </tr>
+  ${[0,1,2,3].map(i => `
+  <tr>
+    <td style="text-align:center">${i+1}</td>
+    <td>${envArr[i] ?? ''}</td>
+    <td class="sig-line"></td>
+    <td style="text-align:center">${i+5}</td>
+    <td>${envArr[i+4] ?? ''}</td>
+    <td class="sig-line"></td>
+  </tr>`).join('')}
+  <tr>
+    <td colspan="2" style="font-weight:bold">EMITENTE: ${p.responsavelExecucao}</td>
+    <td class="sig-line"></td>
+    <td colspan="2" style="font-weight:bold">QSMS: ${qsmsNome}</td>
+    <td class="sig-line"></td>
+  </tr>
+</table>
+
+${p.observacoes ? `<table><tr><th>Observações</th></tr><tr><td>${p.observacoes}</td></tr></table>` : ''}
+
+<p style="font-size:6pt;text-align:right;margin-top:4pt;font-style:italic;">Make it happen.</p>
+</body>
+</html>`;
+
+  const w = window.open('', '_blank');
+  if (!w) return;
+  w.document.write(html);
+  w.document.close();
+  w.onload = () => { w.focus(); w.print(); };
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 interface Props {
   onToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
 }
 
-// ─── Main ─────────────────────────────────────────────────────────────────────
-
 export function PtPetScreen({ onToast }: Props) {
-  const [permits, setPermits]           = useState<WorkPermit[]>([]);
-  const [loading, setLoading]           = useState(true);
+  const [permits, setPermits]       = useState<WorkPermit[]>([]);
+  const [loading, setLoading]       = useState(true);
+  const [search, setSearch]         = useState('');
+  const [filterTipo, setFilterTipo] = useState<WorkPermitTipo | 'all'>('all');
   const [filterStatus, setFilterStatus] = useState<WorkPermitStatus | 'all'>('all');
-  const [filterTipo, setFilterTipo]     = useState<WorkPermitTipo | 'all'>('all');
-  const [search, setSearch]             = useState('');
-  const [showModal, setShowModal]       = useState(false);
-  const [editing, setEditing]           = useState<WorkPermit | null>(null);
-  const [form, setForm]                 = useState<FormData>(emptyForm());
-  const [saving, setSaving]             = useState(false);
-  const [printTarget, setPrintTarget]   = useState<WorkPermit | null>(null);
-  const [confirm, setConfirm]           = useState<{
+
+  const [modalOpen, setModalOpen]   = useState(false);
+  const [editing, setEditing]       = useState<WorkPermit | null>(null);
+  const [form, setForm]             = useState<FormState>(emptyForm());
+  const [saving, setSaving]         = useState(false);
+
+  const [confirmAction, setConfirmAction] = useState<{
     permit: WorkPermit;
     action: 'iniciar' | 'encerrar' | 'cancelar';
   } | null>(null);
 
-  // ─── Load ──────────────────────────────────────────────────────────────────
-
+  // ── load ──
   const load = useCallback(async () => {
-    if (!supabase) { setLoading(false); return; }
+    if (!isSupabaseConfigured()) { setLoading(false); return; }
     setLoading(true);
     const { data, error } = await supabase
       .from('work_permits')
       .select('*')
       .order('created_at', { ascending: false });
     if (error) { onToast('Erro ao carregar permissões', 'error'); }
-    setPermits((data ?? []).map(mapRow));
+    else setPermits((data ?? []).map(mapRow));
     setLoading(false);
   }, [onToast]);
 
   useEffect(() => { load(); }, [load]);
 
-  // ─── KPIs ─────────────────────────────────────────────────────────────────
-
-  const kpis = useMemo(() => ({
-    emitidas:    permits.filter(p => p.status === 'emitida').length,
-    emExecucao:  permits.filter(p => p.status === 'em_execucao').length,
-    encerradas:  permits.filter(p => p.status === 'encerrada').length,
-    ptAtivas:    permits.filter(p => p.tipo === 'PT' && (p.status === 'emitida' || p.status === 'em_execucao')).length,
-    petAtivas:   permits.filter(p => p.tipo === 'PET' && (p.status === 'emitida' || p.status === 'em_execucao')).length,
-  }), [permits]);
-
-  // ─── Filtered ─────────────────────────────────────────────────────────────
-
-  const filtered = useMemo(() => permits.filter(p => {
-    if (filterStatus !== 'all' && p.status !== filterStatus) return false;
-    if (filterTipo   !== 'all' && p.tipo   !== filterTipo)   return false;
-    if (search) {
-      const q = search.toLowerCase();
-      return (
-        p.numero.toLowerCase().includes(q) ||
-        p.localTrabalho.toLowerCase().includes(q) ||
-        p.responsavelExecucao.toLowerCase().includes(q) ||
-        (p.empresaExecutante ?? '').toLowerCase().includes(q)
-      );
-    }
-    return true;
-  }), [permits, filterStatus, filterTipo, search]);
-
-  // ─── Auto-number ──────────────────────────────────────────────────────────
-
-  const nextNumber = useCallback((tipo: WorkPermitTipo) => {
-    const year   = new Date().getFullYear();
+  // ── next number ──
+  const nextNumber = useCallback(async (tipo: WorkPermitTipo): Promise<string> => {
+    const year = new Date().getFullYear();
     const prefix = `${tipo}-${year}-`;
-    const nums   = permits
-      .map(p => p.numero)
-      .filter(n => n.startsWith(prefix))
-      .map(n => parseInt(n.slice(prefix.length), 10))
-      .filter(n => !isNaN(n));
-    const next = nums.length > 0 ? Math.max(...nums) + 1 : 1;
-    return `${prefix}${String(next).padStart(3, '0')}`;
-  }, [permits]);
-
-  // ─── Open modal ───────────────────────────────────────────────────────────
-
-  const openCreate = useCallback((tipo: WorkPermitTipo) => {
-    setEditing(null);
-    setForm({ ...emptyForm(tipo), numero: nextNumber(tipo) });
-    setShowModal(true);
-  }, [nextNumber]);
-
-  const openEdit = useCallback((p: WorkPermit) => {
-    setEditing(p);
-    setForm({
-      numero:               p.numero,
-      tipo:                 p.tipo,
-      subtipo:              p.subtipo ?? '',
-      dataEmissao:          p.dataEmissao,
-      horaInicio:           p.horaInicio,
-      horaFimPrevista:      p.horaFimPrevista,
-      unidade:              p.unidade ?? '',
-      localTrabalho:        p.localTrabalho,
-      descricaoAtividade:   p.descricaoAtividade,
-      empresaExecutante:    p.empresaExecutante ?? '',
-      responsavelExecucao:  p.responsavelExecucao,
-      equipe:               p.equipe ?? '',
-      riscos:               p.riscos ?? '',
-      medidasControle:      p.medidasControle ?? '',
-      episSelecionados:     p.episSelecionados
-        ? p.episSelecionados.split(',').map(e => e.trim()).filter(Boolean)
-        : [],
-      autorizadorNome:      p.autorizadorNome ?? '',
-      autorizadorFuncao:    p.autorizadorFuncao ?? '',
-      observacoes:          p.observacoes ?? '',
-    });
-    setShowModal(true);
+    const { data } = await supabase
+      .from('work_permits')
+      .select('numero')
+      .like('numero', `${prefix}%`);
+    let max = 0;
+    for (const row of data ?? []) {
+      const n = parseInt(row.numero.split('-').pop() ?? '0', 10);
+      if (n > max) max = n;
+    }
+    return `${prefix}${String(max + 1).padStart(3, '0')}`;
   }, []);
 
-  // ─── Save ─────────────────────────────────────────────────────────────────
-
-  const handleSave = async () => {
-    if (!supabase) return;
-    if (!form.localTrabalho || !form.descricaoAtividade || !form.responsavelExecucao) {
-      onToast('Preencha os campos obrigatórios (*)','error'); return;
-    }
-    if (form.tipo === 'PET' && !form.subtipo) {
-      onToast('Selecione o tipo de PET', 'error'); return;
+  // ── save ──
+  async function handleSave() {
+    if (!form.localTrabalho || !form.descricaoAtividade || !form.responsavelExecucao || !form.horaInicio || !form.horaFimPrevista) {
+      onToast('Preencha os campos obrigatórios', 'error'); return;
     }
     setSaving(true);
+    try {
+      const riscosAll = [
+        ...form.riscosSelected,
+        ...form.riscosExtra.split('\n').map(s => s.trim()).filter(Boolean),
+      ];
+      const medidasAll = [
+        ...form.medidasSelected,
+        ...form.medidasExtra.split('\n').map(s => s.trim()).filter(Boolean),
+      ];
+      const envolvidosJson = JSON.stringify(
+        form.envolvidos.filter(n => n.trim()).map(nome => ({ nome }))
+      );
 
-    const payload = {
-      numero:               form.numero,
-      tipo:                 form.tipo,
-      subtipo:              form.subtipo || null,
-      data_emissao:         form.dataEmissao,
-      hora_inicio:          form.horaInicio,
-      hora_fim_prevista:    form.horaFimPrevista,
-      unidade:              form.unidade || null,
-      local_trabalho:       form.localTrabalho,
-      descricao_atividade:  form.descricaoAtividade,
-      empresa_executante:   form.empresaExecutante || null,
-      responsavel_execucao: form.responsavelExecucao,
-      equipe:               form.equipe || null,
-      riscos:               form.riscos || null,
-      medidas_controle:     form.medidasControle || null,
-      epis_selecionados:    form.episSelecionados.length ? form.episSelecionados.join(', ') : null,
-      autorizador_nome:     form.autorizadorNome || null,
-      autorizador_funcao:   form.autorizadorFuncao || null,
-      observacoes:          form.observacoes || null,
-    };
+      const payload = {
+        tipo:                 form.tipo,
+        subtipo:              form.subtipo || null,
+        data_emissao:         form.dataEmissao,
+        hora_inicio:          form.horaInicio,
+        hora_fim_prevista:    form.horaFimPrevista,
+        unidade:              form.unidade || null,
+        empresa_tipo:         form.empresaTipo,
+        empresa_executante:   form.empresaTipo,
+        local_trabalho:       form.localTrabalho,
+        descricao_atividade:  form.descricaoAtividade,
+        responsavel_execucao: form.responsavelExecucao,
+        autorizador_nome:     form.autorizadorNome || null,
+        autorizador_funcao:   form.autorizadorFuncao || null,
+        riscos:               JSON.stringify(riscosAll),
+        medidas_controle:     JSON.stringify(medidasAll),
+        epis_selecionados:    JSON.stringify(form.episSelected),
+        epcs_selecionados:    JSON.stringify(form.epcsSelected),
+        envolvidos:           envolvidosJson,
+        qsms_nome:            form.qsmsNome || null,
+        observacoes:          form.observacoes || null,
+      };
 
-    if (editing) {
-      const { error } = await supabase.from('work_permits').update(payload).eq('id', editing.id);
-      if (error) { onToast('Erro ao atualizar', 'error'); setSaving(false); return; }
-      onToast('Permissão atualizada', 'success');
-    } else {
-      const { error } = await supabase.from('work_permits').insert({ ...payload, status: 'emitida' });
-      if (error) { onToast('Erro ao emitir permissão', 'error'); setSaving(false); return; }
-      onToast(`${form.tipo} ${form.numero} emitida`, 'success');
-    }
-
-    setSaving(false);
-    setShowModal(false);
-    load();
-  };
-
-  // ─── Status actions ───────────────────────────────────────────────────────
-
-  const changeStatus = async (p: WorkPermit, s: WorkPermitStatus) => {
-    if (!supabase) return;
-    const upd: Record<string, unknown> = { status: s };
-    if (s === 'encerrada' || s === 'cancelada') upd.hora_encerramento = new Date().toISOString();
-    const { error } = await supabase.from('work_permits').update(upd).eq('id', p.id);
-    if (error) { onToast('Erro ao atualizar status', 'error'); return; }
-    onToast(
-      s === 'em_execucao' ? 'Trabalho iniciado' :
-      s === 'encerrada'   ? 'Permissão encerrada' : 'Permissão cancelada',
-      s === 'cancelada' ? 'info' : 'success'
-    );
-    setConfirm(null);
-    load();
-  };
-
-  // ─── Render ───────────────────────────────────────────────────────────────
-
-  if (!isSupabaseConfigured) {
-    return <div className="p-8 text-center text-gray-400">Supabase não configurado.</div>;
+      if (editing) {
+        const { error } = await supabase.from('work_permits').update(payload).eq('id', editing.id);
+        if (error) throw error;
+        onToast('Permissão atualizada', 'success');
+      } else {
+        const numero = await nextNumber(form.tipo);
+        const { error } = await supabase.from('work_permits').insert({ ...payload, numero, status: 'emitida' });
+        if (error) throw error;
+        onToast(`${numero} emitida com sucesso`, 'success');
+      }
+      setModalOpen(false);
+      load();
+    } catch (e: unknown) {
+      onToast((e as Error).message ?? 'Erro ao salvar', 'error');
+    } finally { setSaving(false); }
   }
 
+  // ── status transitions ──
+  async function handleStatusChange(permit: WorkPermit, action: 'iniciar' | 'encerrar' | 'cancelar') {
+    const newStatus = action === 'iniciar' ? 'em_execucao' : action === 'encerrar' ? 'encerrada' : 'cancelada';
+    const extra = action === 'encerrar' ? { hora_encerramento: new Date().toISOString() } : {};
+    const { error } = await supabase.from('work_permits')
+      .update({ status: newStatus, ...extra })
+      .eq('id', permit.id);
+    if (error) { onToast('Erro ao atualizar status', 'error'); return; }
+    onToast(`${permit.numero} — ${STATUS_CFG[newStatus].label}`, 'success');
+    setConfirmAction(null);
+    load();
+  }
+
+  // ── open modal ──
+  function openNew() {
+    setEditing(null);
+    setForm(emptyForm());
+    setModalOpen(true);
+  }
+
+  function openEdit(p: WorkPermit) {
+    setEditing(p);
+    setForm(permitToForm(p));
+    setModalOpen(true);
+  }
+
+  // ── filtered list ──
+  const filtered = useMemo(() => permits.filter(p => {
+    if (filterTipo !== 'all' && p.tipo !== filterTipo) return false;
+    if (filterStatus !== 'all' && p.status !== filterStatus) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      return p.numero.toLowerCase().includes(q) ||
+             p.localTrabalho.toLowerCase().includes(q) ||
+             p.descricaoAtividade.toLowerCase().includes(q) ||
+             p.responsavelExecucao.toLowerCase().includes(q);
+    }
+    return true;
+  }), [permits, filterTipo, filterStatus, search]);
+
+  // ── KPIs ──
+  const kpi = useMemo(() => ({
+    total:   permits.length,
+    emitida: permits.filter(p => p.status === 'emitida').length,
+    exec:    permits.filter(p => p.status === 'em_execucao').length,
+    enc:     permits.filter(p => p.status === 'encerrada').length,
+  }), [permits]);
+
+  // ─── Checkbox toggle helper ─────────────────────────────────────────────────
+  function toggleCheck(key: 'riscosSelected' | 'episSelected' | 'epcsSelected' | 'medidasSelected', val: string) {
+    setForm(f => {
+      const arr = f[key] as string[];
+      return { ...f, [key]: arr.includes(val) ? arr.filter(x => x !== val) : [...arr, val] };
+    });
+  }
+
+  // ─── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="flex flex-col h-full gap-4">
+    <div className="p-6 space-y-6">
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">PT / PET</h2>
-          <p className="text-xs text-gray-500">Permissões de Trabalho · Permissões Especiais</p>
+          <h1 className="text-xl font-bold text-white flex items-center gap-2">
+            <FileCheck2 className="w-5 h-5 text-blue-400" />
+            PT / PET — Permissões de Trabalho
+          </h1>
+          <p className="text-sm text-slate-400 mt-0.5">FOR-TR-SMS-042 · Gestão e emissão de permissões</p>
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => openCreate('PT')}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-colors"
-          >
-            <Plus className="w-4 h-4" /> Nova PT
-          </button>
-          <button
-            onClick={() => openCreate('PET')}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white text-sm rounded-lg transition-colors"
-          >
-            <Plus className="w-4 h-4" /> Nova PET
-          </button>
-        </div>
+        <button
+          onClick={openNew}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+        >
+          <Plus className="w-4 h-4" /> Nova Permissão
+        </button>
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+      <div className="grid grid-cols-4 gap-4">
         {[
-          { label: 'Emitidas',     value: kpis.emitidas,   cls: 'text-blue-600 dark:text-blue-400' },
-          { label: 'Em Execução',  value: kpis.emExecucao, cls: 'text-yellow-600 dark:text-yellow-400' },
-          { label: 'Encerradas',   value: kpis.encerradas, cls: 'text-green-600 dark:text-green-400' },
-          { label: 'PTs Ativas',   value: kpis.ptAtivas,   cls: 'text-blue-600 dark:text-blue-400' },
-          { label: 'PETs Ativas',  value: kpis.petAtivas,  cls: 'text-orange-600 dark:text-orange-400' },
+          { label: 'Total',         value: kpi.total,   cls: 'text-slate-200' },
+          { label: 'Emitidas',      value: kpi.emitida, cls: 'text-blue-400'  },
+          { label: 'Em Execução',   value: kpi.exec,    cls: 'text-yellow-400'},
+          { label: 'Encerradas',    value: kpi.enc,     cls: 'text-green-400' },
         ].map(k => (
-          <div key={k.label} className="bg-white dark:bg-gray-800 rounded-xl p-3 border border-gray-100 dark:border-gray-700 shadow-sm">
-            <p className="text-xs text-gray-500 mb-1">{k.label}</p>
-            <p className={`text-2xl font-bold ${k.cls}`}>{k.value}</p>
+          <div key={k.label} className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-4">
+            <p className="text-xs text-slate-400">{k.label}</p>
+            <p className={`text-2xl font-bold mt-1 ${k.cls}`}>{k.value}</p>
           </div>
         ))}
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-2">
-        <div className="relative">
-          <Search className="absolute left-2.5 top-2 w-4 h-4 text-gray-400" />
+      <div className="flex gap-3 flex-wrap">
+        <div className="relative flex-1 min-w-48">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Buscar..."
-            className="pl-8 pr-3 py-1.5 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white w-44"
+            value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Buscar por número, local, atividade…"
+            className="w-full pl-9 pr-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
           />
         </div>
-        <select
-          value={filterTipo}
-          onChange={e => setFilterTipo(e.target.value as WorkPermitTipo | 'all')}
-          className="px-3 py-1.5 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-        >
-          <option value="all">PT + PET</option>
+        <select value={filterTipo} onChange={e => setFilterTipo(e.target.value as WorkPermitTipo | 'all')}
+          className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:outline-none">
+          <option value="all">Todos os tipos</option>
           <option value="PT">PT</option>
           <option value="PET">PET</option>
         </select>
-        <select
-          value={filterStatus}
-          onChange={e => setFilterStatus(e.target.value as WorkPermitStatus | 'all')}
-          className="px-3 py-1.5 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-        >
+        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value as WorkPermitStatus | 'all')}
+          className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:outline-none">
           <option value="all">Todos os status</option>
-          <option value="emitida">Emitida</option>
-          <option value="em_execucao">Em Execução</option>
-          <option value="encerrada">Encerrada</option>
-          <option value="cancelada">Cancelada</option>
+          {(Object.keys(STATUS_CFG) as WorkPermitStatus[]).map(s => (
+            <option key={s} value={s}>{STATUS_CFG[s].label}</option>
+          ))}
         </select>
       </div>
 
       {/* Table */}
-      <div className="flex-1 overflow-auto bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm">
+      <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl overflow-hidden">
         {loading ? (
-          <div className="flex items-center justify-center h-32 text-gray-400 text-sm">Carregando...</div>
+          <div className="flex items-center justify-center py-16 text-slate-400">
+            <Clock className="w-5 h-5 animate-spin mr-2" /> Carregando…
+          </div>
         ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-32 gap-2 text-gray-400">
-            <FileCheck2 className="w-8 h-8 opacity-30" />
+          <div className="flex flex-col items-center justify-center py-16 text-slate-400">
+            <FileCheck2 className="w-10 h-10 mb-3 opacity-30" />
             <p className="text-sm">Nenhuma permissão encontrada</p>
           </div>
         ) : (
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 dark:bg-gray-900/50 text-xs text-gray-500 uppercase sticky top-0">
-              <tr>
-                <th className="px-4 py-3 text-left">Número</th>
-                <th className="px-4 py-3 text-left">Tipo</th>
-                <th className="px-4 py-3 text-left">Local</th>
-                <th className="px-4 py-3 text-left">Data</th>
-                <th className="px-4 py-3 text-left hidden md:table-cell">Responsável</th>
-                <th className="px-4 py-3 text-left">Status</th>
-                <th className="px-4 py-3 text-right">Ações</th>
+            <thead>
+              <tr className="border-b border-slate-700">
+                {['Nº Permissão','Tipo','Data','Local','Atividade','Responsável','Status','Ações'].map(h => (
+                  <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wide">
+                    {h}
+                  </th>
+                ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+            <tbody className="divide-y divide-slate-700/50">
               {filtered.map(p => {
-                const sc = STATUS_CFG[p.status];
-                const subLabel = p.subtipo ? PET_SUBTIPOS[p.subtipo] : null;
+                const cfg = STATUS_CFG[p.status];
+                const SubIcon = p.subtipo ? PET_SUBTIPOS[p.subtipo]?.icon : null;
                 const active = p.status === 'emitida' || p.status === 'em_execucao';
                 return (
-                  <tr key={p.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors">
-                    <td className="px-4 py-3 font-mono font-semibold text-gray-900 dark:text-white whitespace-nowrap">{p.numero}</td>
+                  <tr key={p.id} className="hover:bg-slate-800/60 transition-colors">
+                    <td className="px-4 py-3 font-mono text-blue-300 font-medium">{p.numero}</td>
                     <td className="px-4 py-3">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium gap-1 ${
-                        p.tipo === 'PT'
-                          ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300'
-                          : 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300'
-                      }`}>
-                        {p.tipo}
-                        {subLabel && <span className="opacity-70">· {subLabel.nr}</span>}
+                      <div className="flex items-center gap-1.5">
+                        {SubIcon && <SubIcon className="w-3.5 h-3.5 text-slate-400" />}
+                        <span className="text-white font-medium">{p.tipo}</span>
+                        {p.subtipo && <span className="text-slate-400 text-xs">({PET_SUBTIPOS[p.subtipo]?.nr})</span>}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-slate-300">{fmtDate(p.dataEmissao)}</td>
+                    <td className="px-4 py-3 text-slate-300 max-w-[140px] truncate">{p.localTrabalho}</td>
+                    <td className="px-4 py-3 text-slate-300 max-w-[180px] truncate">{p.descricaoAtividade}</td>
+                    <td className="px-4 py-3 text-slate-300">{p.responsavelExecucao}</td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${cfg.badgeCls}`}>
+                        {cfg.label}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-gray-700 dark:text-gray-300 max-w-[160px] truncate">{p.localTrabalho}</td>
-                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{fmtDate(p.dataEmissao)}</td>
-                    <td className="px-4 py-3 text-gray-700 dark:text-gray-300 max-w-[140px] truncate hidden md:table-cell">{p.responsavelExecucao}</td>
                     <td className="px-4 py-3">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${sc.badgeCls}`}>
-                        {sc.label}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-1">
-                        {/* Imprimir */}
-                        <button
-                          onClick={() => setPrintTarget(p)}
+                      <div className="flex items-center gap-1.5">
+                        <button onClick={() => doPrint(p)}
                           title="Imprimir"
-                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
-                        >
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors">
                           <Printer className="w-4 h-4" />
                         </button>
-                        {/* Editar */}
                         {active && (
-                          <button
-                            onClick={() => openEdit(p)}
+                          <button onClick={() => openEdit(p)}
                             title="Editar"
-                            className="p-1.5 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-                          >
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors">
                             <Edit2 className="w-4 h-4" />
                           </button>
                         )}
-                        {/* Iniciar */}
                         {p.status === 'emitida' && (
-                          <button
-                            onClick={() => setConfirm({ permit: p, action: 'iniciar' })}
+                          <button onClick={() => setConfirmAction({ permit: p, action: 'iniciar' })}
                             title="Iniciar execução"
-                            className="p-1.5 text-gray-400 hover:text-yellow-600 hover:bg-yellow-50 dark:hover:bg-yellow-900/30 rounded transition-colors"
-                          >
+                            className="p-1.5 rounded-lg text-yellow-500 hover:text-yellow-300 hover:bg-slate-700 transition-colors">
                             <PlayCircle className="w-4 h-4" />
                           </button>
                         )}
-                        {/* Encerrar / Cancelar */}
+                        {p.status === 'em_execucao' && (
+                          <button onClick={() => setConfirmAction({ permit: p, action: 'encerrar' })}
+                            title="Encerrar"
+                            className="p-1.5 rounded-lg text-green-500 hover:text-green-300 hover:bg-slate-700 transition-colors">
+                            <CheckCircle2 className="w-4 h-4" />
+                          </button>
+                        )}
                         {active && (
-                          <>
-                            <button
-                              onClick={() => setConfirm({ permit: p, action: 'encerrar' })}
-                              title="Encerrar"
-                              className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/30 rounded transition-colors"
-                            >
-                              <CheckCircle2 className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => setConfirm({ permit: p, action: 'cancelar' })}
-                              title="Cancelar"
-                              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
-                            >
-                              <XCircle className="w-4 h-4" />
-                            </button>
-                          </>
+                          <button onClick={() => setConfirmAction({ permit: p, action: 'cancelar' })}
+                            title="Cancelar"
+                            className="p-1.5 rounded-lg text-red-500 hover:text-red-300 hover:bg-slate-700 transition-colors">
+                            <XCircle className="w-4 h-4" />
+                          </button>
                         )}
                       </div>
                     </td>
@@ -521,550 +806,343 @@ export function PtPetScreen({ onToast }: Props) {
         )}
       </div>
 
-      {/* ── Modals ── */}
-      {showModal && (
-        <PermitModal
-          form={form}
-          setForm={setForm}
-          isEditing={!!editing}
-          onSave={handleSave}
-          onClose={() => setShowModal(false)}
-          saving={saving}
-        />
-      )}
-
-      {printTarget && (
-        <PrintModal permit={printTarget} onClose={() => setPrintTarget(null)} />
-      )}
-
-      {confirm && (
-        <ConfirmModal
-          confirm={confirm}
-          onConfirm={() => changeStatus(
-            confirm.permit,
-            confirm.action === 'iniciar' ? 'em_execucao' :
-            confirm.action === 'encerrar' ? 'encerrada' : 'cancelada'
-          )}
-          onClose={() => setConfirm(null)}
-        />
-      )}
-    </div>
-  );
-}
-
-// ─── PermitModal ──────────────────────────────────────────────────────────────
-
-function PermitModal({
-  form, setForm, isEditing, onSave, onClose, saving,
-}: {
-  form: FormData;
-  setForm: React.Dispatch<React.SetStateAction<FormData>>;
-  isEditing: boolean;
-  onSave: () => void;
-  onClose: () => void;
-  saving: boolean;
-}) {
-  const set = (key: keyof FormData) =>
-    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
-      setForm(f => ({ ...f, [key]: e.target.value }));
-
-  const toggleEpi = (epi: string) =>
-    setForm(f => ({
-      ...f,
-      episSelecionados: f.episSelecionados.includes(epi)
-        ? f.episSelecionados.filter(e => e !== epi)
-        : [...f.episSelecionados, epi],
-    }));
-
-  return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
-
-        {/* Modal header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
-          <div>
-            <h3 className="font-semibold text-gray-900 dark:text-white">
-              {isEditing ? 'Editar Permissão' : `Emitir ${form.tipo}`}
+      {/* ── CONFIRM MODAL ── */}
+      {confirmAction && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-4">
+            <h3 className="text-lg font-bold text-white mb-2">
+              {confirmAction.action === 'iniciar'   && 'Iniciar Execução'}
+              {confirmAction.action === 'encerrar'  && 'Encerrar Permissão'}
+              {confirmAction.action === 'cancelar'  && 'Cancelar Permissão'}
             </h3>
-            <p className="text-xs text-gray-500">{form.numero}</p>
-          </div>
-          <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Scrollable body */}
-        <div className="overflow-y-auto flex-1 px-6 py-4 space-y-5">
-
-          {/* Tipo / Subtipo */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Tipo</label>
-              <select
-                value={form.tipo}
-                onChange={e => setForm(f => ({
-                  ...f,
-                  tipo: e.target.value as WorkPermitTipo,
-                  subtipo: '',
-                }))}
-                disabled={isEditing}
-                className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white disabled:opacity-60"
-              >
-                <option value="PT">PT — Permissão de Trabalho</option>
-                <option value="PET">PET — Permissão Especial</option>
-              </select>
+            <p className="text-slate-400 text-sm mb-6">
+              Confirma a ação para <span className="text-white font-medium">{confirmAction.permit.numero}</span>?
+              {confirmAction.action === 'encerrar' && ' A hora de encerramento será registrada automaticamente.'}
+              {confirmAction.action === 'cancelar' && ' Esta ação não pode ser desfeita.'}
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button onClick={() => setConfirmAction(null)}
+                className="px-4 py-2 rounded-lg text-sm text-slate-300 hover:text-white hover:bg-slate-800 transition-colors">
+                Cancelar
+              </button>
+              <button
+                onClick={() => handleStatusChange(confirmAction.permit, confirmAction.action)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors ${
+                  confirmAction.action === 'cancelar' ? 'bg-red-600 hover:bg-red-700' :
+                  confirmAction.action === 'encerrar' ? 'bg-green-600 hover:bg-green-700' :
+                  'bg-yellow-600 hover:bg-yellow-700'
+                }`}>
+                Confirmar
+              </button>
             </div>
-            {form.tipo === 'PET' && (
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Tipo PET *</label>
-                <select
-                  value={form.subtipo}
-                  onChange={e => setForm(f => ({ ...f, subtipo: e.target.value as WorkPermitSubtipo | '' }))}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                >
-                  <option value="">Selecione...</option>
-                  {(Object.entries(PET_SUBTIPOS) as [WorkPermitSubtipo, typeof PET_SUBTIPOS[WorkPermitSubtipo]][]).map(([k, v]) => (
-                    <option key={k} value={k}>{v.label} ({v.nr})</option>
+          </div>
+        </div>
+      )}
+
+      {/* ── FORM MODAL ── */}
+      {modalOpen && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 backdrop-blur-sm overflow-y-auto py-6">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-4xl mx-4 my-auto">
+
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-6 border-b border-slate-700">
+              <h2 className="text-lg font-bold text-white">
+                {editing ? `Editar — ${editing.numero}` : 'Nova Permissão de Trabalho'}
+              </h2>
+              <button onClick={() => setModalOpen(false)} className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6 max-h-[80vh] overflow-y-auto">
+
+              {/* ── Tipo ── */}
+              <Section title="Tipo de Permissão">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Tipo *</Label>
+                    <div className="flex gap-3 mt-1">
+                      {(['PT','PET'] as WorkPermitTipo[]).map(t => (
+                        <label key={t} className="flex items-center gap-2 cursor-pointer">
+                          <input type="radio" checked={form.tipo === t}
+                            onChange={() => setForm(f => ({ ...f, tipo: t, subtipo: '' }))}
+                            className="accent-blue-500" />
+                          <span className="text-sm text-white font-medium">{t}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  {form.tipo === 'PET' && (
+                    <div>
+                      <Label>Subtipo PET *</Label>
+                      <select value={form.subtipo}
+                        onChange={e => setForm(f => ({ ...f, subtipo: e.target.value as WorkPermitSubtipo | '' }))}
+                        className={inputCls}>
+                        <option value="">Selecione…</option>
+                        {(Object.entries(PET_SUBTIPOS) as [WorkPermitSubtipo, typeof PET_SUBTIPOS[WorkPermitSubtipo]][]).map(([k, v]) => (
+                          <option key={k} value={k}>{v.label} ({v.nr})</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+              </Section>
+
+              {/* ── Identificação ── */}
+              <Section title="Identificação">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Data de Emissão *</Label>
+                    <input type="date" value={form.dataEmissao}
+                      onChange={e => setForm(f => ({ ...f, dataEmissao: e.target.value }))}
+                      className={inputCls} />
+                  </div>
+                  <div>
+                    <Label>Empresa</Label>
+                    <div className="flex gap-4 mt-2">
+                      {(['Tiger Rentank','Terceiros'] as const).map(opt => (
+                        <label key={opt} className="flex items-center gap-2 cursor-pointer">
+                          <input type="radio" checked={form.empresaTipo === opt}
+                            onChange={() => setForm(f => ({ ...f, empresaTipo: opt }))}
+                            className="accent-blue-500" />
+                          <span className="text-sm text-white">{opt}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <Label>Hora Início *</Label>
+                    <input type="time" value={form.horaInicio}
+                      onChange={e => setForm(f => ({ ...f, horaInicio: e.target.value }))}
+                      className={inputCls} />
+                  </div>
+                  <div>
+                    <Label>Hora Final Prevista *</Label>
+                    <input type="time" value={form.horaFimPrevista}
+                      onChange={e => setForm(f => ({ ...f, horaFimPrevista: e.target.value }))}
+                      className={inputCls} />
+                  </div>
+                  <div>
+                    <Label>Unidade / Base</Label>
+                    <input type="text" value={form.unidade}
+                      onChange={e => setForm(f => ({ ...f, unidade: e.target.value }))}
+                      placeholder="Ex: RDO, Macaé, CS…"
+                      className={inputCls} />
+                  </div>
+                  <div>
+                    <Label>Responsável pela Atividade *</Label>
+                    <input type="text" value={form.responsavelExecucao}
+                      onChange={e => setForm(f => ({ ...f, responsavelExecucao: e.target.value }))}
+                      className={inputCls} />
+                  </div>
+                  <div className="col-span-2">
+                    <Label>Área / Local da Atividade *</Label>
+                    <input type="text" value={form.localTrabalho}
+                      onChange={e => setForm(f => ({ ...f, localTrabalho: e.target.value }))}
+                      className={inputCls} />
+                  </div>
+                  <div className="col-span-2">
+                    <Label>Descrição da Atividade *</Label>
+                    <textarea value={form.descricaoAtividade} rows={2}
+                      onChange={e => setForm(f => ({ ...f, descricaoAtividade: e.target.value }))}
+                      className={textareaCls} />
+                  </div>
+                </div>
+              </Section>
+
+              {/* ── Riscos ── */}
+              <Section title="Aspectos e Impactos / Perigos e Riscos">
+                <div className="grid grid-cols-3 gap-x-4 gap-y-1">
+                  {[RISCOS_COL1, RISCOS_COL2, RISCOS_COL3].map((col, ci) => (
+                    <div key={ci} className="space-y-1">
+                      {col.map(r => (
+                        <label key={r} className="flex items-start gap-2 cursor-pointer group">
+                          <input type="checkbox"
+                            checked={form.riscosSelected.includes(r)}
+                            onChange={() => toggleCheck('riscosSelected', r)}
+                            className="mt-0.5 accent-blue-500 shrink-0" />
+                          <span className="text-xs text-slate-300 group-hover:text-white leading-tight">{r}</span>
+                        </label>
+                      ))}
+                    </div>
                   ))}
-                </select>
+                </div>
+                <div className="mt-3">
+                  <Label>Outros riscos (um por linha)</Label>
+                  <textarea value={form.riscosExtra} rows={2}
+                    onChange={e => setForm(f => ({ ...f, riscosExtra: e.target.value }))}
+                    className={textareaCls} />
+                </div>
+              </Section>
+
+              {/* ── EPIs ── */}
+              <Section title="Equipamentos de Proteção Individual — EPI">
+                <div className="grid grid-cols-3 gap-x-4 gap-y-1">
+                  {EPI_LIST.map(e => (
+                    <label key={e} className="flex items-start gap-2 cursor-pointer group">
+                      <input type="checkbox"
+                        checked={form.episSelected.includes(e)}
+                        onChange={() => toggleCheck('episSelected', e)}
+                        className="mt-0.5 accent-blue-500 shrink-0" />
+                      <span className="text-xs text-slate-300 group-hover:text-white leading-tight">{e}</span>
+                    </label>
+                  ))}
+                </div>
+              </Section>
+
+              {/* ── EPCs ── */}
+              <Section title="Equipamentos de Proteção Coletiva — EPC">
+                <div className="grid grid-cols-3 gap-x-4 gap-y-1">
+                  {EPC_LIST.map(e => (
+                    <label key={e} className="flex items-start gap-2 cursor-pointer group">
+                      <input type="checkbox"
+                        checked={form.epcsSelected.includes(e)}
+                        onChange={() => toggleCheck('epcsSelected', e)}
+                        className="mt-0.5 accent-green-500 shrink-0" />
+                      <span className="text-xs text-slate-300 group-hover:text-white leading-tight">{e}</span>
+                    </label>
+                  ))}
+                </div>
+              </Section>
+
+              {/* ── Medidas ── */}
+              <Section title="Medidas de Segurança / Preventivas">
+                <div className="grid grid-cols-2 gap-x-6 gap-y-1">
+                  {ALL_MEDIDAS.map(m => (
+                    <label key={m} className="flex items-start gap-2 cursor-pointer group">
+                      <input type="checkbox"
+                        checked={form.medidasSelected.includes(m)}
+                        onChange={() => toggleCheck('medidasSelected', m)}
+                        className="mt-0.5 accent-blue-500 shrink-0" />
+                      <span className="text-xs text-slate-300 group-hover:text-white leading-tight">{m}</span>
+                    </label>
+                  ))}
+                </div>
+                <div className="mt-3">
+                  <Label>Outras medidas (uma por linha)</Label>
+                  <textarea value={form.medidasExtra} rows={2}
+                    onChange={e => setForm(f => ({ ...f, medidasExtra: e.target.value }))}
+                    className={textareaCls} />
+                </div>
+              </Section>
+
+              {/* ── Envolvidos ── */}
+              <Section title="Envolvidos na Atividade">
+                <div className="grid grid-cols-2 gap-3">
+                  {form.envolvidos.map((nome, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <span className="text-xs text-slate-500 w-4 text-right">{i + 1}</span>
+                      <input type="text" value={nome}
+                        onChange={e => {
+                          const arr = [...form.envolvidos];
+                          arr[i] = e.target.value;
+                          setForm(f => ({ ...f, envolvidos: arr }));
+                        }}
+                        placeholder={`Colaborador ${i + 1}`}
+                        className={inputCls + ' flex-1'} />
+                    </div>
+                  ))}
+                </div>
+              </Section>
+
+              {/* ── Autorizador / QSMS ── */}
+              <Section title="Autorizador e QSMS">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Nome do Autorizador</Label>
+                    <input type="text" value={form.autorizadorNome}
+                      onChange={e => setForm(f => ({ ...f, autorizadorNome: e.target.value }))}
+                      className={inputCls} />
+                  </div>
+                  <div>
+                    <Label>Função do Autorizador</Label>
+                    <input type="text" value={form.autorizadorFuncao}
+                      onChange={e => setForm(f => ({ ...f, autorizadorFuncao: e.target.value }))}
+                      className={inputCls} />
+                  </div>
+                  <div className="col-span-2">
+                    <Label>Responsável QSMS (para impressão)</Label>
+                    <input type="text" value={form.qsmsNome}
+                      onChange={e => setForm(f => ({ ...f, qsmsNome: e.target.value }))}
+                      placeholder="Nome do QSMS que assina"
+                      className={inputCls} />
+                  </div>
+                </div>
+              </Section>
+
+              {/* ── Observações ── */}
+              <Section title="Observações">
+                <textarea value={form.observacoes} rows={2}
+                  onChange={e => setForm(f => ({ ...f, observacoes: e.target.value }))}
+                  className={textareaCls} />
+              </Section>
+
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-between p-6 border-t border-slate-700">
+              <button onClick={() => setModalOpen(false)}
+                className="px-4 py-2 rounded-lg text-sm text-slate-300 hover:text-white hover:bg-slate-800 transition-colors">
+                Cancelar
+              </button>
+              <div className="flex gap-3">
+                {editing && (
+                  <button
+                    onClick={() => {
+                      const riscosAll = [...form.riscosSelected, ...form.riscosExtra.split('\n').map(s=>s.trim()).filter(Boolean)];
+                      const medidasAll = [...form.medidasSelected, ...form.medidasExtra.split('\n').map(s=>s.trim()).filter(Boolean)];
+                      const p = { ...editing,
+                        riscos: JSON.stringify(riscosAll),
+                        medidasControle: JSON.stringify(medidasAll),
+                        episSelecionados: JSON.stringify(form.episSelected),
+                        responsavelExecucao: form.responsavelExecucao,
+                        localTrabalho: form.localTrabalho,
+                        descricaoAtividade: form.descricaoAtividade,
+                        empresaExecutante: form.empresaTipo,
+                      };
+                      doPrint(p, {
+                        epcs: form.epcsSelected,
+                        envolvidos: form.envolvidos.filter(Boolean),
+                        qsmsNome: form.qsmsNome,
+                        riscosExtra: form.riscosExtra,
+                        medidasExtra: form.medidasExtra,
+                      });
+                    }}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm text-slate-300 hover:text-white hover:bg-slate-700 border border-slate-700 transition-colors">
+                    <Printer className="w-4 h-4" /> Imprimir
+                  </button>
+                )}
+                <button onClick={handleSave} disabled={saving}
+                  className="flex items-center gap-2 px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-colors">
+                  <Save className="w-4 h-4" />
+                  {saving ? 'Salvando…' : editing ? 'Salvar alterações' : 'Emitir permissão'}
+                </button>
               </div>
-            )}
+            </div>
+
           </div>
-
-          {/* Identificação */}
-          <Section title="Identificação">
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Data *">
-                <input type="date" value={form.dataEmissao} onChange={set('dataEmissao')} className={inputCls} />
-              </Field>
-              <Field label="Unidade / Base">
-                <input type="text" value={form.unidade} onChange={set('unidade')} placeholder="Ex: Macaé" className={inputCls} />
-              </Field>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Hora início *">
-                <input type="time" value={form.horaInicio} onChange={set('horaInicio')} className={inputCls} />
-              </Field>
-              <Field label="Hora fim prevista *">
-                <input type="time" value={form.horaFimPrevista} onChange={set('horaFimPrevista')} className={inputCls} />
-              </Field>
-            </div>
-            <Field label="Local de trabalho *">
-              <input type="text" value={form.localTrabalho} onChange={set('localTrabalho')} placeholder="Ex: Pátio / Área de Manutenção" className={inputCls} />
-            </Field>
-          </Section>
-
-          {/* Atividade */}
-          <Section title="Atividade">
-            <Field label="Descrição da atividade *">
-              <textarea rows={3} value={form.descricaoAtividade} onChange={set('descricaoAtividade')} placeholder="Descreva detalhadamente o trabalho a ser realizado..." className={`${inputCls} resize-none`} />
-            </Field>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Empresa executante">
-                <input type="text" value={form.empresaExecutante} onChange={set('empresaExecutante')} className={inputCls} />
-              </Field>
-              <Field label="Responsável pela execução *">
-                <input type="text" value={form.responsavelExecucao} onChange={set('responsavelExecucao')} placeholder="Nome completo" className={inputCls} />
-              </Field>
-            </div>
-            <Field label="Equipe">
-              <textarea rows={2} value={form.equipe} onChange={set('equipe')} placeholder="Nome dos executantes (um por linha ou separados por vírgula)" className={`${inputCls} resize-none`} />
-            </Field>
-          </Section>
-
-          {/* Segurança */}
-          <Section title="Análise de Riscos e Controles">
-            <Field label="Riscos identificados">
-              <textarea rows={3} value={form.riscos} onChange={set('riscos')} placeholder="Liste os riscos associados à atividade..." className={`${inputCls} resize-none`} />
-            </Field>
-            <Field label="Medidas de controle">
-              <textarea rows={3} value={form.medidasControle} onChange={set('medidasControle')} placeholder="Descreva as medidas preventivas e de controle..." className={`${inputCls} resize-none`} />
-            </Field>
-          </Section>
-
-          {/* EPIs */}
-          <Section title="EPIs Necessários">
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {EPI_OPTIONS.map(epi => (
-                <label key={epi} className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={form.episSelecionados.includes(epi)}
-                    onChange={() => toggleEpi(epi)}
-                    className="rounded border-gray-300 text-blue-600"
-                  />
-                  {epi}
-                </label>
-              ))}
-            </div>
-          </Section>
-
-          {/* Autorização */}
-          <Section title="Autorização">
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Autorizador">
-                <input type="text" value={form.autorizadorNome} onChange={set('autorizadorNome')} placeholder="Nome do autorizador" className={inputCls} />
-              </Field>
-              <Field label="Função">
-                <input type="text" value={form.autorizadorFuncao} onChange={set('autorizadorFuncao')} placeholder="Ex: Responsável QSMS" className={inputCls} />
-              </Field>
-            </div>
-            <Field label="Observações">
-              <textarea rows={2} value={form.observacoes} onChange={set('observacoes')} placeholder="Observações adicionais..." className={`${inputCls} resize-none`} />
-            </Field>
-          </Section>
         </div>
-
-        {/* Footer */}
-        <div className="flex gap-3 justify-end px-6 py-4 border-t border-gray-200 dark:border-gray-700 shrink-0">
-          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-            Cancelar
-          </button>
-          <button
-            onClick={onSave}
-            disabled={saving}
-            className="flex items-center gap-1.5 px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-60 transition-colors"
-          >
-            <Save className="w-4 h-4" />
-            {saving ? 'Salvando...' : isEditing ? 'Salvar alterações' : 'Emitir permissão'}
-          </button>
-        </div>
-      </div>
+      )}
     </div>
   );
 }
 
-// ─── PrintModal ───────────────────────────────────────────────────────────────
+// ─── Helpers de estilo ────────────────────────────────────────────────────────
 
-function PrintModal({ permit, onClose }: { permit: WorkPermit; onClose: () => void }) {
-  const printRef = useRef<HTMLDivElement>(null);
-
-  const subInfo = permit.subtipo ? PET_SUBTIPOS[permit.subtipo] : null;
-  const episList = permit.episSelecionados
-    ? permit.episSelecionados.split(',').map(e => e.trim()).filter(Boolean)
-    : [];
-  const equipeList = permit.equipe
-    ? permit.equipe.split(/[\n,]/).map(e => e.trim()).filter(Boolean)
-    : [];
-
-  const doPrint = () => {
-    const content = printRef.current;
-    if (!content) return;
-    const w = window.open('', '_blank', 'width=900,height=700');
-    if (!w) return;
-    w.document.write(`<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8"/>
-  <title>${permit.numero}</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: Arial, sans-serif; font-size: 11px; color: #000; background: #fff; }
-    .pt-doc { width: 190mm; margin: 10mm auto; padding: 0; }
-    .header { border: 2px solid #000; padding: 8px 12px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 0; }
-    .header-title { text-align: center; flex: 1; }
-    .header-title .company { font-size: 13px; font-weight: bold; letter-spacing: 1px; }
-    .header-title .doc-type { font-size: 16px; font-weight: bold; margin-top: 2px; }
-    .header-title .nr-ref { font-size: 10px; color: #555; margin-top: 2px; }
-    .numero-box { border: 2px solid #000; padding: 6px 10px; text-align: center; min-width: 120px; }
-    .numero-box .label { font-size: 9px; text-transform: uppercase; color: #666; }
-    .numero-box .value { font-size: 14px; font-weight: bold; font-family: monospace; }
-    .status-badge { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; border: 1px solid currentColor; }
-    .status-emitida { color: #1d4ed8; }
-    .status-em_execucao { color: #d97706; }
-    .status-encerrada { color: #15803d; }
-    .status-cancelada { color: #dc2626; }
-    table.info { width: 100%; border-collapse: collapse; margin-top: 0; }
-    table.info td, table.info th { border: 1px solid #000; padding: 4px 6px; vertical-align: top; }
-    table.info th { background: #e5e7eb; font-weight: bold; font-size: 10px; text-transform: uppercase; width: 25%; }
-    .section-title { background: #1e3a5f; color: white; padding: 4px 8px; font-weight: bold; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; border: 1px solid #000; border-top: none; }
-    .epi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px 8px; padding: 6px; border: 1px solid #000; border-top: none; }
-    .epi-item { display: flex; align-items: center; gap: 4px; font-size: 10px; }
-    .epi-check { width: 12px; height: 12px; border: 1px solid #000; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; }
-    .sig-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: 1px solid #000; border-top: none; }
-    .sig-cell { padding: 6px 8px; min-height: 60px; display: flex; flex-direction: column; justify-content: flex-end; }
-    .sig-cell:first-child { border-right: 1px solid #000; }
-    .sig-label { font-size: 9px; text-transform: uppercase; color: #666; border-top: 1px solid #000; padding-top: 3px; margin-top: 20px; }
-    .sig-name { font-size: 10px; font-weight: bold; }
-    .sig-role { font-size: 9px; color: #555; }
-    .obs-box { border: 1px solid #000; border-top: none; padding: 6px 8px; min-height: 40px; font-size: 10px; }
-    .enc-row { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid #000; border-top: none; }
-    .enc-cell { padding: 5px 8px; min-height: 50px; display: flex; flex-direction: column; justify-content: flex-end; }
-    .enc-cell:first-child { border-right: 1px solid #000; }
-    .enc-label { font-size: 9px; text-transform: uppercase; color: #666; border-top: 1px solid #000; padding-top: 3px; margin-top: 15px; }
-    .footer-note { text-align: center; font-size: 9px; color: #888; margin-top: 8px; }
-    @media print { body { margin: 0; } .pt-doc { margin: 5mm auto; } }
-  </style>
-</head>
-<body>
-  <div class="pt-doc">
-    <!-- Header -->
-    <div class="header">
-      <div style="min-width:80px; text-align:left;">
-        <div style="font-size:9px;color:#666;">Doc. Nº</div>
-        <div class="status-badge status-${permit.status}">${STATUS_CFG[permit.status].label}</div>
-      </div>
-      <div class="header-title">
-        <div class="company">TIGER RENTANK DO BRASIL</div>
-        <div class="doc-type">${permit.tipo === 'PT' ? 'PERMISSÃO DE TRABALHO' : `PERMISSÃO ESPECIAL DE TRABALHO${subInfo ? ` — ${subInfo.label.toUpperCase()}` : ''}`}</div>
-        ${subInfo ? `<div class="nr-ref">Conforme ${subInfo.nr}</div>` : ''}
-      </div>
-      <div class="numero-box">
-        <div class="label">Número</div>
-        <div class="value">${permit.numero}</div>
-      </div>
-    </div>
-
-    <!-- Identificação -->
-    <div class="section-title">1. Identificação</div>
-    <table class="info">
-      <tr>
-        <th>Data de emissão</th><td>${fmtDate(permit.dataEmissao)}</td>
-        <th>Validade</th><td>${permit.horaInicio} às ${permit.horaFimPrevista}</td>
-      </tr>
-      <tr>
-        <th>Unidade / Base</th><td>${permit.unidade ?? '—'}</td>
-        <th>Local de trabalho</th><td>${permit.localTrabalho}</td>
-      </tr>
-    </table>
-
-    <!-- Atividade -->
-    <div class="section-title">2. Descrição da Atividade</div>
-    <table class="info">
-      <tr><th style="width:25%">Atividade</th><td colspan="3">${permit.descricaoAtividade}</td></tr>
-      <tr>
-        <th>Empresa executante</th><td>${permit.empresaExecutante ?? '—'}</td>
-        <th>Responsável</th><td>${permit.responsavelExecucao}</td>
-      </tr>
-      ${equipeList.length > 0 ? `<tr><th>Equipe</th><td colspan="3">${equipeList.join(' · ')}</td></tr>` : ''}
-    </table>
-
-    <!-- Riscos -->
-    <div class="section-title">3. Análise de Riscos e Medidas de Controle</div>
-    <table class="info">
-      <tr><th>Riscos identificados</th><td>${permit.riscos ?? '—'}</td></tr>
-      <tr><th>Medidas de controle</th><td>${permit.medidasControle ?? '—'}</td></tr>
-    </table>
-
-    <!-- EPIs -->
-    <div class="section-title">4. EPIs Necessários</div>
-    <div class="epi-grid">
-      ${EPI_OPTIONS.map(epi => `
-        <div class="epi-item">
-          <div class="epi-check">${episList.includes(epi) ? '✓' : ''}</div>
-          <span>${epi}</span>
-        </div>`).join('')}
-    </div>
-
-    <!-- Autorização / Assinaturas -->
-    <div class="section-title">5. Autorização e Assinaturas</div>
-    <div class="sig-row">
-      <div class="sig-cell">
-        <div class="sig-name">${permit.responsavelExecucao}</div>
-        <div class="sig-role">Responsável pela execução</div>
-        <div class="sig-label">Assinatura / Data e Hora</div>
-      </div>
-      <div class="sig-cell">
-        <div class="sig-name">${permit.autorizadorNome ?? '_________________________________'}</div>
-        <div class="sig-role">${permit.autorizadorFuncao ?? 'Autorizador'}</div>
-        <div class="sig-label">Assinatura / Data e Hora</div>
-      </div>
-    </div>
-
-    <!-- Encerramento -->
-    <div class="section-title">6. Encerramento</div>
-    <div class="enc-row">
-      <div class="enc-cell">
-        <div>${permit.horaEncerramento ? fmtDateTime(permit.horaEncerramento) : ''}</div>
-        <div class="enc-label">Data e hora de encerramento</div>
-      </div>
-      <div class="enc-cell">
-        <div class="enc-label">Assinatura do autorizador no encerramento</div>
-      </div>
-    </div>
-
-    <!-- Observações -->
-    ${permit.observacoes ? `
-    <div class="section-title">7. Observações</div>
-    <div class="obs-box">${permit.observacoes}</div>` : ''}
-
-    <div class="footer-note">
-      Tiger Rentank do Brasil · SGI — Sistema de Gestão Integrada · ISO 9001 / ISO 14001 / ISO 45001<br/>
-      Emitido em: ${new Date().toLocaleString('pt-BR')}
-    </div>
-  </div>
-  <script>window.onload = function(){ window.print(); }</script>
-</body>
-</html>`);
-    w.document.close();
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
-
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
-          <div>
-            <h3 className="font-semibold text-gray-900 dark:text-white">{permit.numero}</h3>
-            <p className="text-xs text-gray-500">{permit.localTrabalho} · {fmtDate(permit.dataEmissao)}</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={doPrint}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-colors"
-            >
-              <Printer className="w-4 h-4" /> Imprimir
-            </button>
-            <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-
-        {/* Preview */}
-        <div ref={printRef} className="overflow-y-auto flex-1 px-6 py-4 space-y-3 text-sm text-gray-800 dark:text-gray-200">
-          {/* Type badge */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className={`px-2.5 py-1 rounded font-semibold text-xs ${
-              permit.tipo === 'PT'
-                ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300'
-                : 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300'
-            }`}>
-              {permit.tipo === 'PT' ? 'Permissão de Trabalho' : `Permissão Especial — ${permit.subtipo ? PET_SUBTIPOS[permit.subtipo].label : ''}`}
-            </span>
-            <span className={`px-2.5 py-1 rounded text-xs font-medium ${STATUS_CFG[permit.status].badgeCls}`}>
-              {STATUS_CFG[permit.status].label}
-            </span>
-          </div>
-
-          <PreviewBlock label="Identificação">
-            <div className="grid grid-cols-2 gap-x-6 gap-y-1">
-              <KV k="Número" v={permit.numero} />
-              <KV k="Data" v={fmtDate(permit.dataEmissao)} />
-              <KV k="Validade" v={`${permit.horaInicio} – ${permit.horaFimPrevista}`} />
-              <KV k="Unidade" v={permit.unidade ?? '—'} />
-              <KV k="Local" v={permit.localTrabalho} />
-            </div>
-          </PreviewBlock>
-
-          <PreviewBlock label="Atividade">
-            <KV k="Descrição" v={permit.descricaoAtividade} />
-            <KV k="Empresa" v={permit.empresaExecutante ?? '—'} />
-            <KV k="Responsável" v={permit.responsavelExecucao} />
-            {permit.equipe && <KV k="Equipe" v={permit.equipe} />}
-          </PreviewBlock>
-
-          <PreviewBlock label="Riscos e Controles">
-            <KV k="Riscos" v={permit.riscos ?? '—'} />
-            <KV k="Medidas de controle" v={permit.medidasControle ?? '—'} />
-          </PreviewBlock>
-
-          {permit.episSelecionados && (
-            <PreviewBlock label="EPIs">
-              <div className="flex flex-wrap gap-1.5 mt-1">
-                {permit.episSelecionados.split(',').map(e => e.trim()).filter(Boolean).map(epi => (
-                  <span key={epi} className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded text-xs">
-                    <CheckCircle2 className="w-3 h-3" /> {epi}
-                  </span>
-                ))}
-              </div>
-            </PreviewBlock>
-          )}
-
-          <PreviewBlock label="Autorização">
-            <KV k="Autorizador" v={permit.autorizadorNome ?? '—'} />
-            <KV k="Função" v={permit.autorizadorFuncao ?? '—'} />
-          </PreviewBlock>
-
-          {permit.horaEncerramento && (
-            <PreviewBlock label="Encerramento">
-              <KV k="Data/hora" v={fmtDateTime(permit.horaEncerramento)} />
-            </PreviewBlock>
-          )}
-
-          {permit.observacoes && (
-            <PreviewBlock label="Observações">
-              <p className="text-sm">{permit.observacoes}</p>
-            </PreviewBlock>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── ConfirmModal ─────────────────────────────────────────────────────────────
-
-function ConfirmModal({
-  confirm, onConfirm, onClose,
-}: {
-  confirm: { permit: WorkPermit; action: 'iniciar' | 'encerrar' | 'cancelar' };
-  onConfirm: () => void;
-  onClose: () => void;
-}) {
-  const cfg = {
-    iniciar:   { title: 'Iniciar execução?',   desc: 'marcada como Em Execução',  btnCls: 'bg-yellow-600 hover:bg-yellow-700' },
-    encerrar:  { title: 'Encerrar permissão?', desc: 'encerrada definitivamente',  btnCls: 'bg-green-600 hover:bg-green-700'  },
-    cancelar:  { title: 'Cancelar permissão?', desc: 'cancelada',                 btnCls: 'bg-red-600 hover:bg-red-700'      },
-  }[confirm.action];
-
-  return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-sm w-full shadow-2xl">
-        <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-2">{cfg.title}</h3>
-        <p className="text-sm text-gray-500 mb-5">
-          <span className="font-mono font-semibold text-gray-700 dark:text-gray-300">{confirm.permit.numero}</span> será {cfg.desc}.
-        </p>
-        <div className="flex gap-2 justify-end">
-          <button onClick={onClose} className="px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-            Voltar
-          </button>
-          <button onClick={onConfirm} className={`px-4 py-2 text-sm text-white rounded-lg transition-colors ${cfg.btnCls}`}>
-            Confirmar
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Micro-components ─────────────────────────────────────────────────────────
-
-const inputCls = 'w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50';
+const inputCls = 'w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500';
+const textareaCls = 'w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 resize-none';
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 pb-1 border-b border-gray-100 dark:border-gray-700">{title}</h4>
-      <div className="space-y-3">{children}</div>
-    </div>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className="block text-xs font-medium text-gray-500 mb-1">{label}</label>
+      <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-3 pb-2 border-b border-slate-700/60">
+        {title}
+      </h3>
       {children}
     </div>
   );
 }
 
-function PreviewBlock({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="rounded-lg bg-gray-50 dark:bg-gray-800 p-3">
-      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">{label}</p>
-      <div className="space-y-1">{children}</div>
-    </div>
-  );
-}
-
-function KV({ k, v }: { k: string; v: string }) {
-  return (
-    <div className="flex gap-2 text-sm">
-      <span className="text-gray-400 shrink-0">{k}:</span>
-      <span className="text-gray-800 dark:text-gray-200">{v}</span>
-    </div>
-  );
+function Label({ children }: { children: React.ReactNode }) {
+  return <p className="text-xs text-slate-400 mb-1">{children}</p>;
 }
