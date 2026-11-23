@@ -510,7 +510,7 @@ export function PtPetScreen({ onToast }: Props) {
 
   // ── load ──
   const load = useCallback(async () => {
-    if (!isSupabaseConfigured()) { setLoading(false); return; }
+    if (!isSupabaseConfigured) { setLoading(false); return; }
     setLoading(true);
     const { data, error } = await supabase
       .from('work_permits')
