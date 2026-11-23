@@ -119,7 +119,8 @@ const MODULES: Module[] = [
         items: [
           { id: 'programas-sst', label: 'Programas SST', sublabel: 'Documentos e Laudos', icon: FileText },
           { id: 'acidentes-indicadores', label: 'TFCA / TFSA', sublabel: 'Indicadores de Acidentes', icon: Activity },
-          { id: 'pt-pet', label: 'PT / PET', sublabel: 'Permissões de Trabalho', icon: FileCheck2 },
+          { id: 'pt-pet',  label: 'PT / PET',   sublabel: 'Permissões de Trabalho',  icon: FileCheck2 },
+          { id: 'epi-epc', label: 'EPI / EPC',  sublabel: 'Gestão de Equipamentos',  icon: Shield     },
         ],
       },
     ],

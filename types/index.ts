@@ -492,6 +492,30 @@ export interface AccidentRem {
 // ─── PT / PET — Permissões de Trabalho ───────────────────────────────────────
 
 export type WorkPermitTipo    = 'PT' | 'PET';
+// ─── EPI/EPC ────────────────────────────────────────────────────────────────
+export type EpiTipo     = 'EPI' | 'EPC';
+export type EpiStatus   = 'ativo' | 'inativo';
+export type EpiCaStatus = 'vigente' | 'a_vencer' | 'vencido' | 'sem_ca';
+
+export interface Epi {
+  id:             string;
+  nome:           string;
+  tipo:           EpiTipo;
+  categoria:      string;
+  caNumero:       string | null;
+  caValidade:     string | null;    // ISO date string
+  fabricante:     string | null;
+  fornecedor:     string | null;
+  normaTecnica:   string | null;
+  vidaUtilMeses:  number | null;
+  funcoes:        string[];
+  observacoes:    string | null;
+  status:         EpiStatus;
+  createdAt:      string;
+  updatedAt:      string;
+}
+
+// ─── WorkPermit ─────────────────────────────────────────────────────────────
 export type WorkPermitSubtipo = 'altura' | 'confinado' | 'quente' | 'eletrico' | 'icamento';
 export type WorkPermitStatus  = 'emitida' | 'em_execucao' | 'encerrada' | 'cancelada';
 
