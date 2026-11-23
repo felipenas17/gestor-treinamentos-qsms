@@ -488,7 +488,7 @@ ${p.observacoes ? `<table><tr><th>Observações</th></tr><tr><td>${p.observacoes
 // ─── Component ────────────────────────────────────────────────────────────────
 
 interface Props {
-  onToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
+  onToast: (msg: string, type?: 'success' | 'error') => void;
 }
 
 export function PtPetScreen({ onToast }: Props) {
