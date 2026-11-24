@@ -328,6 +328,7 @@ export async function saveAssessmentDraft(payload: {
   const { data: asmnt, error } = await supabase
     .from('assessments')
     .insert({
+      code: `AVAL-${payload.procedure_code}`,
       procedure_code: payload.procedure_code,
       title: payload.title,
       status: 'Rascunho',

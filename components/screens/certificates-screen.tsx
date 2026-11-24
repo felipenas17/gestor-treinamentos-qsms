@@ -310,14 +310,14 @@ export function CertificatesScreen({
       // Step 2 — resolve link_id → assessment_id
       const linkIds = [...new Set((responses as any[]).map((r:any)=>r.link_id).filter(Boolean))];
       const { data: links } = await supabase.from('assessment_links').select('id,assessment_id').in('id',linkIds);
-      // Step 3 — resolve assessment_id → procedure_code
+      // Step 3 — resolve assessment_id → procedure code (via procedures FK)
       const aIds = [...new Set((links||[]).map((l:any)=>l.assessment_id).filter(Boolean))];
-      const { data: assessments } = await supabase.from('assessments').select('id,procedure_code').in('id',aIds);
+      const { data: assessments } = await supabase.from('assessments').select('id,procedures!procedure_id(code)').in('id',aIds);
       // Build lookup maps
       const linkMap: Record<string,string> = {};
       for (const l of (links||[]) as any[]) linkMap[l.id]=l.assessment_id;
       const aMap: Record<string,string> = {};
-      for (const a of (assessments||[]) as any[]) aMap[a.id]=a.procedure_code;
+      for (const a of (assessments||[]) as any[]) aMap[a.id]=(a.procedures as any)?.code||'';
       // Build final responsesMap keyed by procedure_code
       const map: Record<string,{cpf:string;signature:string;responseId:string}> = {};
       for (const r of responses as any[]) {
