@@ -33,6 +33,7 @@ import { AccidentIndicatorsScreen } from '@/components/screens/accident-indicato
 import { PtPetScreen } from '@/components/screens/pt-pet-screen';
 import { EpiScreen } from '@/components/screens/epi-screen';
 import { LaaiprScreen } from '@/components/screens/laaipr-screen';
+import { CipaScreen } from '@/components/screens/cipa-screen';
 // import { ImportDocumentModal } from '@/components/modals/import-document-modal'; // modal não ativo
 
 import {
@@ -1688,6 +1689,9 @@ export default function GestorTreinamentosApp() {
           )}
           {currentTab === 'laaipr' && (
             <LaaiprScreen onToast={showToast} />
+          )}
+          {currentTab === 'cipa' && (
+            <CipaScreen onToast={showToast} />
           )}
         </main>
       </div>

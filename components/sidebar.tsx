@@ -19,6 +19,7 @@ import {
   Activity,
   FileCheck2,
   Layers,
+  HardHat,
 } from 'lucide-react';
 
 interface NavItem {
@@ -130,6 +131,7 @@ const MODULES: Module[] = [
         icon: AlertTriangle,
         items: [
           { id: 'laaipr', label: 'LAAIPR', sublabel: 'Aspectos, Impactos e Riscos', icon: Layers },
+          { id: 'cipa', label: 'CIPA', sublabel: 'Comissão Interna de Prevenção', icon: HardHat },
         ],
       },
     ],
