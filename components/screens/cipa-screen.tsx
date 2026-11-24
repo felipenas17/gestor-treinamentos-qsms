@@ -5,7 +5,7 @@ import {
   Users, Calendar, Vote, Megaphone, BookOpen,
   ClipboardList, Map, Newspaper, Plus, RefreshCw,
   ChevronDown, ChevronUp, Pencil, Trash2, Check, X,
-  FileText, AlertCircle, Clock, Printer,
+  FileText, AlertCircle, Clock, Printer, Upload,
   BarChart2, UserCheck, ExternalLink, ChevronRight,
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
@@ -752,26 +752,40 @@ function ReunioesTab({ mandatos, reunioes, acoes, onRefresh, toast }: {
   const [selectedReuniaoId, setSelectedReuniaoId] = useState<string | null>(null);
   const [saving, setSaving]           = useState(false);
   const [expandedId, setExpandedId]   = useState<string | null>(null);
+  const [ataFile, setAtaFile]         = useState<File | null>(null);
 
   function openNew() {
     const mandatoAtivo = mandatos.find(m => m.status === 'ativo');
     setEditing(null);
     setForm({ ...EMPTY_REUNIAO, mandato_id: mandatoAtivo?.id ?? mandatos[0]?.id ?? '' });
+    setAtaFile(null);
     setShowForm(true);
   }
   function openEdit(r: CipaReuniao) {
     setEditing(r);
     setForm({ mandato_id: r.mandato_id ?? '', numero_reuniao: String(r.numero_reuniao ?? ''), tipo: r.tipo, data_reuniao: r.data_reuniao ?? '', horario: r.horario ?? '', local: r.local ?? '', pauta: r.pauta ?? '', deliberacoes: r.deliberacoes ?? '', proxima_reuniao: r.proxima_reuniao ?? '', status: r.status, arquivo_url: r.arquivo_url ?? '' });
+    setAtaFile(null);
     setShowForm(true);
   }
   async function saveReuniao() {
     if (!supabase) return;
     if (!form.data_reuniao) { toast('Data obrigatória', 'error'); return; }
     setSaving(true);
-    const payload = { mandato_id: form.mandato_id || null, numero_reuniao: form.numero_reuniao ? Number(form.numero_reuniao) : null, tipo: form.tipo, data_reuniao: form.data_reuniao, horario: form.horario || null, local: form.local || null, pauta: form.pauta || null, deliberacoes: form.deliberacoes || null, proxima_reuniao: form.proxima_reuniao || null, status: form.status, arquivo_url: form.arquivo_url || null };
+    let arquivo_url = form.arquivo_url;
+    if (ataFile) {
+      const path = `atas/${Date.now()}-${ataFile.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+      const { error: uploadError } = await supabase.storage.from('cipa-docs').upload(path, ataFile, { upsert: true });
+      if (!uploadError) {
+        const { data: urlData } = supabase.storage.from('cipa-docs').getPublicUrl(path);
+        arquivo_url = urlData?.publicUrl ?? arquivo_url;
+      } else {
+        toast('Erro ao enviar arquivo', 'error');
+      }
+    }
+    const payload = { mandato_id: form.mandato_id || null, numero_reuniao: form.numero_reuniao ? Number(form.numero_reuniao) : null, tipo: form.tipo, data_reuniao: form.data_reuniao, horario: form.horario || null, local: form.local || null, pauta: form.pauta || null, deliberacoes: form.deliberacoes || null, proxima_reuniao: form.proxima_reuniao || null, status: form.status, arquivo_url: arquivo_url || null };
     if (editing) await supabase.from('cipa_reunioes').update(payload).eq('id', editing.id);
     else await supabase.from('cipa_reunioes').insert([payload]);
-    setShowForm(false);
+    setShowForm(false); setAtaFile(null);
     setSaving(false);
     toast(editing ? 'Reunião atualizada' : 'Reunião criada');
     await onRefresh();
@@ -880,6 +894,11 @@ function ReunioesTab({ mandatos, reunioes, acoes, onRefresh, toast }: {
                     {r.proxima_reuniao && (
                       <p className="text-xs text-gray-500 dark:text-gray-400">Próxima reunião: <b className="text-gray-700 dark:text-gray-200">{fmtDate(r.proxima_reuniao)}</b></p>
                     )}
+                    {r.arquivo_url && (
+                      <a href={r.arquivo_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-orange-600 dark:text-orange-400 hover:underline text-sm">
+                        <FileText className="w-4 h-4" />Visualizar ata
+                      </a>
+                    )}
 
                     {/* Ações */}
                     <div>
@@ -930,7 +949,21 @@ function ReunioesTab({ mandatos, reunioes, acoes, onRefresh, toast }: {
             <div className="col-span-2"><FLabel>Pauta</FLabel><FTextarea rows={3} value={form.pauta} onChange={e => setForm(p => ({ ...p, pauta: e.target.value }))} /></div>
             <div className="col-span-2"><FLabel>Deliberações</FLabel><FTextarea rows={3} value={form.deliberacoes} onChange={e => setForm(p => ({ ...p, deliberacoes: e.target.value }))} /></div>
             <div><FLabel>Próxima reunião</FLabel><FInput type="date" value={form.proxima_reuniao} onChange={e => setForm(p => ({ ...p, proxima_reuniao: e.target.value }))} /></div>
-            <div><FLabel>URL da ata (PDF)</FLabel><FInput value={form.arquivo_url} onChange={e => setForm(p => ({ ...p, arquivo_url: e.target.value }))} placeholder="https://..." /></div>
+            <div className="col-span-2">
+              <FLabel>Ata da reunião (PDF/imagem)</FLabel>
+              <div className="mt-1 space-y-1.5">
+                {form.arquivo_url && (
+                  <a href={form.arquivo_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-orange-600 dark:text-orange-400 hover:underline text-sm">
+                    <FileText className="w-4 h-4" />Visualizar ata atual
+                  </a>
+                )}
+                <label className="flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-gray-300 dark:border-gray-600 cursor-pointer hover:border-orange-400 dark:hover:border-orange-500 transition-colors">
+                  <Upload className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                  <span className="text-sm text-gray-500 dark:text-gray-400 truncate">{ataFile ? ataFile.name : form.arquivo_url ? 'Trocar arquivo...' : 'Escolher PDF ou imagem...'}</span>
+                  <input type="file" accept=".pdf,image/*" className="hidden" onChange={e => setAtaFile(e.target.files?.[0] ?? null)} />
+                </label>
+              </div>
+            </div>
           </div>
           <ModalButtons onCancel={() => setShowForm(false)} onSave={saveReuniao} saving={saving} />
         </Modal>
@@ -1842,15 +1875,27 @@ function MapaRiscoTab({ mapas, onRefresh, toast }: {
   const [editing, setEditing]   = useState<CipaMapaRisco | null>(null);
   const [form, setForm]         = useState<MapaForm>(EMPTY_MAPA);
   const [saving, setSaving]     = useState(false);
+  const [mapaFile, setMapaFile] = useState<File | null>(null);
 
   async function save() {
     if (!supabase) return;
     if (!form.area.trim()) { toast('Área obrigatória', 'error'); return; }
     setSaving(true);
-    const payload = { ano: Number(form.ano), area: form.area, descricao: form.descricao || null, arquivo_url: form.arquivo_url || null, data_elaboracao: form.data_elaboracao || null, revisao_prevista: form.revisao_prevista || null, status: form.status };
+    let arquivo_url = form.arquivo_url;
+    if (mapaFile) {
+      const path = `mapas/${Date.now()}-${mapaFile.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+      const { error: uploadError } = await supabase.storage.from('cipa-docs').upload(path, mapaFile, { upsert: true });
+      if (!uploadError) {
+        const { data: urlData } = supabase.storage.from('cipa-docs').getPublicUrl(path);
+        arquivo_url = urlData?.publicUrl ?? arquivo_url;
+      } else {
+        toast('Erro ao enviar arquivo', 'error');
+      }
+    }
+    const payload = { ano: Number(form.ano), area: form.area, descricao: form.descricao || null, arquivo_url: arquivo_url || null, data_elaboracao: form.data_elaboracao || null, revisao_prevista: form.revisao_prevista || null, status: form.status };
     if (editing) await supabase.from('cipa_mapa_risco').update(payload).eq('id', editing.id);
     else await supabase.from('cipa_mapa_risco').insert([payload]);
-    setShowForm(false); setSaving(false);
+    setShowForm(false); setMapaFile(null); setSaving(false);
     toast(editing ? 'Mapa atualizado' : 'Mapa criado');
     await onRefresh();
   }
@@ -1859,7 +1904,7 @@ function MapaRiscoTab({ mapas, onRefresh, toast }: {
   return (
     <div className="max-w-4xl space-y-4">
       <div className="flex justify-end">
-        <button onClick={() => { setEditing(null); setForm(EMPTY_MAPA); setShowForm(true); }} className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-orange-600 text-white text-sm font-semibold hover:bg-orange-700 transition-colors"><Plus className="w-4 h-4" /> Novo Mapa de Risco</button>
+        <button onClick={() => { setEditing(null); setForm(EMPTY_MAPA); setMapaFile(null); setShowForm(true); }} className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-orange-600 text-white text-sm font-semibold hover:bg-orange-700 transition-colors"><Plus className="w-4 h-4" /> Novo Mapa de Risco</button>
       </div>
       {mapas.length === 0 ? (
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700"><EmptyState icon={Map} text="Nenhum mapa de risco cadastrado" /></div>
@@ -1886,7 +1931,7 @@ function MapaRiscoTab({ mapas, onRefresh, toast }: {
                   <td className="px-4 py-3">{m.arquivo_url ? <a href={m.arquivo_url} target="_blank" rel="noopener noreferrer" className="text-orange-600 dark:text-orange-400 hover:underline flex items-center gap-1 text-xs"><FileText className="w-3.5 h-3.5" />Abrir</a> : <span className="text-gray-400 text-xs">—</span>}</td>
                   <td className="px-4 py-3">
                     <div className="flex gap-1">
-                      <button onClick={() => { setEditing(m); setForm({ ano: String(m.ano), area: m.area, descricao: m.descricao ?? '', arquivo_url: m.arquivo_url ?? '', data_elaboracao: m.data_elaboracao ?? '', revisao_prevista: m.revisao_prevista ?? '', status: m.status }); setShowForm(true); }} className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-400"><Pencil className="w-3.5 h-3.5" /></button>
+                      <button onClick={() => { setEditing(m); setForm({ ano: String(m.ano), area: m.area, descricao: m.descricao ?? '', arquivo_url: m.arquivo_url ?? '', data_elaboracao: m.data_elaboracao ?? '', revisao_prevista: m.revisao_prevista ?? '', status: m.status }); setMapaFile(null); setShowForm(true); }} className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-400"><Pencil className="w-3.5 h-3.5" /></button>
                       <button onClick={() => del(m.id)} className="p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-red-400"><Trash2 className="w-3.5 h-3.5" /></button>
                     </div>
                   </td>
@@ -1905,7 +1950,21 @@ function MapaRiscoTab({ mapas, onRefresh, toast }: {
             <div><FLabel>Data de elaboração</FLabel><FInput type="date" value={form.data_elaboracao} onChange={e => setForm(p => ({ ...p, data_elaboracao: e.target.value }))} /></div>
             <div><FLabel>Próxima revisão</FLabel><FInput type="date" value={form.revisao_prevista} onChange={e => setForm(p => ({ ...p, revisao_prevista: e.target.value }))} /></div>
             <div className="col-span-2"><FLabel>Descrição</FLabel><FTextarea rows={2} value={form.descricao} onChange={e => setForm(p => ({ ...p, descricao: e.target.value }))} /></div>
-            <div className="col-span-2"><FLabel>URL do arquivo</FLabel><FInput value={form.arquivo_url} onChange={e => setForm(p => ({ ...p, arquivo_url: e.target.value }))} placeholder="https://..." /></div>
+            <div className="col-span-2">
+              <FLabel>Arquivo do mapa (PDF/imagem)</FLabel>
+              <div className="mt-1 space-y-1.5">
+                {form.arquivo_url && (
+                  <a href={form.arquivo_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-orange-600 dark:text-orange-400 hover:underline text-sm">
+                    <FileText className="w-4 h-4" />Visualizar arquivo atual
+                  </a>
+                )}
+                <label className="flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-gray-300 dark:border-gray-600 cursor-pointer hover:border-orange-400 dark:hover:border-orange-500 transition-colors">
+                  <Upload className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                  <span className="text-sm text-gray-500 dark:text-gray-400 truncate">{mapaFile ? mapaFile.name : form.arquivo_url ? 'Trocar arquivo...' : 'Escolher PDF ou imagem...'}</span>
+                  <input type="file" accept=".pdf,image/*" className="hidden" onChange={e => setMapaFile(e.target.files?.[0] ?? null)} />
+                </label>
+              </div>
+            </div>
           </div>
           <ModalButtons onCancel={() => setShowForm(false)} onSave={save} saving={saving} />
         </Modal>
@@ -1931,6 +1990,7 @@ function InformativosTab({ informativos, onRefresh, toast }: {
   const [form, setForm]         = useState<InfoForm>(EMPTY_INFO);
   const [saving, setSaving]     = useState(false);
   const [busca, setBusca]       = useState('');
+  const [infoFile, setInfoFile] = useState<File | null>(null);
 
   const categorias = [...new Set(informativos.map(i => i.categoria).filter(Boolean) as string[])].sort();
   const filtrados = busca.trim()
@@ -1941,10 +2001,21 @@ function InformativosTab({ informativos, onRefresh, toast }: {
     if (!supabase) return;
     if (!form.titulo.trim()) { toast('Título obrigatório', 'error'); return; }
     setSaving(true);
-    const payload = { titulo: form.titulo, categoria: form.categoria || null, arquivo_url: form.arquivo_url || null, data_publicacao: form.data_publicacao || null };
+    let arquivo_url = form.arquivo_url;
+    if (infoFile) {
+      const path = `informativos/${Date.now()}-${infoFile.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+      const { error: uploadError } = await supabase.storage.from('cipa-docs').upload(path, infoFile, { upsert: true });
+      if (!uploadError) {
+        const { data: urlData } = supabase.storage.from('cipa-docs').getPublicUrl(path);
+        arquivo_url = urlData?.publicUrl ?? arquivo_url;
+      } else {
+        toast('Erro ao enviar arquivo', 'error');
+      }
+    }
+    const payload = { titulo: form.titulo, categoria: form.categoria || null, arquivo_url: arquivo_url || null, data_publicacao: form.data_publicacao || null };
     if (editing) await supabase.from('cipa_informativos').update(payload).eq('id', editing.id);
     else await supabase.from('cipa_informativos').insert([payload]);
-    setShowForm(false); setSaving(false);
+    setShowForm(false); setInfoFile(null); setSaving(false);
     toast(editing ? 'Informativo atualizado' : 'Informativo cadastrado');
     await onRefresh();
   }
@@ -1954,7 +2025,7 @@ function InformativosTab({ informativos, onRefresh, toast }: {
     <div className="max-w-4xl space-y-4">
       <div className="flex items-center gap-3">
         <FInput className="flex-1" placeholder="Buscar informativo..." value={busca} onChange={e => setBusca(e.target.value)} />
-        <button onClick={() => { setEditing(null); setForm(EMPTY_INFO); setShowForm(true); }} className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-orange-600 text-white text-sm font-semibold hover:bg-orange-700 transition-colors whitespace-nowrap"><Plus className="w-4 h-4" /> Novo Informativo</button>
+        <button onClick={() => { setEditing(null); setForm(EMPTY_INFO); setInfoFile(null); setShowForm(true); }} className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-orange-600 text-white text-sm font-semibold hover:bg-orange-700 transition-colors whitespace-nowrap"><Plus className="w-4 h-4" /> Novo Informativo</button>
       </div>
 
       {filtrados.length === 0 ? (
@@ -1978,7 +2049,7 @@ function InformativosTab({ informativos, onRefresh, toast }: {
                   <td className="px-4 py-3">{i.arquivo_url ? <a href={i.arquivo_url} target="_blank" rel="noopener noreferrer" className="text-orange-600 dark:text-orange-400 hover:underline flex items-center gap-1 text-xs"><FileText className="w-3.5 h-3.5" />Abrir</a> : <span className="text-gray-400 text-xs">—</span>}</td>
                   <td className="px-4 py-3">
                     <div className="flex gap-1">
-                      <button onClick={() => { setEditing(i); setForm({ titulo: i.titulo, categoria: i.categoria ?? '', arquivo_url: i.arquivo_url ?? '', data_publicacao: i.data_publicacao ?? '' }); setShowForm(true); }} className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-400"><Pencil className="w-3.5 h-3.5" /></button>
+                      <button onClick={() => { setEditing(i); setForm({ titulo: i.titulo, categoria: i.categoria ?? '', arquivo_url: i.arquivo_url ?? '', data_publicacao: i.data_publicacao ?? '' }); setInfoFile(null); setShowForm(true); }} className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-400"><Pencil className="w-3.5 h-3.5" /></button>
                       <button onClick={() => del(i.id)} className="p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-red-400"><Trash2 className="w-3.5 h-3.5" /></button>
                     </div>
                   </td>
@@ -1999,7 +2070,21 @@ function InformativosTab({ informativos, onRefresh, toast }: {
               <datalist id="categorias-list">{categorias.map(c => <option key={c} value={c} />)}</datalist>
             </div>
             <div><FLabel>Data de publicação</FLabel><FInput type="date" value={form.data_publicacao} onChange={e => setForm(p => ({ ...p, data_publicacao: e.target.value }))} /></div>
-            <div className="col-span-2"><FLabel>URL do arquivo</FLabel><FInput value={form.arquivo_url} onChange={e => setForm(p => ({ ...p, arquivo_url: e.target.value }))} placeholder="https://..." /></div>
+            <div className="col-span-2">
+              <FLabel>Arquivo do informativo (PDF/imagem)</FLabel>
+              <div className="mt-1 space-y-1.5">
+                {form.arquivo_url && (
+                  <a href={form.arquivo_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-orange-600 dark:text-orange-400 hover:underline text-sm">
+                    <FileText className="w-4 h-4" />Visualizar arquivo atual
+                  </a>
+                )}
+                <label className="flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-gray-300 dark:border-gray-600 cursor-pointer hover:border-orange-400 dark:hover:border-orange-500 transition-colors">
+                  <Upload className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                  <span className="text-sm text-gray-500 dark:text-gray-400 truncate">{infoFile ? infoFile.name : form.arquivo_url ? 'Trocar arquivo...' : 'Escolher PDF ou imagem...'}</span>
+                  <input type="file" accept=".pdf,image/*" className="hidden" onChange={e => setInfoFile(e.target.files?.[0] ?? null)} />
+                </label>
+              </div>
+            </div>
           </div>
           <ModalButtons onCancel={() => setShowForm(false)} onSave={save} saving={saving} />
         </Modal>
