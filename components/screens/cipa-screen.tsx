@@ -995,6 +995,7 @@ function EleicoesTab({ mandatos, eleicoes, onRefresh, toast }: {
   const [origin, setOrigin] = useState('');
   const printRef = useRef<HTMLDivElement>(null);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setOrigin(window.location.origin); }, []);
 
   const selectedEleicao = eleicoes.find(e => e.id === selectedEleicaoId) ?? null;
