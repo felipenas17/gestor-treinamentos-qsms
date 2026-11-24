@@ -5,7 +5,7 @@ import {
   Users, Calendar, Vote, Megaphone, BookOpen,
   ClipboardList, Map, Newspaper, Plus, RefreshCw,
   ChevronDown, ChevronUp, Pencil, Trash2, Check, X,
-  FileText, AlertCircle, Clock, Printer, Upload,
+  FileText, AlertCircle, Clock, Printer, Upload, Eye,
   BarChart2, UserCheck, ExternalLink, ChevronRight,
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
@@ -896,7 +896,7 @@ function ReunioesTab({ mandatos, reunioes, acoes, onRefresh, toast }: {
                     )}
                     {r.arquivo_url && (
                       <a href={r.arquivo_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-orange-600 dark:text-orange-400 hover:underline text-sm">
-                        <FileText className="w-4 h-4" />Visualizar ata
+                        <Eye className="w-4 h-4" />Visualizar ata
                       </a>
                     )}
 
@@ -954,7 +954,7 @@ function ReunioesTab({ mandatos, reunioes, acoes, onRefresh, toast }: {
               <div className="mt-1 space-y-1.5">
                 {form.arquivo_url && (
                   <a href={form.arquivo_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-orange-600 dark:text-orange-400 hover:underline text-sm">
-                    <FileText className="w-4 h-4" />Visualizar ata atual
+                    <Eye className="w-4 h-4" />Visualizar ata atual
                   </a>
                 )}
                 <label className="flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-gray-300 dark:border-gray-600 cursor-pointer hover:border-orange-400 dark:hover:border-orange-500 transition-colors">
@@ -1928,7 +1928,7 @@ function MapaRiscoTab({ mapas, onRefresh, toast }: {
                   <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{fmtDate(m.data_elaboracao)}</td>
                   <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{fmtDate(m.revisao_prevista)}</td>
                   <td className="px-4 py-3"><StatusBadge status={m.status} /></td>
-                  <td className="px-4 py-3">{m.arquivo_url ? <a href={m.arquivo_url} target="_blank" rel="noopener noreferrer" className="text-orange-600 dark:text-orange-400 hover:underline flex items-center gap-1 text-xs"><FileText className="w-3.5 h-3.5" />Abrir</a> : <span className="text-gray-400 text-xs">—</span>}</td>
+                  <td className="px-4 py-3">{m.arquivo_url ? <a href={m.arquivo_url} target="_blank" rel="noopener noreferrer" title="Visualizar arquivo" className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-orange-50 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 hover:bg-orange-100 dark:hover:bg-orange-900/50 transition-colors"><Eye className="w-4 h-4" /></a> : <span className="text-gray-400 text-xs">—</span>}</td>
                   <td className="px-4 py-3">
                     <div className="flex gap-1">
                       <button onClick={() => { setEditing(m); setForm({ ano: String(m.ano), area: m.area, descricao: m.descricao ?? '', arquivo_url: m.arquivo_url ?? '', data_elaboracao: m.data_elaboracao ?? '', revisao_prevista: m.revisao_prevista ?? '', status: m.status }); setMapaFile(null); setShowForm(true); }} className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-400"><Pencil className="w-3.5 h-3.5" /></button>
@@ -1955,7 +1955,7 @@ function MapaRiscoTab({ mapas, onRefresh, toast }: {
               <div className="mt-1 space-y-1.5">
                 {form.arquivo_url && (
                   <a href={form.arquivo_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-orange-600 dark:text-orange-400 hover:underline text-sm">
-                    <FileText className="w-4 h-4" />Visualizar arquivo atual
+                    <Eye className="w-4 h-4" />Visualizar arquivo atual
                   </a>
                 )}
                 <label className="flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-gray-300 dark:border-gray-600 cursor-pointer hover:border-orange-400 dark:hover:border-orange-500 transition-colors">
@@ -2046,7 +2046,7 @@ function InformativosTab({ informativos, onRefresh, toast }: {
                   <td className="px-4 py-3 font-medium text-gray-800 dark:text-gray-100">{i.titulo}</td>
                   <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{i.categoria ?? '—'}</td>
                   <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{fmtDate(i.data_publicacao)}</td>
-                  <td className="px-4 py-3">{i.arquivo_url ? <a href={i.arquivo_url} target="_blank" rel="noopener noreferrer" className="text-orange-600 dark:text-orange-400 hover:underline flex items-center gap-1 text-xs"><FileText className="w-3.5 h-3.5" />Abrir</a> : <span className="text-gray-400 text-xs">—</span>}</td>
+                  <td className="px-4 py-3">{i.arquivo_url ? <a href={i.arquivo_url} target="_blank" rel="noopener noreferrer" title="Visualizar arquivo" className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-orange-50 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 hover:bg-orange-100 dark:hover:bg-orange-900/50 transition-colors"><Eye className="w-4 h-4" /></a> : <span className="text-gray-400 text-xs">—</span>}</td>
                   <td className="px-4 py-3">
                     <div className="flex gap-1">
                       <button onClick={() => { setEditing(i); setForm({ titulo: i.titulo, categoria: i.categoria ?? '', arquivo_url: i.arquivo_url ?? '', data_publicacao: i.data_publicacao ?? '' }); setInfoFile(null); setShowForm(true); }} className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-400"><Pencil className="w-3.5 h-3.5" /></button>
@@ -2075,7 +2075,7 @@ function InformativosTab({ informativos, onRefresh, toast }: {
               <div className="mt-1 space-y-1.5">
                 {form.arquivo_url && (
                   <a href={form.arquivo_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-orange-600 dark:text-orange-400 hover:underline text-sm">
-                    <FileText className="w-4 h-4" />Visualizar arquivo atual
+                    <Eye className="w-4 h-4" />Visualizar arquivo atual
                   </a>
                 )}
                 <label className="flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-gray-300 dark:border-gray-600 cursor-pointer hover:border-orange-400 dark:hover:border-orange-500 transition-colors">
