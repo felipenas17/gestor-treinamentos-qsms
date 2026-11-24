@@ -43,13 +43,16 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   if (!supabase) return NextResponse.json({ error: 'Serviço indisponível' }, { status: 503 });
 
-  let body: { token?: string; chapa_id?: string };
+  let body: { token?: string; chapa_id?: string; vice_presidente_voto?: string };
   try { body = await req.json(); }
   catch { return NextResponse.json({ error: 'JSON inválido' }, { status: 400 }); }
 
-  const { token, chapa_id } = body;
+  const { token, chapa_id, vice_presidente_voto } = body;
   if (!token || !chapa_id)
     return NextResponse.json({ error: 'Campos obrigatórios: token, chapa_id' }, { status: 400 });
+
+  if (!vice_presidente_voto || !['titular', 'suplente'].includes(vice_presidente_voto))
+    return NextResponse.json({ error: 'Informe o voto para vice-presidente (titular ou suplente)' }, { status: 400 });
 
   // 1. Buscar eleitor pelo token
   const { data: eleitor } = await supabase
@@ -84,7 +87,7 @@ export async function POST(req: NextRequest) {
   // 4. Registrar o voto
   const { error: voteErr } = await supabase
     .from('cipa_votos')
-    .insert({ eleicao_id: eleitor.eleicao_id, chapa_id, eleitor_id: eleitor.id });
+    .insert({ eleicao_id: eleitor.eleicao_id, chapa_id, eleitor_id: eleitor.id, vice_presidente_voto });
 
   if (voteErr) {
     if (voteErr.code === '23505')

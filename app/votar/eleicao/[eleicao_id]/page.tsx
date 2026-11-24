@@ -28,6 +28,7 @@ type Step =
   | 'already_voted'
   | 'closed'
   | 'voting'
+  | 'vice'          // escolher vice-presidente da chapa selecionada
   | 'confirming'
   | 'success'
   | 'error_not_found'
@@ -66,6 +67,7 @@ export default function VotarEleicaoPage() {
   const [eleicao, setEleicao]         = useState<Eleicao | null>(null);
   const [chapas, setChapas]           = useState<Chapa[]>([]);
   const [selected, setSelected]       = useState<string | null>(null);
+  const [viceVoto, setViceVoto]       = useState<'titular' | 'suplente' | null>(null);
   const [submitting, setSubmitting]   = useState(false);
   const [voteError, setVoteError]     = useState('');
 
@@ -123,14 +125,14 @@ export default function VotarEleicaoPage() {
   // ── Submit vote ──────────────────────────────────────────────────────────
 
   async function submitVote() {
-    if (!selected || !token) return;
+    if (!selected || !token || !viceVoto) return;
     setSubmitting(true);
     setVoteError('');
     try {
       const res = await fetch('/api/votar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, chapa_id: selected }),
+        body: JSON.stringify({ token, chapa_id: selected, vice_presidente_voto: viceVoto }),
       });
       const data = await res.json();
       if (res.ok) { setStep('success'); }
@@ -309,6 +311,137 @@ export default function VotarEleicaoPage() {
     </PageShell>
   );
 
+  // ── Vice-president step ──────────────────────────────────────────────────
+  if (step === 'vice' && chapaSelected) return (
+    <PageShell>
+      <div className="max-w-md w-full mx-auto space-y-6">
+        {/* Header */}
+        <div className="text-center space-y-1">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-orange-100 dark:bg-orange-900/30 mb-2">
+            <Vote className="w-7 h-7 text-orange-600" />
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Vice-presidente</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            Escolha quem será o vice-presidente da chapa selecionada
+          </p>
+        </div>
+
+        {/* Chapa selecionada */}
+        <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-xl px-4 py-3 text-center">
+          <p className="text-xs uppercase tracking-widest text-orange-600 font-semibold">Chapa escolhida</p>
+          <p className="font-bold text-orange-700 dark:text-orange-300 mt-0.5">
+            {chapaSelected.nome ?? `Chapa ${String(chapaSelected.numero_chapa).padStart(2, '0')}`}
+          </p>
+        </div>
+
+        {/* Opções de vice */}
+        <div className="space-y-3">
+          {/* Titular */}
+          <button
+            onClick={() => setViceVoto(viceVoto === 'titular' ? null : 'titular')}
+            className={[
+              'w-full text-left rounded-2xl border-2 p-5 transition-all',
+              viceVoto === 'titular'
+                ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20'
+                : 'border-gray-200 dark:border-gray-700 hover:border-orange-300 dark:hover:border-orange-700 bg-white dark:bg-gray-800',
+            ].join(' ')}
+          >
+            <div className="flex items-center gap-4">
+              <div className={[
+                'w-14 h-14 rounded-xl flex items-center justify-center font-black text-xs flex-shrink-0 uppercase tracking-wide',
+                viceVoto === 'titular'
+                  ? 'bg-orange-500 text-white'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400',
+              ].join(' ')}>
+                TIT
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs uppercase tracking-wide font-semibold text-gray-400 dark:text-gray-500 mb-0.5">Titular</p>
+                <p className={[
+                  'font-semibold truncate',
+                  viceVoto === 'titular' ? 'text-orange-700 dark:text-orange-300' : 'text-gray-800 dark:text-gray-100',
+                ].join(' ')}>
+                  {chapaSelected.candidato_titular}
+                </p>
+              </div>
+              <div className={[
+                'w-6 h-6 rounded-full border-2 flex-shrink-0 flex items-center justify-center',
+                viceVoto === 'titular'
+                  ? 'border-orange-500 bg-orange-500'
+                  : 'border-gray-300 dark:border-gray-600',
+              ].join(' ')}>
+                {viceVoto === 'titular' && <div className="w-2.5 h-2.5 rounded-full bg-white" />}
+              </div>
+            </div>
+          </button>
+
+          {/* Suplente */}
+          {chapaSelected.candidato_suplente && (
+            <button
+              onClick={() => setViceVoto(viceVoto === 'suplente' ? null : 'suplente')}
+              className={[
+                'w-full text-left rounded-2xl border-2 p-5 transition-all',
+                viceVoto === 'suplente'
+                  ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20'
+                  : 'border-gray-200 dark:border-gray-700 hover:border-orange-300 dark:hover:border-orange-700 bg-white dark:bg-gray-800',
+              ].join(' ')}
+            >
+              <div className="flex items-center gap-4">
+                <div className={[
+                  'w-14 h-14 rounded-xl flex items-center justify-center font-black text-xs flex-shrink-0 uppercase tracking-wide',
+                  viceVoto === 'suplente'
+                    ? 'bg-orange-500 text-white'
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400',
+                ].join(' ')}>
+                  SUP
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs uppercase tracking-wide font-semibold text-gray-400 dark:text-gray-500 mb-0.5">Suplente</p>
+                  <p className={[
+                    'font-semibold truncate',
+                    viceVoto === 'suplente' ? 'text-orange-700 dark:text-orange-300' : 'text-gray-800 dark:text-gray-100',
+                  ].join(' ')}>
+                    {chapaSelected.candidato_suplente}
+                  </p>
+                </div>
+                <div className={[
+                  'w-6 h-6 rounded-full border-2 flex-shrink-0 flex items-center justify-center',
+                  viceVoto === 'suplente'
+                    ? 'border-orange-500 bg-orange-500'
+                    : 'border-gray-300 dark:border-gray-600',
+                ].join(' ')}>
+                  {viceVoto === 'suplente' && <div className="w-2.5 h-2.5 rounded-full bg-white" />}
+                </div>
+              </div>
+            </button>
+          )}
+        </div>
+
+        {/* Navigation */}
+        <div className="flex gap-3">
+          <button
+            onClick={() => setStep('voting')}
+            className="flex-1 py-3 rounded-xl border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-semibold text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+          >
+            Voltar
+          </button>
+          <button
+            onClick={() => { if (viceVoto) setStep('confirming'); }}
+            disabled={!viceVoto}
+            className="flex-1 py-3 rounded-xl bg-orange-600 hover:bg-orange-700 disabled:bg-gray-200 dark:disabled:bg-gray-700 disabled:text-gray-400 dark:disabled:text-gray-500 text-white font-bold text-sm transition-colors flex items-center justify-center gap-2"
+          >
+            Continuar
+            {viceVoto && <ChevronRight className="w-4 h-4" />}
+          </button>
+        </div>
+
+        <p className="text-xs text-center text-gray-400 dark:text-gray-500">
+          O presidente da CIPA é designado pela empresa. Você está votando para vice-presidente.
+        </p>
+      </div>
+    </PageShell>
+  );
+
   if (step === 'confirming' && chapaSelected) return (
     <PageShell>
       <div className="max-w-md w-full mx-auto space-y-6">
@@ -322,8 +455,9 @@ export default function VotarEleicaoPage() {
           </p>
         </div>
 
+        {/* Chapa */}
         <div className="bg-orange-50 dark:bg-orange-900/20 border-2 border-orange-500 rounded-2xl p-6 text-center space-y-1">
-          <p className="text-xs uppercase tracking-widest text-orange-600 font-semibold">Sua escolha</p>
+          <p className="text-xs uppercase tracking-widest text-orange-600 font-semibold">Chapa escolhida</p>
           <p className="text-4xl font-black text-orange-600">
             {chapaSelected.nome ?? `Chapa ${String(chapaSelected.numero_chapa).padStart(2, '0')}`}
           </p>
@@ -331,6 +465,17 @@ export default function VotarEleicaoPage() {
           {chapaSelected.candidato_suplente && (
             <p className="text-sm text-gray-500 dark:text-gray-400">Suplente: {chapaSelected.candidato_suplente}</p>
           )}
+        </div>
+
+        {/* Vice-presidente */}
+        <div className="bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-2xl p-5 text-center space-y-1">
+          <p className="text-xs uppercase tracking-widest text-gray-500 dark:text-gray-400 font-semibold">Vice-presidente</p>
+          <p className="font-bold text-gray-900 dark:text-white text-lg">
+            {viceVoto === 'titular' ? chapaSelected.candidato_titular : chapaSelected.candidato_suplente}
+          </p>
+          <p className="text-xs text-gray-400 dark:text-gray-500">
+            {viceVoto === 'titular' ? 'Candidato titular' : 'Candidato suplente'} da chapa
+          </p>
         </div>
 
         <p className="text-sm text-center text-gray-500 dark:text-gray-400">
@@ -345,7 +490,7 @@ export default function VotarEleicaoPage() {
 
         <div className="flex gap-3">
           <button
-            onClick={() => setStep('voting')}
+            onClick={() => setStep('vice')}
             disabled={submitting}
             className="flex-1 py-3 rounded-xl border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-semibold text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
           >
@@ -453,11 +598,11 @@ export default function VotarEleicaoPage() {
 
         {/* Vote button */}
         <button
-          onClick={() => { if (selected) setStep('confirming'); }}
+          onClick={() => { if (selected) { setViceVoto(null); setStep('vice'); } }}
           disabled={!selected}
           className="w-full py-4 rounded-2xl bg-orange-600 hover:bg-orange-700 disabled:bg-gray-200 dark:disabled:bg-gray-700 disabled:text-gray-400 dark:disabled:text-gray-500 text-white font-bold text-base transition-colors flex items-center justify-center gap-2"
         >
-          Votar na chapa selecionada
+          Continuar com esta chapa
           {selected && <ChevronRight className="w-5 h-5" />}
         </button>
 
