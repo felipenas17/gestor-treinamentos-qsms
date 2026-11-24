@@ -137,6 +137,7 @@ interface CipaChapa {
   id: string;
   eleicao_id: string;
   numero_chapa: number;
+  nome: string | null;
   candidato_titular: string;
   candidato_suplente: string | null;
   created_at: string;
@@ -979,7 +980,7 @@ function EleicoesTab({ mandatos, eleicoes, onRefresh, toast }: {
   // ── Chapas ─────────────────────────────────────────────────────────────────
   const [chapas, setChapas]             = useState<CipaChapa[]>([]);
   const [showChapaForm, setShowChapaForm] = useState(false);
-  const [chapaForm, setChapaForm]       = useState({ candidato_titular: '', candidato_suplente: '' });
+  const [chapaForm, setChapaForm]       = useState({ nome: '', candidato_titular: '', candidato_suplente: '' });
 
   // ── Eleitores ──────────────────────────────────────────────────────────────
   const [eleitores, setEleitores]           = useState<CipaEleitor[]>([]);
@@ -1001,26 +1002,32 @@ function EleicoesTab({ mandatos, eleicoes, onRefresh, toast }: {
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setOrigin(window.location.origin); }, []);
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => {
-    if (!supabase) return;
-    supabase.from('employees').select('id,name,role').eq('status', 'Ativo').order('name')
-      .then(({ data }) => setEmployees(data ?? []));
-  }, []);
-
   const selectedEleicao = eleicoes.find(e => e.id === selectedEleicaoId) ?? null;
 
-  // ── Load detail data ───────────────────────────────────────────────────────
+  // ── Load detail data (auto-sync employees as eleitores) ────────────────────
   const loadDetail = useCallback(async (eleicaoId: string) => {
     if (!supabase) return;
     setLoadingDetail(true);
-    const [{ data: c }, { data: el }, { data: votos }] = await Promise.all([
+    const [{ data: c }, { data: el }, { data: votos }, { data: emps }] = await Promise.all([
       supabase.from('cipa_chapas').select('*').eq('eleicao_id', eleicaoId).order('numero_chapa'),
       supabase.from('cipa_eleitores').select('*').eq('eleicao_id', eleicaoId).order('nome'),
       supabase.from('cipa_votos').select('chapa_id').eq('eleicao_id', eleicaoId),
+      supabase.from('employees').select('id,name,role').eq('status', 'Ativo').order('name'),
     ]);
     setChapas(c ?? []);
-    setEleitores(el ?? []);
+    setEmployees(emps ?? []);
+
+    // Auto-sync: add any active employee not yet registered as eleitor
+    const jaAdicionados = new Set((el ?? []).map((e: CipaEleitor) => e.nome));
+    const novos = (emps ?? []).filter((e: { name: string }) => !jaAdicionados.has(e.name));
+    let elFinal = el ?? [];
+    if (novos.length > 0) {
+      await supabase.from('cipa_eleitores').insert(novos.map((e: { name: string }) => ({ eleicao_id: eleicaoId, nome: e.name })));
+      const { data: elUpdated } = await supabase.from('cipa_eleitores').select('*').eq('eleicao_id', eleicaoId).order('nome');
+      elFinal = elUpdated ?? [];
+    }
+    setEleitores(elFinal);
+
     const counts: Record<string, number> = {};
     (votos ?? []).forEach((v: { chapa_id: string }) => { counts[v.chapa_id] = (counts[v.chapa_id] ?? 0) + 1; });
     setResultados(counts);
@@ -1084,11 +1091,12 @@ function EleicoesTab({ mandatos, eleicoes, onRefresh, toast }: {
     await supabase.from('cipa_chapas').insert([{
       eleicao_id: selectedEleicaoId,
       numero_chapa: nextNum,
+      nome: chapaForm.nome.trim() || null,
       candidato_titular: chapaForm.candidato_titular.trim(),
       candidato_suplente: chapaForm.candidato_suplente.trim() || null,
     }]);
     setShowChapaForm(false);
-    setChapaForm({ candidato_titular: '', candidato_suplente: '' });
+    setChapaForm({ nome: '', candidato_titular: '', candidato_suplente: '' });
     setSaving(false);
     toast('Chapa registrada');
     await loadDetail(selectedEleicaoId);
@@ -1344,7 +1352,7 @@ ${eleitores.map(el => `<div class="card">
             <div className="space-y-3">
               <div className="flex justify-end">
                 <button
-                  onClick={() => { setChapaForm({ candidato_titular: '', candidato_suplente: '' }); setShowChapaForm(true); }}
+                  onClick={() => { setChapaForm({ nome: '', candidato_titular: '', candidato_suplente: '' }); setShowChapaForm(true); }}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-600 text-white text-xs font-semibold hover:bg-orange-700 transition-colors"
                 >
                   <Plus className="w-3.5 h-3.5" /> Nova Chapa
@@ -1360,9 +1368,12 @@ ${eleitores.map(el => `<div class="card">
                         {String(chapa.numero_chapa).padStart(2, '0')}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-sm text-gray-800 dark:text-gray-100">{chapa.candidato_titular}</p>
+                        <p className="font-semibold text-sm text-gray-800 dark:text-gray-100">
+                          {chapa.nome ?? `Chapa ${String(chapa.numero_chapa).padStart(2, '0')}`}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{chapa.candidato_titular}</p>
                         {chapa.candidato_suplente && (
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Suplente: {chapa.candidato_suplente}</p>
+                          <p className="text-xs text-gray-400 dark:text-gray-500">Suplente: {chapa.candidato_suplente}</p>
                         )}
                       </div>
                       <div className="text-xs font-semibold text-orange-600 dark:text-orange-400">
@@ -1385,22 +1396,14 @@ ${eleitores.map(el => `<div class="card">
                 <p className="text-xs text-gray-500 dark:text-gray-400">
                   {eleitores.filter(e => e.votou).length}/{eleitores.length} votaram
                 </p>
-                <div className="flex gap-2">
-                  {eleitores.length > 0 && origin && (
-                    <button
-                      onClick={printQrCodes}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                    >
-                      <Printer className="w-3.5 h-3.5" /> Imprimir QR Codes
-                    </button>
-                  )}
+                {eleitores.length > 0 && origin && (
                   <button
-                    onClick={() => { setEmpSearch(''); setShowEleitorForm(true); }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-600 text-white text-xs font-semibold hover:bg-orange-700 transition-colors"
+                    onClick={printQrCodes}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                   >
-                    <Plus className="w-3.5 h-3.5" /> Adicionar Eleitor
+                    <Printer className="w-3.5 h-3.5" /> Imprimir QR Codes
                   </button>
-                </div>
+                )}
               </div>
 
               {eleitores.length === 0 ? (
@@ -1545,85 +1548,37 @@ ${eleitores.map(el => `<div class="card">
 
       {showChapaForm && (
         <Modal title="Nova Chapa" onClose={() => setShowChapaForm(false)}>
-          <datalist id="cipa-employee-names">
-            {employees.map(e => <option key={e.id} value={e.name} />)}
-          </datalist>
           <div className="space-y-3">
+            <div>
+              <FLabel required>Nome da Chapa</FLabel>
+              <FInput
+                placeholder="Ex: Chapa Verde, Chapa Roberto, Chapa Azul…"
+                value={chapaForm.nome}
+                onChange={e => setChapaForm(p => ({ ...p, nome: e.target.value }))}
+                autoFocus
+              />
+            </div>
             <div>
               <FLabel required>Candidato Titular</FLabel>
               <FInput
-                list="cipa-employee-names"
                 placeholder="Nome completo do titular"
                 value={chapaForm.candidato_titular}
                 onChange={e => setChapaForm(p => ({ ...p, candidato_titular: e.target.value }))}
-                autoFocus
               />
             </div>
             <div>
               <FLabel>Candidato Suplente</FLabel>
               <FInput
-                list="cipa-employee-names"
                 placeholder="Nome completo do suplente (opcional)"
                 value={chapaForm.candidato_suplente}
                 onChange={e => setChapaForm(p => ({ ...p, candidato_suplente: e.target.value }))}
               />
             </div>
-            <p className="text-xs text-gray-400">O número da chapa será atribuído automaticamente ({chapas.length + 1}).</p>
+            <p className="text-xs text-gray-400">Nº da chapa atribuído automaticamente ({chapas.length + 1}).</p>
           </div>
           <ModalButtons onCancel={() => setShowChapaForm(false)} onSave={saveChapa} saving={saving} saveLabel="Registrar Chapa" />
         </Modal>
       )}
-
-      {showEleitorForm && (() => {
-        const jaAdicionados = new Set(eleitores.map(e => e.nome));
-        const disponiveis = employees
-          .filter(e => !jaAdicionados.has(e.name))
-          .filter(e => !empSearch || e.name.toLowerCase().includes(empSearch.toLowerCase()) || e.role.toLowerCase().includes(empSearch.toLowerCase()));
-        return (
-          <Modal title="Selecionar Eleitores" onClose={() => { setShowEleitorForm(false); setEmpSearch(''); }}>
-            <div className="space-y-3">
-              {/* Search */}
-              <input
-                type="text"
-                placeholder="Buscar por nome ou cargo..."
-                value={empSearch}
-                onChange={e => setEmpSearch(e.target.value)}
-                autoFocus
-                className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-500/40 focus:border-orange-400"
-              />
-
-              {/* Employee list */}
-              <div className="max-h-60 overflow-y-auto space-y-1 -mx-1 px-1">
-                {disponiveis.length === 0 ? (
-                  <p className="text-sm text-gray-400 text-center py-6">
-                    {employees.length === 0 ? 'Nenhum funcionário cadastrado' : 'Nenhum disponível para adicionar'}
-                  </p>
-                ) : disponiveis.map(e => (
-                  <button
-                    key={e.id}
-                    onClick={() => saveEleitor(e.name)}
-                    className="w-full text-left px-3 py-2.5 rounded-lg hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors group"
-                  >
-                    <p className="font-medium text-sm text-gray-800 dark:text-gray-100 group-hover:text-orange-700 dark:group-hover:text-orange-300">{e.name}</p>
-                    <p className="text-xs text-gray-400">{e.role}</p>
-                  </button>
-                ))}
-              </div>
-
-              {/* Import all */}
-              {employees.filter(e => !jaAdicionados.has(e.name)).length > 1 && (
-                <button
-                  onClick={importarTodosEleitores}
-                  disabled={saving}
-                  className="w-full py-2.5 rounded-lg border-2 border-dashed border-orange-300 dark:border-orange-700 text-orange-600 dark:text-orange-400 text-sm font-semibold hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors disabled:opacity-60"
-                >
-                  {saving ? 'Importando…' : `Importar todos (${employees.filter(e => !jaAdicionados.has(e.name)).length} funcionários)`}
-                </button>
-              )}
-            </div>
-          </Modal>
-        );
-      })()}
     </div>
   );
 }
