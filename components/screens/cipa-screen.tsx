@@ -1033,21 +1033,36 @@ function EleicoesTab({ mandatos, eleicoes, onRefresh, toast }: {
   }
 
   // ── Election CRUD ──────────────────────────────────────────────────────────
-  function openNew() { setEditing(null); setForm({ ...EMPTY_ELEICAO, mandato_id: mandatos[0]?.id ?? '' }); setShowForm(true); }
+  function openNew() { setEditing(null); setForm({ ...EMPTY_ELEICAO, mandato_id: '' }); setShowForm(true); }
   function openEdit(e: CipaEleicao) {
     setEditing(e);
-    setForm({ mandato_id: e.mandato_id ?? '', ano: String(e.ano), data_eleicao: e.data_eleicao ?? '', total_votantes: String(e.total_votantes ?? ''), total_votos: String(e.total_votos ?? ''), status: e.status, edital_url: e.edital_url ?? '', ata_url: e.ata_url ?? '', observacoes: e.observacoes ?? '' });
+    setForm({ mandato_id: e.mandato_id ?? '', ano: String(e.ano), data_eleicao: e.data_eleicao ?? '', total_votantes: '', total_votos: '', status: e.status, edital_url: e.edital_url ?? '', ata_url: e.ata_url ?? '', observacoes: e.observacoes ?? '' });
     setShowForm(true);
   }
   async function save() {
     if (!supabase) return;
     setSaving(true);
-    const payload = { mandato_id: form.mandato_id || null, ano: Number(form.ano), data_eleicao: form.data_eleicao || null, total_votantes: form.total_votantes ? Number(form.total_votantes) : null, total_votos: form.total_votos ? Number(form.total_votos) : null, status: form.status, edital_url: form.edital_url || null, ata_url: form.ata_url || null, observacoes: form.observacoes || null };
-    if (editing) await supabase.from('cipa_eleicoes').update(payload).eq('id', editing.id);
-    else await supabase.from('cipa_eleicoes').insert([payload]);
-    setShowForm(false); setSaving(false);
-    toast(editing ? 'Eleição atualizada' : 'Eleição registrada');
-    await onRefresh();
+    const payload = {
+      mandato_id: form.mandato_id || null,
+      ano: Number(form.ano),
+      data_eleicao: form.data_eleicao || null,
+      status: editing ? form.status : 'planejada' as const,
+      edital_url: editing ? (form.edital_url || null) : null,
+      ata_url: editing ? (form.ata_url || null) : null,
+      observacoes: form.observacoes || null,
+    };
+    if (editing) {
+      await supabase.from('cipa_eleicoes').update(payload).eq('id', editing.id);
+      setShowForm(false); setSaving(false);
+      toast('Eleição atualizada');
+      await onRefresh();
+    } else {
+      const { data: row } = await supabase.from('cipa_eleicoes').insert([payload]).select('id').single();
+      setShowForm(false); setSaving(false);
+      toast('Eleição criada! Adicione chapas e eleitores.', 'success');
+      await onRefresh();
+      if (row?.id) selectEleicao(row.id);
+    }
   }
   async function del(id: string) { if (!supabase) return; await supabase.from('cipa_eleicoes').delete().eq('id', id); toast('Removido'); await onRefresh(); }
 
@@ -1181,16 +1196,26 @@ ${eleitores.map(el => `<div class="card">
       )}
       {showForm && (
         <Modal title={editing ? 'Editar Eleição' : 'Nova Eleição'} onClose={() => setShowForm(false)}>
+          {!editing && (
+            <div className="mb-4 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg px-4 py-3 text-xs text-orange-700 dark:text-orange-300 leading-relaxed">
+              Depois de criar, você será levado direto para gerenciar a eleição — onde adiciona as <strong>chapas</strong>, os <strong>eleitores</strong> e gera os <strong>QR Codes</strong>.
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-4">
-            <div><FLabel required>Ano</FLabel><FInput type="number" value={form.ano} onChange={e => setForm(p => ({ ...p, ano: e.target.value }))} /></div>
+            <div><FLabel required>Ano</FLabel><FInput type="number" value={form.ano} onChange={e => setForm(p => ({ ...p, ano: e.target.value }))} autoFocus /></div>
             <div><FLabel>Data da eleição</FLabel><FInput type="date" value={form.data_eleicao} onChange={e => setForm(p => ({ ...p, data_eleicao: e.target.value }))} /></div>
-            <div><FLabel>Status</FLabel><FSelect value={form.status} onChange={e => setForm(p => ({ ...p, status: e.target.value as EleicaoForm['status'] }))}><option value="planejada">Planejada</option><option value="em_andamento">Em andamento</option><option value="concluida">Concluída</option></FSelect></div>
-            <div><FLabel>Mandato</FLabel><FSelect value={form.mandato_id} onChange={e => setForm(p => ({ ...p, mandato_id: e.target.value }))}><option value="">Nenhum</option>{mandatos.map(m => <option key={m.id} value={m.id}>{m.titulo}</option>)}</FSelect></div>
-            <div><FLabel>URL do edital</FLabel><FInput value={form.edital_url} onChange={e => setForm(p => ({ ...p, edital_url: e.target.value }))} placeholder="https://..." /></div>
-            <div><FLabel>URL da ata</FLabel><FInput value={form.ata_url} onChange={e => setForm(p => ({ ...p, ata_url: e.target.value }))} placeholder="https://..." /></div>
+            <div className="col-span-2"><FLabel>Mandato vinculado</FLabel><FSelect value={form.mandato_id} onChange={e => setForm(p => ({ ...p, mandato_id: e.target.value }))}><option value="">Nenhum (definir depois)</option>{mandatos.map(m => <option key={m.id} value={m.id}>{m.titulo}</option>)}</FSelect></div>
+            {editing && (
+              <>
+                <div><FLabel>Status</FLabel><FSelect value={form.status} onChange={e => setForm(p => ({ ...p, status: e.target.value as EleicaoForm['status'] }))}><option value="planejada">Planejada</option><option value="em_andamento">Em andamento</option><option value="concluida">Concluída</option></FSelect></div>
+                <div></div>
+                <div><FLabel>URL do edital</FLabel><FInput value={form.edital_url} onChange={e => setForm(p => ({ ...p, edital_url: e.target.value }))} placeholder="https://..." /></div>
+                <div><FLabel>URL da ata</FLabel><FInput value={form.ata_url} onChange={e => setForm(p => ({ ...p, ata_url: e.target.value }))} placeholder="https://..." /></div>
+              </>
+            )}
             <div className="col-span-2"><FLabel>Observações</FLabel><FTextarea rows={2} value={form.observacoes} onChange={e => setForm(p => ({ ...p, observacoes: e.target.value }))} /></div>
           </div>
-          <ModalButtons onCancel={() => setShowForm(false)} onSave={save} saving={saving} />
+          <ModalButtons onCancel={() => setShowForm(false)} onSave={save} saving={saving} saveLabel={editing ? 'Salvar' : 'Criar Eleição'} />
         </Modal>
       )}
     </div>
@@ -1484,10 +1509,10 @@ ${eleitores.map(el => `<div class="card">
       </div>
 
       {/* ── Modals ─────────────────────────────────────────────────────────── */}
-      {showForm && (
-        <Modal title={editing ? 'Editar Eleição' : 'Nova Eleição'} onClose={() => setShowForm(false)}>
+      {showForm && editing && (
+        <Modal title="Editar Eleição" onClose={() => setShowForm(false)}>
           <div className="grid grid-cols-2 gap-4">
-            <div><FLabel required>Ano</FLabel><FInput type="number" value={form.ano} onChange={e => setForm(p => ({ ...p, ano: e.target.value }))} /></div>
+            <div><FLabel required>Ano</FLabel><FInput type="number" value={form.ano} onChange={e => setForm(p => ({ ...p, ano: e.target.value }))} autoFocus /></div>
             <div><FLabel>Data da eleição</FLabel><FInput type="date" value={form.data_eleicao} onChange={e => setForm(p => ({ ...p, data_eleicao: e.target.value }))} /></div>
             <div><FLabel>Status</FLabel><FSelect value={form.status} onChange={e => setForm(p => ({ ...p, status: e.target.value as EleicaoForm['status'] }))}><option value="planejada">Planejada</option><option value="em_andamento">Em andamento</option><option value="concluida">Concluída</option></FSelect></div>
             <div><FLabel>Mandato</FLabel><FSelect value={form.mandato_id} onChange={e => setForm(p => ({ ...p, mandato_id: e.target.value }))}><option value="">Nenhum</option>{mandatos.map(m => <option key={m.id} value={m.id}>{m.titulo}</option>)}</FSelect></div>
