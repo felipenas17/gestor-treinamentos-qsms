@@ -18,6 +18,7 @@ import {
   BarChart3,
   Activity,
   FileCheck2,
+  Layers,
 } from 'lucide-react';
 
 interface NavItem {
@@ -121,6 +122,14 @@ const MODULES: Module[] = [
           { id: 'acidentes-indicadores', label: 'TFCA / TFSA', sublabel: 'Indicadores de Acidentes', icon: Activity },
           { id: 'pt-pet',  label: 'PT / PET',   sublabel: 'Permissões de Trabalho',  icon: FileCheck2 },
           { id: 'epi-epc', label: 'EPI / EPC',  sublabel: 'Gestão de Equipamentos',  icon: Shield     },
+        ],
+      },
+      {
+        id: 'gestao-riscos',
+        label: 'Gestão de Riscos',
+        icon: AlertTriangle,
+        items: [
+          { id: 'laaipr', label: 'LAAIPR', sublabel: 'Aspectos, Impactos e Riscos', icon: Layers },
         ],
       },
     ],

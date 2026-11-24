@@ -32,6 +32,7 @@ import { SstProgramsScreen } from '@/components/screens/sst-programs-screen';
 import { AccidentIndicatorsScreen } from '@/components/screens/accident-indicators-screen';
 import { PtPetScreen } from '@/components/screens/pt-pet-screen';
 import { EpiScreen } from '@/components/screens/epi-screen';
+import { LaaiprScreen } from '@/components/screens/laaipr-screen';
 // import { ImportDocumentModal } from '@/components/modals/import-document-modal'; // modal não ativo
 
 import {
@@ -1684,6 +1685,9 @@ export default function GestorTreinamentosApp() {
           )}
           {currentTab === 'epi-epc' && (
             <EpiScreen onToast={showToast} />
+          )}
+          {currentTab === 'laaipr' && (
+            <LaaiprScreen onToast={showToast} />
           )}
         </main>
       </div>
