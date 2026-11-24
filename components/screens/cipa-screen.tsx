@@ -984,8 +984,11 @@ function EleicoesTab({ mandatos, eleicoes, onRefresh, toast }: {
   // ── Eleitores ──────────────────────────────────────────────────────────────
   const [eleitores, setEleitores]           = useState<CipaEleitor[]>([]);
   const [showEleitorForm, setShowEleitorForm] = useState(false);
-  const [eleitorForm, setEleitorForm]       = useState({ nome: '' });
+  const [empSearch, setEmpSearch]           = useState('');
   const [expandedQr, setExpandedQr]         = useState<string | null>(null);
+
+  // ── Employees (para seletor) ───────────────────────────────────────────────
+  const [employees, setEmployees] = useState<{ id: string; name: string; role: string }[]>([]);
 
   // ── Results ────────────────────────────────────────────────────────────────
   const [resultados, setResultados] = useState<Record<string, number>>({});
@@ -997,6 +1000,13 @@ function EleicoesTab({ mandatos, eleicoes, onRefresh, toast }: {
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setOrigin(window.location.origin); }, []);
+
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => {
+    if (!supabase) return;
+    supabase.from('employees').select('id,name,role').eq('status', 'Ativo').order('name')
+      .then(({ data }) => setEmployees(data ?? []));
+  }, []);
 
   const selectedEleicao = eleicoes.find(e => e.id === selectedEleicaoId) ?? null;
 
@@ -1091,15 +1101,24 @@ function EleicoesTab({ mandatos, eleicoes, onRefresh, toast }: {
   }
 
   // ── Eleitor CRUD ───────────────────────────────────────────────────────────
-  async function saveEleitor() {
-    if (!supabase || !selectedEleicaoId || !eleitorForm.nome.trim()) return;
-    setSaving(true);
-    await supabase.from('cipa_eleitores').insert([{ eleicao_id: selectedEleicaoId, nome: eleitorForm.nome.trim() }]);
-    setShowEleitorForm(false);
-    setEleitorForm({ nome: '' });
-    setSaving(false);
-    toast('Eleitor adicionado');
+  async function saveEleitor(nome: string) {
+    if (!supabase || !selectedEleicaoId || !nome.trim()) return;
+    await supabase.from('cipa_eleitores').insert([{ eleicao_id: selectedEleicaoId, nome: nome.trim() }]);
     await loadDetail(selectedEleicaoId);
+  }
+
+  async function importarTodosEleitores() {
+    if (!supabase || !selectedEleicaoId) return;
+    const jaAdicionados = new Set(eleitores.map(e => e.nome));
+    const novos = employees.filter(e => !jaAdicionados.has(e.name));
+    if (novos.length === 0) { toast('Todos os funcionários já foram adicionados'); return; }
+    setSaving(true);
+    await supabase.from('cipa_eleitores').insert(novos.map(e => ({ eleicao_id: selectedEleicaoId, nome: e.name })));
+    setSaving(false);
+    setShowEleitorForm(false);
+    setEmpSearch('');
+    await loadDetail(selectedEleicaoId);
+    toast(`${novos.length} eleitores importados`, 'success');
   }
   async function deleteEleitor(id: string) {
     if (!supabase || !selectedEleicaoId) return;
@@ -1376,7 +1395,7 @@ ${eleitores.map(el => `<div class="card">
                     </button>
                   )}
                   <button
-                    onClick={() => { setEleitorForm({ nome: '' }); setShowEleitorForm(true); }}
+                    onClick={() => { setEmpSearch(''); setShowEleitorForm(true); }}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-600 text-white text-xs font-semibold hover:bg-orange-700 transition-colors"
                   >
                     <Plus className="w-3.5 h-3.5" /> Adicionar Eleitor
@@ -1526,10 +1545,14 @@ ${eleitores.map(el => `<div class="card">
 
       {showChapaForm && (
         <Modal title="Nova Chapa" onClose={() => setShowChapaForm(false)}>
+          <datalist id="cipa-employee-names">
+            {employees.map(e => <option key={e.id} value={e.name} />)}
+          </datalist>
           <div className="space-y-3">
             <div>
               <FLabel required>Candidato Titular</FLabel>
               <FInput
+                list="cipa-employee-names"
                 placeholder="Nome completo do titular"
                 value={chapaForm.candidato_titular}
                 onChange={e => setChapaForm(p => ({ ...p, candidato_titular: e.target.value }))}
@@ -1539,6 +1562,7 @@ ${eleitores.map(el => `<div class="card">
             <div>
               <FLabel>Candidato Suplente</FLabel>
               <FInput
+                list="cipa-employee-names"
                 placeholder="Nome completo do suplente (opcional)"
                 value={chapaForm.candidato_suplente}
                 onChange={e => setChapaForm(p => ({ ...p, candidato_suplente: e.target.value }))}
@@ -1550,21 +1574,56 @@ ${eleitores.map(el => `<div class="card">
         </Modal>
       )}
 
-      {showEleitorForm && (
-        <Modal title="Adicionar Eleitor" onClose={() => setShowEleitorForm(false)}>
-          <div>
-            <FLabel required>Nome do Eleitor</FLabel>
-            <FInput
-              placeholder="Nome completo"
-              value={eleitorForm.nome}
-              onChange={e => setEleitorForm({ nome: e.target.value })}
-              autoFocus
-            />
-            <p className="text-xs text-gray-400 mt-2">Um QR Code exclusivo será gerado automaticamente para este eleitor.</p>
-          </div>
-          <ModalButtons onCancel={() => setShowEleitorForm(false)} onSave={saveEleitor} saving={saving} saveLabel="Adicionar" />
-        </Modal>
-      )}
+      {showEleitorForm && (() => {
+        const jaAdicionados = new Set(eleitores.map(e => e.nome));
+        const disponiveis = employees
+          .filter(e => !jaAdicionados.has(e.name))
+          .filter(e => !empSearch || e.name.toLowerCase().includes(empSearch.toLowerCase()) || e.role.toLowerCase().includes(empSearch.toLowerCase()));
+        return (
+          <Modal title="Selecionar Eleitores" onClose={() => { setShowEleitorForm(false); setEmpSearch(''); }}>
+            <div className="space-y-3">
+              {/* Search */}
+              <input
+                type="text"
+                placeholder="Buscar por nome ou cargo..."
+                value={empSearch}
+                onChange={e => setEmpSearch(e.target.value)}
+                autoFocus
+                className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-500/40 focus:border-orange-400"
+              />
+
+              {/* Employee list */}
+              <div className="max-h-60 overflow-y-auto space-y-1 -mx-1 px-1">
+                {disponiveis.length === 0 ? (
+                  <p className="text-sm text-gray-400 text-center py-6">
+                    {employees.length === 0 ? 'Nenhum funcionário cadastrado' : 'Nenhum disponível para adicionar'}
+                  </p>
+                ) : disponiveis.map(e => (
+                  <button
+                    key={e.id}
+                    onClick={() => saveEleitor(e.name)}
+                    className="w-full text-left px-3 py-2.5 rounded-lg hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors group"
+                  >
+                    <p className="font-medium text-sm text-gray-800 dark:text-gray-100 group-hover:text-orange-700 dark:group-hover:text-orange-300">{e.name}</p>
+                    <p className="text-xs text-gray-400">{e.role}</p>
+                  </button>
+                ))}
+              </div>
+
+              {/* Import all */}
+              {employees.filter(e => !jaAdicionados.has(e.name)).length > 1 && (
+                <button
+                  onClick={importarTodosEleitores}
+                  disabled={saving}
+                  className="w-full py-2.5 rounded-lg border-2 border-dashed border-orange-300 dark:border-orange-700 text-orange-600 dark:text-orange-400 text-sm font-semibold hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors disabled:opacity-60"
+                >
+                  {saving ? 'Importando…' : `Importar todos (${employees.filter(e => !jaAdicionados.has(e.name)).length} funcionários)`}
+                </button>
+              )}
+            </div>
+          </Modal>
+        );
+      })()}
     </div>
   );
 }
