@@ -5,7 +5,7 @@ import {
   Users, Calendar, Vote, Megaphone, BookOpen,
   ClipboardList, Map, Newspaper, Plus, RefreshCw,
   ChevronDown, ChevronUp, Pencil, Trash2, Check, X,
-  FileText, AlertCircle, Clock, QrCode, Printer,
+  FileText, AlertCircle, Clock, Printer,
   BarChart2, UserCheck, ExternalLink, ChevronRight,
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
@@ -984,12 +984,6 @@ function EleicoesTab({ mandatos, eleicoes, onRefresh, toast }: {
 
   // ── Eleitores ──────────────────────────────────────────────────────────────
   const [eleitores, setEleitores]           = useState<CipaEleitor[]>([]);
-  const [showEleitorForm, setShowEleitorForm] = useState(false);
-  const [empSearch, setEmpSearch]           = useState('');
-  const [expandedQr, setExpandedQr]         = useState<string | null>(null);
-
-  // ── Employees (para seletor) ───────────────────────────────────────────────
-  const [employees, setEmployees] = useState<{ id: string; name: string; role: string }[]>([]);
 
   // ── Results ────────────────────────────────────────────────────────────────
   const [resultados, setResultados] = useState<Record<string, number>>({});
@@ -1015,17 +1009,33 @@ function EleicoesTab({ mandatos, eleicoes, onRefresh, toast }: {
       supabase.from('employees').select('id,name,role').eq('status', 'Ativo').order('name'),
     ]);
     setChapas(c ?? []);
-    setEmployees(emps ?? []);
 
     // Auto-sync: add any active employee not yet registered as eleitor
     const jaAdicionados = new Set((el ?? []).map((e: CipaEleitor) => e.nome));
-    const novos = (emps ?? []).filter((e: { name: string }) => !jaAdicionados.has(e.name));
+    const novos = (emps ?? []).filter((e: { id: string; name: string }) => !jaAdicionados.has(e.name));
     let elFinal = el ?? [];
     if (novos.length > 0) {
-      await supabase.from('cipa_eleitores').insert(novos.map((e: { name: string }) => ({ eleicao_id: eleicaoId, nome: e.name })));
+      await supabase.from('cipa_eleitores').insert(novos.map((e: { id: string; name: string }) => ({ eleicao_id: eleicaoId, nome: e.name, employee_id: e.id })));
       const { data: elUpdated } = await supabase.from('cipa_eleitores').select('*').eq('eleicao_id', eleicaoId).order('nome');
       elFinal = elUpdated ?? [];
     }
+
+    // Backfill employee_id for existing eleitores that have it null
+    const semEmployeeId = (elFinal).filter((e: CipaEleitor & { employee_id?: string | null }) => !e.employee_id);
+    if (semEmployeeId.length > 0 && emps) {
+      const empByName: Record<string, string> = {};
+      (emps as { id: string; name: string }[]).forEach(e => { empByName[e.name] = e.id; });
+      await Promise.all(
+        semEmployeeId.map((el: CipaEleitor) => {
+          const empId = empByName[el.nome];
+          if (!empId) return Promise.resolve();
+          return supabase!.from('cipa_eleitores').update({ employee_id: empId }).eq('id', el.id);
+        })
+      );
+      const { data: elUpdated2 } = await supabase.from('cipa_eleitores').select('*').eq('eleicao_id', eleicaoId).order('nome');
+      elFinal = elUpdated2 ?? elFinal;
+    }
+
     setEleitores(elFinal);
 
     const counts: Record<string, number> = {};
@@ -1109,25 +1119,6 @@ function EleicoesTab({ mandatos, eleicoes, onRefresh, toast }: {
   }
 
   // ── Eleitor CRUD ───────────────────────────────────────────────────────────
-  async function saveEleitor(nome: string) {
-    if (!supabase || !selectedEleicaoId || !nome.trim()) return;
-    await supabase.from('cipa_eleitores').insert([{ eleicao_id: selectedEleicaoId, nome: nome.trim() }]);
-    await loadDetail(selectedEleicaoId);
-  }
-
-  async function importarTodosEleitores() {
-    if (!supabase || !selectedEleicaoId) return;
-    const jaAdicionados = new Set(eleitores.map(e => e.nome));
-    const novos = employees.filter(e => !jaAdicionados.has(e.name));
-    if (novos.length === 0) { toast('Todos os funcionários já foram adicionados'); return; }
-    setSaving(true);
-    await supabase.from('cipa_eleitores').insert(novos.map(e => ({ eleicao_id: selectedEleicaoId, nome: e.name })));
-    setSaving(false);
-    setShowEleitorForm(false);
-    setEmpSearch('');
-    await loadDetail(selectedEleicaoId);
-    toast(`${novos.length} eleitores importados`, 'success');
-  }
   async function deleteEleitor(id: string) {
     if (!supabase || !selectedEleicaoId) return;
     await supabase.from('cipa_eleitores').delete().eq('id', id);
@@ -1135,27 +1126,31 @@ function EleicoesTab({ mandatos, eleicoes, onRefresh, toast }: {
     await loadDetail(selectedEleicaoId);
   }
 
-  // ── Print QR Codes ─────────────────────────────────────────────────────────
+  // ── Print QR Code (único por eleição) ─────────────────────────────────────
   function printQrCodes() {
-    if (!selectedEleicao || eleitores.length === 0 || !origin) return;
-    const html = `<!doctype html><html><head><title>QR Codes CIPA ${selectedEleicao.ano}</title>
+    if (!selectedEleicao || !selectedEleicaoId || !origin) return;
+    const url = `${origin}/votar/eleicao/${selectedEleicaoId}`;
+    const html = `<!doctype html><html><head><title>QR Code Votação CIPA ${selectedEleicao.ano}</title>
 <style>
-  body{font-family:Arial,sans-serif;margin:0;padding:24px;background:#fff;color:#111}
-  h2{text-align:center;margin-bottom:4px}p.sub{text-align:center;color:#666;margin:0 0 24px}
-  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-  .card{border:1px solid #ddd;padding:16px;text-align:center;border-radius:8px;page-break-inside:avoid}
-  .name{font-weight:700;margin-top:8px;font-size:14px}.stat{font-size:11px;color:#888;margin-top:3px}
+  body{font-family:Arial,sans-serif;margin:0;padding:40px;background:#fff;color:#111;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh}
+  h2{text-align:center;margin-bottom:4px;font-size:28px}
+  p.sub{text-align:center;color:#666;margin:0 0 32px;font-size:16px}
+  .box{border:3px solid #ea580c;border-radius:16px;padding:32px;text-align:center;max-width:420px}
+  .url{font-size:11px;color:#888;margin-top:16px;word-break:break-all;font-family:monospace}
+  .inst{margin-top:20px;font-size:14px;color:#444;line-height:1.6}
   img{display:block;margin:0 auto}
-  @media print{body{padding:12px}.grid{gap:12px}}
+  @media print{body{padding:24px}}
 </style></head><body>
-<h2>Eleição CIPA ${selectedEleicao.ano}</h2>
-<p class="sub">QR Codes para votação • ${eleitores.length} eleitores</p>
-<div class="grid">
-${eleitores.map(el => `<div class="card">
-  <img src="https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(origin + '/votar/' + el.token_voto)}" width="160" height="160" alt="QR ${el.nome}" />
-  <div class="name">${el.nome}</div>
-  <div class="stat">${el.votou ? '✓ Já votou' : 'Aguardando voto'}</div>
-</div>`).join('')}
+<div class="box">
+  <h2>Eleição CIPA ${selectedEleicao.ano}</h2>
+  <p class="sub">Escaneie para votar</p>
+  <img src="https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(url)}&color=000000&bgcolor=ffffff&margin=10" width="280" height="280" alt="QR Code Votação" />
+  <div class="url">${url}</div>
+  <div class="inst">
+    1. Aponte a câmera do celular para o QR Code<br>
+    2. Informe seu CPF e nome completo<br>
+    3. Escolha sua chapa e confirme o voto
+  </div>
 </div>
 <script>window.addEventListener('load',()=>{setTimeout(()=>window.print(),400)})<\/script>
 </body></html>`;
@@ -1391,74 +1386,71 @@ ${eleitores.map(el => `<div class="card">
 
           {/* ── Eleitores ───────────────────────────────────────────────── */}
           {subTab === 'eleitores' && (
-            <div className="space-y-3">
+            <div className="space-y-4">
+
+              {/* QR Code único da eleição */}
+              {origin && selectedEleicaoId && (
+                <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-2xl p-4">
+                  <div className="flex items-start gap-4">
+                    <div className="flex-shrink-0 bg-white dark:bg-gray-800 rounded-xl p-2 border border-orange-200 dark:border-orange-700">
+                      <QRCodeSVG
+                        value={`${origin}/votar/eleicao/${selectedEleicaoId}`}
+                        size={100}
+                        includeMargin={false}
+                        level="M"
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-orange-700 dark:text-orange-300">QR Code da Votação</p>
+                      <p className="text-xs text-orange-600/70 dark:text-orange-400/70 mt-0.5 mb-2">
+                        Exiba ou imprima este QR. O eleitor escaneia, digita CPF + nome e vota.
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 font-mono break-all leading-tight">
+                        {`${origin}/votar/eleicao/${selectedEleicaoId}`}
+                      </p>
+                      <div className="flex gap-2 mt-3">
+                        <button
+                          onClick={printQrCodes}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-600 text-white text-xs font-semibold hover:bg-orange-700 transition-colors"
+                        >
+                          <Printer className="w-3.5 h-3.5" /> Imprimir QR
+                        </button>
+                        <a
+                          href={`${origin}/votar/eleicao/${selectedEleicaoId}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-orange-300 dark:border-orange-700 text-orange-700 dark:text-orange-300 text-xs font-medium hover:bg-orange-100 dark:hover:bg-orange-900/30 transition-colors"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" /> Abrir link
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Header: contagem */}
               <div className="flex items-center justify-between">
                 <p className="text-xs text-gray-500 dark:text-gray-400">
                   {eleitores.filter(e => e.votou).length}/{eleitores.length} votaram
                 </p>
-                {eleitores.length > 0 && origin && (
-                  <button
-                    onClick={printQrCodes}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                  >
-                    <Printer className="w-3.5 h-3.5" /> Imprimir QR Codes
-                  </button>
-                )}
               </div>
 
               {eleitores.length === 0 ? (
                 <EmptyState icon={UserCheck} text="Nenhum eleitor registrado" />
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   {eleitores.map(el => (
-                    <div key={el.id} className="bg-gray-50 dark:bg-gray-700/40 rounded-xl overflow-hidden">
-                      <div className="flex items-center gap-3 px-4 py-3">
-                        {/* Vote status dot */}
-                        <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${el.votou ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'}`} />
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm text-gray-800 dark:text-gray-100">{el.nome}</p>
-                          <p className="text-xs text-gray-400">{el.votou ? `Votou em ${fmtDate(el.data_voto)}` : 'Ainda não votou'}</p>
-                        </div>
-
-                        {/* QR toggle */}
-                        <button
-                          onClick={() => setExpandedQr(expandedQr === el.id ? null : el.id)}
-                          className="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium border border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-700 transition-colors"
-                        >
-                          <QrCode className="w-3.5 h-3.5" />
-                          QR
-                        </button>
-
-                        {/* Open voting link */}
-                        {origin && (
-                          <a
-                            href={`${origin}/votar/${el.token_voto}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-400 flex-shrink-0"
-                          >
-                            <ExternalLink className="w-3.5 h-3.5" />
-                          </a>
-                        )}
-                        <button onClick={() => deleteEleitor(el.id)} className="p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-red-400 flex-shrink-0">
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                    <div key={el.id} className="flex items-center gap-3 px-4 py-2.5 bg-gray-50 dark:bg-gray-700/40 rounded-xl">
+                      {/* Vote status dot */}
+                      <div className={`w-2 h-2 rounded-full flex-shrink-0 ${el.votou ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'}`} />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm text-gray-800 dark:text-gray-100 truncate">{el.nome}</p>
+                        <p className="text-xs text-gray-400">{el.votou ? `Votou em ${fmtDate(el.data_voto)}` : 'Aguardando voto'}</p>
                       </div>
-
-                      {/* Expanded QR code */}
-                      {expandedQr === el.id && origin && (
-                        <div className="border-t border-gray-200 dark:border-gray-600 px-4 py-4 flex flex-col items-center gap-3 bg-white dark:bg-gray-800">
-                          <QRCodeSVG
-                            value={`${origin}/votar/${el.token_voto}`}
-                            size={160}
-                            includeMargin
-                            level="M"
-                          />
-                          <p className="text-xs text-gray-500 font-mono break-all text-center max-w-xs">
-                            {`${origin}/votar/${el.token_voto}`}
-                          </p>
-                        </div>
-                      )}
+                      <button onClick={() => deleteEleitor(el.id)} className="p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-red-400 flex-shrink-0">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   ))}
                 </div>
