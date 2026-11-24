@@ -343,6 +343,7 @@ export function LaaiprScreen({ onToast }: Props) {
     }
   }, [onToast]);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { load(); }, [load]);
 
   // Unique setor list
