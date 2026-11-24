@@ -300,10 +300,10 @@ export function CertificatesScreen({
   useEffect(() => {
     if (!supabase) return;
     (async () => {
-      // Step 1 — fetch responses
+      // Step 1 — fetch responses (join employees to get CPF)
       const { data: responses } = await supabase
         .from('responses')
-        .select('id,employee_cpf,employee_signature,completed_at,link_id')
+        .select('id,employee_signature,completed_at,link_id,employees!employee_id(cpf_masked)')
         .eq('status','Entregue')
         .order('completed_at',{ascending:false});
       if (!responses?.length) return;
@@ -322,7 +322,7 @@ export function CertificatesScreen({
       const map: Record<string,{cpf:string;signature:string;responseId:string}> = {};
       for (const r of responses as any[]) {
         const pc = aMap[linkMap[r.link_id]];
-        if (pc && !map[pc]) map[pc]={ cpf: r.employee_cpf||'', signature: r.employee_signature||'', responseId: r.id };
+        if (pc && !map[pc]) map[pc]={ cpf: (r.employees as any)?.cpf_masked||'', signature: r.employee_signature||'', responseId: r.id };
       }
       setResponsesMap(map);
     })();
