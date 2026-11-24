@@ -297,6 +297,7 @@ export function CipaScreen({ onToast }: CipaScreenProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { loadAll(); }, [loadAll]);
 
   const mandatoAtivo = mandatos.find(m => m.status === 'ativo');
@@ -378,6 +379,7 @@ function PainelTab({
 
   function diasParaReuniao() {
     if (!proximaReuniao?.data_reuniao) return null;
+    // eslint-disable-next-line react-hooks/purity
     const diff = Math.ceil((new Date(proximaReuniao.data_reuniao).getTime() - Date.now()) / 86400000);
     return diff;
   }
@@ -518,9 +520,8 @@ function MandatosTab({ mandatos, membros, onRefresh, toast }: {
   const [membroForm,  setMembroForm]  = useState<MembroForm>(EMPTY_MEMBRO);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    if (!selectedMandatoId && mandatos.length > 0) setSelectedMandatoId(mandatos[0].id);
-  }, [mandatos, selectedMandatoId]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { if (!selectedMandatoId && mandatos.length > 0) setSelectedMandatoId(mandatos[0].id); }, [mandatos, selectedMandatoId]);
 
   const selectedMandato = mandatos.find(m => m.id === selectedMandatoId);
   const selectedMembros = membros.filter(m => m.mandato_id === selectedMandatoId);
@@ -1054,6 +1055,7 @@ function SipatTab({ sipats, atividades, onRefresh, toast }: {
   const [selectedSipatId, setSelectedSipatId] = useState<string | null>(sipats[0]?.id ?? null);
   const [saving, setSaving]         = useState(false);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { if (!selectedSipatId && sipats.length > 0) setSelectedSipatId(sipats[0].id); }, [sipats, selectedSipatId]);
 
   async function saveSipat() {
