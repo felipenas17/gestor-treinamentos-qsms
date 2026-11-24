@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   Search, X, Layers, Leaf, Shield, RefreshCw, Eye,
-  ChevronDown, ChevronLeft, ChevronRight, Loader2,
+  ChevronDown, ChevronLeft, ChevronRight, Loader2, Plus, Pencil, Save,
 } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 
@@ -31,6 +31,29 @@ interface LaaiprRecord {
   ciclo_vida: string | null;
   created_at: string;
 }
+
+type FormData = Omit<LaaiprRecord, 'id' | 'created_at'>;
+
+const EMPTY_FORM: FormData = {
+  setor: '',
+  atividade: '',
+  aspecto_perigo: '',
+  situacao: 'N',
+  impacto_risco: '',
+  referencia: 'SS',
+  origem: 'D',
+  classe: 'A',
+  temporalidade: 'A',
+  abrangencia: 1,
+  freq_prob: 1,
+  severidade: 1,
+  partes_interessadas: 'N',
+  requisito_legal: '',
+  importancia: 2,
+  significancia: 'N',
+  controles_disponiveis: '',
+  ciclo_vida: '',
+};
 
 interface Props {
   onToast: (msg: string, type?: 'success' | 'error') => void;
@@ -171,9 +194,357 @@ function ToggleGroup<T extends string>({ prefix, options, value, onChange }: {
   );
 }
 
+// ─── Form label helper ────────────────────────────────────────────────────────
+
+function FLabel({ children }: { children: React.ReactNode }) {
+  return <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">{children}</label>;
+}
+
+function FInput({
+  value, onChange, placeholder, required,
+}: {
+  value: string; onChange: (v: string) => void; placeholder?: string; required?: boolean;
+}) {
+  return (
+    <input
+      type="text"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      required={required}
+      className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400"
+    />
+  );
+}
+
+function FTextarea({ value, onChange, placeholder, rows = 2 }: {
+  value: string; onChange: (v: string) => void; placeholder?: string; rows?: number;
+}) {
+  return (
+    <textarea
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      rows={rows}
+      className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 resize-none"
+    />
+  );
+}
+
+function FSelect({ value, onChange, children }: {
+  value: string | number; onChange: (v: string) => void; children: React.ReactNode;
+}) {
+  return (
+    <div className="relative">
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full appearance-none pl-3 pr-7 py-2 text-sm border border-slate-200 rounded-lg bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-300 cursor-pointer"
+      >
+        {children}
+      </select>
+      <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+    </div>
+  );
+}
+
+// ─── Form Modal ───────────────────────────────────────────────────────────────
+
+function FormModal({
+  initial,
+  setores,
+  saving,
+  onSave,
+  onClose,
+}: {
+  initial: FormData;
+  setores: string[];
+  saving: boolean;
+  onSave: (data: FormData) => void;
+  onClose: () => void;
+}) {
+  const [form, setForm] = useState<FormData>(initial);
+
+  function set<K extends keyof FormData>(key: K, val: FormData[K]) {
+    setForm((prev) => {
+      const next = { ...prev, [key]: val };
+      // Auto-calculate importancia = freq_prob + severidade
+      const freq = key === 'freq_prob' ? (val as number) : (prev.freq_prob ?? 1);
+      const sev  = key === 'severidade' ? (val as number) : (prev.severidade ?? 1);
+      next.importancia = freq + sev;
+      // Auto-suggest significancia (can be overridden)
+      if (key === 'freq_prob' || key === 'severidade') {
+        next.significancia = (freq + sev) >= 4 ? 'S' : 'N';
+      }
+      return next;
+    });
+  }
+
+  const imp = (form.freq_prob ?? 1) + (form.severidade ?? 1);
+  const impColor = imp >= 5 ? 'text-red-700 bg-red-100' : imp >= 4 ? 'text-amber-700 bg-amber-100' : 'text-slate-700 bg-slate-100';
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!form.setor.trim()) return;
+    onSave(form);
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-3xl max-h-[92vh] overflow-y-auto bg-white rounded-2xl shadow-2xl border border-slate-200"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50 rounded-t-2xl">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center">
+              <Layers className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-slate-800 leading-tight">
+                {initial.setor ? 'Editar Registro' : 'Novo Registro LAAIPR'}
+              </h2>
+              <p className="text-[11px] text-slate-500">ISO 14001 · ISO 45001</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-200 transition-colors">
+            <X className="w-4 h-4 text-slate-500" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+
+          {/* ── Seção 1: Identificação ─── */}
+          <div>
+            <div className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3 pb-1 border-b border-slate-100">
+              Identificação
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <FLabel>Setor *</FLabel>
+                <FSelect value={form.setor} onChange={(v) => set('setor', v)}>
+                  <option value="">— Selecione ou digite —</option>
+                  {setores.filter(s => s !== 'Todos').map(s => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </FSelect>
+                {/* Allow custom setor */}
+                {!setores.includes(form.setor) && (
+                  <input
+                    type="text"
+                    value={form.setor}
+                    onChange={(e) => set('setor', e.target.value)}
+                    placeholder="Ou digite um novo setor"
+                    className="mt-1.5 w-full px-3 py-1.5 text-sm border border-indigo-300 rounded-lg bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                  />
+                )}
+                <input
+                  type="text"
+                  placeholder="Novo setor (nome livre)"
+                  onFocus={() => set('setor', '')}
+                  onBlur={(e) => { if (!e.target.value) set('setor', setores[1] ?? ''); }}
+                  onChange={(e) => set('setor', e.target.value)}
+                  className="mt-1 w-full px-3 py-1.5 text-xs border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:ring-1 focus:ring-indigo-300 placeholder-slate-400"
+                  value={!setores.filter(s => s !== 'Todos').includes(form.setor) ? form.setor : ''}
+                  style={{ display: setores.filter(s => s !== 'Todos').includes(form.setor) ? 'none' : 'block' }}
+                />
+              </div>
+              <div>
+                <FLabel>Atividade</FLabel>
+                <FInput value={form.atividade ?? ''} onChange={(v) => set('atividade', v)} placeholder="Ex: Movimentação de Cargas" />
+              </div>
+              <div>
+                <FLabel>Aspecto / Perigo</FLabel>
+                <FInput value={form.aspecto_perigo ?? ''} onChange={(v) => set('aspecto_perigo', v)} placeholder="Ex: Trabalho em Altura" />
+              </div>
+              <div>
+                <FLabel>Impacto / Risco</FLabel>
+                <FInput value={form.impacto_risco ?? ''} onChange={(v) => set('impacto_risco', v)} placeholder="Ex: Queda de Nível Diferente" />
+              </div>
+            </div>
+          </div>
+
+          {/* ── Seção 2: Classificação ─── */}
+          <div>
+            <div className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3 pb-1 border-b border-slate-100">
+              Classificação
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <FLabel>Referência (MA / SS)</FLabel>
+                <FSelect value={form.referencia ?? 'SS'} onChange={(v) => set('referencia', v)}>
+                  <option value="SS">SS — Saúde e Segurança</option>
+                  <option value="MA">MA — Meio Ambiente</option>
+                </FSelect>
+              </div>
+              <div>
+                <FLabel>Situação</FLabel>
+                <FSelect value={form.situacao ?? 'N'} onChange={(v) => set('situacao', v)}>
+                  <option value="N">Normal</option>
+                  <option value="A">Anormal</option>
+                  <option value="E">Emergência</option>
+                </FSelect>
+              </div>
+              <div>
+                <FLabel>Partes Interessadas</FLabel>
+                <FSelect value={form.partes_interessadas ?? 'N'} onChange={(v) => set('partes_interessadas', v)}>
+                  <option value="N">N — Não Identificado</option>
+                  <option value="I">I — Identificado</option>
+                </FSelect>
+              </div>
+              <div>
+                <FLabel>Origem</FLabel>
+                <FSelect value={form.origem ?? 'D'} onChange={(v) => set('origem', v)}>
+                  <option value="D">Direta</option>
+                  <option value="I">Indireta</option>
+                </FSelect>
+              </div>
+              <div>
+                <FLabel>Classe</FLabel>
+                <FSelect value={form.classe ?? 'A'} onChange={(v) => set('classe', v)}>
+                  <option value="A">Adverso</option>
+                  <option value="B">Benéfico</option>
+                </FSelect>
+              </div>
+              <div>
+                <FLabel>Temporalidade</FLabel>
+                <FSelect value={form.temporalidade ?? 'A'} onChange={(v) => set('temporalidade', v)}>
+                  <option value="P">Passado</option>
+                  <option value="A">Atual</option>
+                  <option value="F">Futuro</option>
+                </FSelect>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Seção 3: Avaliação de Risco ─── */}
+          <div>
+            <div className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3 pb-1 border-b border-slate-100">
+              Avaliação de Risco / Impacto
+            </div>
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <FLabel>Frequência / Probabilidade</FLabel>
+                <FSelect value={form.freq_prob ?? 1} onChange={(v) => set('freq_prob', Number(v))}>
+                  <option value={1}>1 — Baixa</option>
+                  <option value={2}>2 — Média</option>
+                  <option value={3}>3 — Alta</option>
+                </FSelect>
+              </div>
+              <div>
+                <FLabel>Severidade</FLabel>
+                <FSelect value={form.severidade ?? 1} onChange={(v) => set('severidade', Number(v))}>
+                  <option value={1}>1 — Não Causa Dano</option>
+                  <option value={2}>2 — Dano Leve</option>
+                  <option value={3}>3 — Dano Moderado</option>
+                  <option value={4}>4 — Dano Grave</option>
+                  <option value={5}>5 — Catastrófico</option>
+                </FSelect>
+              </div>
+            </div>
+
+            {/* Importância calculada + Significância */}
+            <div className="bg-slate-50 rounded-xl px-4 py-3 border border-slate-200 flex items-center gap-6">
+              <div className="flex items-center gap-3">
+                <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Importância</div>
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl font-bold ${impColor}`}>
+                  {imp}
+                </div>
+                <div className="text-xs text-slate-400">= freq + sev<br />({form.freq_prob} + {form.severidade})</div>
+              </div>
+              <div className="h-10 w-px bg-slate-200" />
+              <div className="flex-1">
+                <FLabel>Significância (ajuste manual se necessário)</FLabel>
+                <FSelect value={form.significancia ?? 'N'} onChange={(v) => set('significancia', v)}>
+                  <option value="S">S — Significativo</option>
+                  <option value="N">N — Não Significativo</option>
+                </FSelect>
+              </div>
+              <div className="flex-1">
+                <FLabel>Abrangência (1–3)</FLabel>
+                <FSelect value={form.abrangencia ?? 1} onChange={(v) => set('abrangencia', Number(v))}>
+                  <option value={1}>1 — Local</option>
+                  <option value={2}>2 — Regional</option>
+                  <option value={3}>3 — Global</option>
+                </FSelect>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Seção 4: Requisitos e Controles ─── */}
+          <div>
+            <div className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3 pb-1 border-b border-slate-100">
+              Requisitos e Controles
+            </div>
+            <div className="space-y-3">
+              <div>
+                <FLabel>Requisito Legal</FLabel>
+                <FTextarea
+                  value={form.requisito_legal ?? ''}
+                  onChange={(v) => set('requisito_legal', v)}
+                  placeholder="Ex: NR 35 - NR 06 - ISO 45001"
+                />
+              </div>
+              <div>
+                <FLabel>Controles Disponíveis</FLabel>
+                <FTextarea
+                  value={form.controles_disponiveis ?? ''}
+                  onChange={(v) => set('controles_disponiveis', v)}
+                  placeholder="Ex: Treinamento (4), Procedimento PG-TR-SMS-011 (4), EPI (5)"
+                  rows={3}
+                />
+              </div>
+              <div>
+                <FLabel>Ciclo de Vida / Observações</FLabel>
+                <FTextarea
+                  value={form.ciclo_vida ?? ''}
+                  onChange={(v) => set('ciclo_vida', v)}
+                  placeholder="Observações sobre o ciclo de vida ou controles existentes"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* ── Actions ─── */}
+          <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={saving || !form.setor.trim()}
+              className="flex items-center gap-2 px-5 py-2 text-sm font-semibold text-white bg-teal-600 rounded-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
+            >
+              {saving
+                ? <Loader2 className="w-4 h-4 animate-spin" />
+                : <Save className="w-4 h-4" />}
+              {saving ? 'Salvando...' : 'Salvar Registro'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ─── Detail Modal ─────────────────────────────────────────────────────────────
 
-function DetailModal({ record, onClose }: { record: LaaiprRecord; onClose: () => void }) {
+function DetailModal({
+  record, onClose, onEdit,
+}: {
+  record: LaaiprRecord;
+  onClose: () => void;
+  onEdit: () => void;
+}) {
   const ref = refInfo(record.referencia);
   const sit = situacaoInfo(record.situacao);
 
@@ -208,12 +579,21 @@ function DetailModal({ record, onClose }: { record: LaaiprRecord; onClose: () =>
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">{record.setor}</p>
           </div>
-          <button
-            onClick={onClose}
-            className="shrink-0 p-1.5 rounded-lg hover:bg-slate-200 transition-colors"
-          >
-            <X className="w-4 h-4 text-slate-500" />
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={onEdit}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-indigo-600 border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 transition-colors"
+            >
+              <Pencil className="w-3 h-3" />
+              Editar
+            </button>
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-lg hover:bg-slate-200 transition-colors"
+            >
+              <X className="w-4 h-4 text-slate-500" />
+            </button>
+          </div>
         </div>
 
         {/* Modal Body */}
@@ -312,7 +692,10 @@ const PAGE_SIZE = 25;
 export function LaaiprScreen({ onToast }: Props) {
   const [records,  setRecords]  = useState<LaaiprRecord[]>([]);
   const [loading,  setLoading]  = useState(false);
+  const [saving,   setSaving]   = useState(false);
   const [selected, setSelected] = useState<LaaiprRecord | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [editing,  setEditing]  = useState<LaaiprRecord | null>(null);
   const [page,     setPage]     = useState(1);
 
   // Filters
@@ -385,6 +768,63 @@ export function LaaiprScreen({ onToast }: Props) {
   const maSig   = records.filter((r) => r.referencia === 'MA' && r.significancia === 'S').length;
   const ssSig   = records.filter((r) => r.referencia === 'SS' && r.significancia === 'S').length;
 
+  // ── Save handler ────────────────────────────────────────────────────────────
+
+  async function handleSave(formData: FormData) {
+    if (!supabase || !isSupabaseConfigured) {
+      onToast('Supabase não configurado', 'error');
+      return;
+    }
+    setSaving(true);
+    try {
+      if (editing) {
+        // Update existing
+        const { error } = await supabase
+          .from('laaipr_records')
+          .update(formData)
+          .eq('id', editing.id);
+        if (error) throw error;
+        onToast('Registro atualizado com sucesso ✓', 'success');
+      } else {
+        // Insert new
+        const { error } = await supabase
+          .from('laaipr_records')
+          .insert([formData]);
+        if (error) throw error;
+        onToast('Novo registro adicionado ✓', 'success');
+      }
+      setShowForm(false);
+      setEditing(null);
+      setSelected(null);
+      await load();
+    } catch (err: any) {
+      onToast('Erro ao salvar: ' + (err?.message ?? String(err)), 'error');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // ── Open form for edit ───────────────────────────────────────────────────────
+
+  function openEdit(rec: LaaiprRecord) {
+    setEditing(rec);
+    setSelected(null);
+    setShowForm(true);
+  }
+
+  function openNew() {
+    setEditing(null);
+    setShowForm(true);
+  }
+
+  // ── Build initial form from record ──────────────────────────────────────────
+
+  function formInitial(): FormData {
+    if (!editing) return { ...EMPTY_FORM };
+    const { id: _id, created_at: _ca, ...rest } = editing;
+    return rest as FormData;
+  }
+
   return (
     <div className="p-6 space-y-6">
 
@@ -393,7 +833,7 @@ export function LaaiprScreen({ onToast }: Props) {
         <div>
           <div className="flex items-center gap-2.5 mb-1">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center shadow-md shadow-teal-500/20">
-              <Layers className="w-4.5 h-4.5 text-white w-4 h-4" />
+              <Layers className="w-4 h-4 text-white" />
             </div>
             <h1 className="text-xl font-bold text-slate-800">LAAIPR</h1>
           </div>
@@ -401,14 +841,23 @@ export function LaaiprScreen({ onToast }: Props) {
             Levantamento e Avaliação de Aspectos e Impactos / Perigos e Riscos — ISO 14001 + ISO 45001
           </p>
         </div>
-        <button
-          onClick={() => { load(); onToast('Dados atualizados ✓'); }}
-          disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-200 bg-white text-slate-600 text-sm font-medium hover:bg-slate-50 transition-colors disabled:opacity-50 shrink-0"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-          Atualizar
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => { load(); onToast('Dados atualizados ✓'); }}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-200 bg-white text-slate-600 text-sm font-medium hover:bg-slate-50 transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            Atualizar
+          </button>
+          <button
+            onClick={openNew}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-600 text-white text-sm font-semibold hover:bg-teal-700 transition-colors shadow-sm shadow-teal-600/20"
+          >
+            <Plus className="w-4 h-4" />
+            Novo Registro
+          </button>
+        </div>
       </div>
 
       {/* ── Summary Cards ───────────────────────────────────────────────────── */}
@@ -607,7 +1056,22 @@ export function LaaiprScreen({ onToast }: Props) {
 
       {/* ── Detail Modal ─────────────────────────────────────────────────────── */}
       {selected && (
-        <DetailModal record={selected} onClose={() => setSelected(null)} />
+        <DetailModal
+          record={selected}
+          onClose={() => setSelected(null)}
+          onEdit={() => openEdit(selected)}
+        />
+      )}
+
+      {/* ── Form Modal (Novo / Editar) ────────────────────────────────────────── */}
+      {showForm && (
+        <FormModal
+          initial={formInitial()}
+          setores={setores}
+          saving={saving}
+          onSave={handleSave}
+          onClose={() => { setShowForm(false); setEditing(null); }}
+        />
       )}
     </div>
   );
