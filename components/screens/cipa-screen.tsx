@@ -1,12 +1,14 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Users, Calendar, Vote, Megaphone, BookOpen,
   ClipboardList, Map, Newspaper, Plus, RefreshCw,
   ChevronDown, ChevronUp, Pencil, Trash2, Check, X,
-  FileText, AlertCircle, Clock,
+  FileText, AlertCircle, Clock, QrCode, Printer,
+  BarChart2, UserCheck, ExternalLink, ChevronRight,
 } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
@@ -128,6 +130,25 @@ interface CipaInformativo {
   categoria: string | null;
   arquivo_url: string | null;
   data_publicacao: string | null;
+  created_at: string;
+}
+
+interface CipaChapa {
+  id: string;
+  eleicao_id: string;
+  numero_chapa: number;
+  candidato_titular: string;
+  candidato_suplente: string | null;
+  created_at: string;
+}
+
+interface CipaEleitor {
+  id: string;
+  eleicao_id: string;
+  nome: string;
+  token_voto: string;
+  votou: boolean;
+  data_voto: string | null;
   created_at: string;
 }
 
@@ -945,11 +966,72 @@ function EleicoesTab({ mandatos, eleicoes, onRefresh, toast }: {
   onRefresh: () => Promise<void>;
   toast: (m: string, t?: 'success'|'error') => void;
 }) {
-  const [showForm, setShowForm] = useState(false);
-  const [editing, setEditing]   = useState<CipaEleicao | null>(null);
-  const [form, setForm]         = useState<EleicaoForm>(EMPTY_ELEICAO);
-  const [saving, setSaving]     = useState(false);
+  // ── Election CRUD ──────────────────────────────────────────────────────────
+  const [showForm, setShowForm]   = useState(false);
+  const [editing, setEditing]     = useState<CipaEleicao | null>(null);
+  const [form, setForm]           = useState<EleicaoForm>(EMPTY_ELEICAO);
+  const [saving, setSaving]       = useState(false);
 
+  // ── Drill-down ─────────────────────────────────────────────────────────────
+  const [selectedEleicaoId, setSelectedEleicaoId] = useState<string | null>(null);
+  const [subTab, setSubTab] = useState<'chapas' | 'eleitores' | 'resultados'>('chapas');
+
+  // ── Chapas ─────────────────────────────────────────────────────────────────
+  const [chapas, setChapas]             = useState<CipaChapa[]>([]);
+  const [showChapaForm, setShowChapaForm] = useState(false);
+  const [chapaForm, setChapaForm]       = useState({ candidato_titular: '', candidato_suplente: '' });
+
+  // ── Eleitores ──────────────────────────────────────────────────────────────
+  const [eleitores, setEleitores]           = useState<CipaEleitor[]>([]);
+  const [showEleitorForm, setShowEleitorForm] = useState(false);
+  const [eleitorForm, setEleitorForm]       = useState({ nome: '' });
+  const [expandedQr, setExpandedQr]         = useState<string | null>(null);
+
+  // ── Results ────────────────────────────────────────────────────────────────
+  const [resultados, setResultados] = useState<Record<string, number>>({});
+
+  // ── Misc ───────────────────────────────────────────────────────────────────
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [origin, setOrigin] = useState('');
+  const printRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => { setOrigin(window.location.origin); }, []);
+
+  const selectedEleicao = eleicoes.find(e => e.id === selectedEleicaoId) ?? null;
+
+  // ── Load detail data ───────────────────────────────────────────────────────
+  const loadDetail = useCallback(async (eleicaoId: string) => {
+    if (!supabase) return;
+    setLoadingDetail(true);
+    const [{ data: c }, { data: el }, { data: votos }] = await Promise.all([
+      supabase.from('cipa_chapas').select('*').eq('eleicao_id', eleicaoId).order('numero_chapa'),
+      supabase.from('cipa_eleitores').select('*').eq('eleicao_id', eleicaoId).order('nome'),
+      supabase.from('cipa_votos').select('chapa_id').eq('eleicao_id', eleicaoId),
+    ]);
+    setChapas(c ?? []);
+    setEleitores(el ?? []);
+    const counts: Record<string, number> = {};
+    (votos ?? []).forEach((v: { chapa_id: string }) => { counts[v.chapa_id] = (counts[v.chapa_id] ?? 0) + 1; });
+    setResultados(counts);
+    setLoadingDetail(false);
+  }, []);
+
+  function selectEleicao(id: string) {
+    setSelectedEleicaoId(id);
+    setSubTab('chapas');
+    loadDetail(id);
+  }
+
+  // ── Status control ─────────────────────────────────────────────────────────
+  async function changeStatus(eleicao: CipaEleicao, newStatus: CipaEleicao['status']) {
+    if (!supabase) return;
+    await supabase.from('cipa_eleicoes').update({ status: newStatus }).eq('id', eleicao.id);
+    toast(newStatus === 'em_andamento' ? '✓ Votação aberta!' : '✓ Votação encerrada', 'success');
+    await onRefresh();
+    loadDetail(eleicao.id);
+  }
+
+  // ── Election CRUD ──────────────────────────────────────────────────────────
   function openNew() { setEditing(null); setForm({ ...EMPTY_ELEICAO, mandato_id: mandatos[0]?.id ?? '' }); setShowForm(true); }
   function openEdit(e: CipaEleicao) {
     setEditing(e);
@@ -968,7 +1050,86 @@ function EleicoesTab({ mandatos, eleicoes, onRefresh, toast }: {
   }
   async function del(id: string) { if (!supabase) return; await supabase.from('cipa_eleicoes').delete().eq('id', id); toast('Removido'); await onRefresh(); }
 
-  return (
+  // ── Chapa CRUD ─────────────────────────────────────────────────────────────
+  async function saveChapa() {
+    if (!supabase || !selectedEleicaoId || !chapaForm.candidato_titular.trim()) return;
+    setSaving(true);
+    const nextNum = chapas.length > 0 ? Math.max(...chapas.map(c => c.numero_chapa)) + 1 : 1;
+    await supabase.from('cipa_chapas').insert([{
+      eleicao_id: selectedEleicaoId,
+      numero_chapa: nextNum,
+      candidato_titular: chapaForm.candidato_titular.trim(),
+      candidato_suplente: chapaForm.candidato_suplente.trim() || null,
+    }]);
+    setShowChapaForm(false);
+    setChapaForm({ candidato_titular: '', candidato_suplente: '' });
+    setSaving(false);
+    toast('Chapa registrada');
+    await loadDetail(selectedEleicaoId);
+  }
+  async function deleteChapa(id: string) {
+    if (!supabase || !selectedEleicaoId) return;
+    await supabase.from('cipa_chapas').delete().eq('id', id);
+    toast('Chapa removida');
+    await loadDetail(selectedEleicaoId);
+  }
+
+  // ── Eleitor CRUD ───────────────────────────────────────────────────────────
+  async function saveEleitor() {
+    if (!supabase || !selectedEleicaoId || !eleitorForm.nome.trim()) return;
+    setSaving(true);
+    await supabase.from('cipa_eleitores').insert([{ eleicao_id: selectedEleicaoId, nome: eleitorForm.nome.trim() }]);
+    setShowEleitorForm(false);
+    setEleitorForm({ nome: '' });
+    setSaving(false);
+    toast('Eleitor adicionado');
+    await loadDetail(selectedEleicaoId);
+  }
+  async function deleteEleitor(id: string) {
+    if (!supabase || !selectedEleicaoId) return;
+    await supabase.from('cipa_eleitores').delete().eq('id', id);
+    toast('Eleitor removido');
+    await loadDetail(selectedEleicaoId);
+  }
+
+  // ── Print QR Codes ─────────────────────────────────────────────────────────
+  function printQrCodes() {
+    if (!selectedEleicao || eleitores.length === 0 || !origin) return;
+    const html = `<!doctype html><html><head><title>QR Codes CIPA ${selectedEleicao.ano}</title>
+<style>
+  body{font-family:Arial,sans-serif;margin:0;padding:24px;background:#fff;color:#111}
+  h2{text-align:center;margin-bottom:4px}p.sub{text-align:center;color:#666;margin:0 0 24px}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  .card{border:1px solid #ddd;padding:16px;text-align:center;border-radius:8px;page-break-inside:avoid}
+  .name{font-weight:700;margin-top:8px;font-size:14px}.stat{font-size:11px;color:#888;margin-top:3px}
+  img{display:block;margin:0 auto}
+  @media print{body{padding:12px}.grid{gap:12px}}
+</style></head><body>
+<h2>Eleição CIPA ${selectedEleicao.ano}</h2>
+<p class="sub">QR Codes para votação • ${eleitores.length} eleitores</p>
+<div class="grid">
+${eleitores.map(el => `<div class="card">
+  <img src="https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(origin + '/votar/' + el.token_voto)}" width="160" height="160" alt="QR ${el.nome}" />
+  <div class="name">${el.nome}</div>
+  <div class="stat">${el.votou ? '✓ Já votou' : 'Aguardando voto'}</div>
+</div>`).join('')}
+</div>
+<script>window.addEventListener('load',()=>{setTimeout(()=>window.print(),400)})<\/script>
+</body></html>`;
+    const pw = window.open('', '_blank');
+    if (!pw) { toast('Permita pop-ups para imprimir', 'error'); return; }
+    pw.document.write(html);
+    pw.document.close();
+  }
+
+  // ── Total votes helper ─────────────────────────────────────────────────────
+  const totalVotos = Object.values(resultados).reduce((a, b) => a + b, 0);
+  const maxVotos   = Math.max(1, ...Object.values(resultados));
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // RENDER — LIST VIEW
+  // ══════════════════════════════════════════════════════════════════════════
+  if (!selectedEleicaoId) return (
     <div className="max-w-4xl space-y-4">
       <div className="flex justify-end">
         <button onClick={openNew} className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-orange-600 text-white text-sm font-semibold hover:bg-orange-700 transition-colors"><Plus className="w-4 h-4" /> Nova Eleição</button>
@@ -985,7 +1146,7 @@ function EleicoesTab({ mandatos, eleicoes, onRefresh, toast }: {
               <th className="px-4 py-3 text-left font-medium">Votantes</th>
               <th className="px-4 py-3 text-left font-medium">Votos</th>
               <th className="px-4 py-3 text-left font-medium">Mandato</th>
-              <th className="w-20"></th>
+              <th className="px-4 py-3 text-left font-medium">Ações</th>
             </tr></thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
               {eleicoes.map(e => {
@@ -999,7 +1160,13 @@ function EleicoesTab({ mandatos, eleicoes, onRefresh, toast }: {
                     <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{e.total_votos ?? '—'}</td>
                     <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs">{mandato?.titulo ?? '—'}</td>
                     <td className="px-4 py-3">
-                      <div className="flex gap-1">
+                      <div className="flex gap-1 items-center">
+                        <button
+                          onClick={() => selectEleicao(e.id)}
+                          className="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 hover:bg-orange-200 dark:hover:bg-orange-800/40 transition-colors"
+                        >
+                          Gerenciar <ChevronRight className="w-3 h-3" />
+                        </button>
                         <button onClick={() => openEdit(e)} className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-400"><Pencil className="w-3.5 h-3.5" /></button>
                         <button onClick={() => del(e.id)} className="p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-red-400"><Trash2 className="w-3.5 h-3.5" /></button>
                       </div>
@@ -1025,6 +1192,355 @@ function EleicoesTab({ mandatos, eleicoes, onRefresh, toast }: {
             <div className="col-span-2"><FLabel>Observações</FLabel><FTextarea rows={2} value={form.observacoes} onChange={e => setForm(p => ({ ...p, observacoes: e.target.value }))} /></div>
           </div>
           <ModalButtons onCancel={() => setShowForm(false)} onSave={save} saving={saving} />
+        </Modal>
+      )}
+    </div>
+  );
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // RENDER — DETAIL VIEW
+  // ══════════════════════════════════════════════════════════════════════════
+  return (
+    <div className="max-w-4xl space-y-4" ref={printRef}>
+
+      {/* Breadcrumb + header */}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <button onClick={() => { setSelectedEleicaoId(null); }} className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 hover:text-orange-600 dark:hover:text-orange-400 transition-colors mb-1">
+            <ChevronRight className="w-3.5 h-3.5 rotate-180" /> Eleições
+          </button>
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            Eleição CIPA {selectedEleicao?.ano}
+            {selectedEleicao && <StatusBadge status={selectedEleicao.status} />}
+          </h2>
+          {selectedEleicao?.data_eleicao && (
+            <p className="text-xs text-gray-500 mt-0.5">{fmtDate(selectedEleicao.data_eleicao)}</p>
+          )}
+        </div>
+
+        {/* Control buttons */}
+        <div className="flex items-center gap-2">
+          {selectedEleicao?.status === 'planejada' && (
+            <button
+              onClick={() => changeStatus(selectedEleicao, 'em_andamento')}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-green-600 text-white text-xs font-semibold hover:bg-green-700 transition-colors"
+            >
+              <Vote className="w-3.5 h-3.5" /> Abrir Votação
+            </button>
+          )}
+          {selectedEleicao?.status === 'em_andamento' && (
+            <button
+              onClick={() => changeStatus(selectedEleicao, 'concluida')}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-600 text-white text-xs font-semibold hover:bg-red-700 transition-colors"
+            >
+              <X className="w-3.5 h-3.5" /> Encerrar Votação
+            </button>
+          )}
+          {selectedEleicao && (
+            <button
+              onClick={() => openEdit(selectedEleicao)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            >
+              <Pencil className="w-3.5 h-3.5" /> Editar
+            </button>
+          )}
+          <button
+            onClick={() => { if (selectedEleicaoId) loadDetail(selectedEleicaoId); }}
+            className="p-2 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loadingDetail ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
+      </div>
+
+      {/* Stats bar */}
+      {selectedEleicao && (
+        <div className="grid grid-cols-3 gap-3">
+          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 text-center">
+            <p className="text-2xl font-black text-orange-600">{chapas.length}</p>
+            <p className="text-xs text-gray-500 mt-0.5">Chapas</p>
+          </div>
+          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 text-center">
+            <p className="text-2xl font-black text-blue-600">{eleitores.length}</p>
+            <p className="text-xs text-gray-500 mt-0.5">Eleitores</p>
+          </div>
+          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 text-center">
+            <p className="text-2xl font-black text-green-600">{totalVotos}</p>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Votos {eleitores.length > 0 && <span className="text-gray-400">({Math.round(totalVotos / eleitores.length * 100)}%)</span>}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Sub-tabs */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div className="flex border-b border-gray-200 dark:border-gray-700">
+          {([
+            { id: 'chapas',    label: 'Chapas',    icon: Users },
+            { id: 'eleitores', label: 'Eleitores', icon: UserCheck },
+            { id: 'resultados', label: 'Resultados', icon: BarChart2 },
+          ] as const).map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              onClick={() => setSubTab(id)}
+              className={`flex items-center gap-1.5 px-5 py-3 text-xs font-semibold border-b-2 transition-colors ${
+                subTab === id
+                  ? 'border-orange-500 text-orange-600 dark:text-orange-400'
+                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+              }`}
+            >
+              <Icon className="w-3.5 h-3.5" /> {label}
+            </button>
+          ))}
+        </div>
+
+        <div className="p-4">
+          {/* ── Chapas ──────────────────────────────────────────────────── */}
+          {subTab === 'chapas' && (
+            <div className="space-y-3">
+              <div className="flex justify-end">
+                <button
+                  onClick={() => { setChapaForm({ candidato_titular: '', candidato_suplente: '' }); setShowChapaForm(true); }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-600 text-white text-xs font-semibold hover:bg-orange-700 transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Nova Chapa
+                </button>
+              </div>
+              {chapas.length === 0 ? (
+                <EmptyState icon={Users} text="Nenhuma chapa registrada" />
+              ) : (
+                <div className="space-y-2">
+                  {chapas.map(chapa => (
+                    <div key={chapa.id} className="flex items-center gap-4 bg-gray-50 dark:bg-gray-700/40 rounded-xl px-4 py-3">
+                      <div className="w-10 h-10 rounded-lg bg-orange-100 dark:bg-orange-900/30 text-orange-600 font-black text-lg flex items-center justify-center flex-shrink-0">
+                        {String(chapa.numero_chapa).padStart(2, '0')}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm text-gray-800 dark:text-gray-100">{chapa.candidato_titular}</p>
+                        {chapa.candidato_suplente && (
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Suplente: {chapa.candidato_suplente}</p>
+                        )}
+                      </div>
+                      <div className="text-xs font-semibold text-orange-600 dark:text-orange-400">
+                        {resultados[chapa.id] ?? 0} voto{(resultados[chapa.id] ?? 0) !== 1 ? 's' : ''}
+                      </div>
+                      <button onClick={() => deleteChapa(chapa.id)} className="p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-red-400 flex-shrink-0">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Eleitores ───────────────────────────────────────────────── */}
+          {subTab === 'eleitores' && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {eleitores.filter(e => e.votou).length}/{eleitores.length} votaram
+                </p>
+                <div className="flex gap-2">
+                  {eleitores.length > 0 && origin && (
+                    <button
+                      onClick={printQrCodes}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                    >
+                      <Printer className="w-3.5 h-3.5" /> Imprimir QR Codes
+                    </button>
+                  )}
+                  <button
+                    onClick={() => { setEleitorForm({ nome: '' }); setShowEleitorForm(true); }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-600 text-white text-xs font-semibold hover:bg-orange-700 transition-colors"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Adicionar Eleitor
+                  </button>
+                </div>
+              </div>
+
+              {eleitores.length === 0 ? (
+                <EmptyState icon={UserCheck} text="Nenhum eleitor registrado" />
+              ) : (
+                <div className="space-y-2">
+                  {eleitores.map(el => (
+                    <div key={el.id} className="bg-gray-50 dark:bg-gray-700/40 rounded-xl overflow-hidden">
+                      <div className="flex items-center gap-3 px-4 py-3">
+                        {/* Vote status dot */}
+                        <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${el.votou ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'}`} />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm text-gray-800 dark:text-gray-100">{el.nome}</p>
+                          <p className="text-xs text-gray-400">{el.votou ? `Votou em ${fmtDate(el.data_voto)}` : 'Ainda não votou'}</p>
+                        </div>
+
+                        {/* QR toggle */}
+                        <button
+                          onClick={() => setExpandedQr(expandedQr === el.id ? null : el.id)}
+                          className="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium border border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-700 transition-colors"
+                        >
+                          <QrCode className="w-3.5 h-3.5" />
+                          QR
+                        </button>
+
+                        {/* Open voting link */}
+                        {origin && (
+                          <a
+                            href={`${origin}/votar/${el.token_voto}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-400 flex-shrink-0"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </a>
+                        )}
+                        <button onClick={() => deleteEleitor(el.id)} className="p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-red-400 flex-shrink-0">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      {/* Expanded QR code */}
+                      {expandedQr === el.id && origin && (
+                        <div className="border-t border-gray-200 dark:border-gray-600 px-4 py-4 flex flex-col items-center gap-3 bg-white dark:bg-gray-800">
+                          <QRCodeSVG
+                            value={`${origin}/votar/${el.token_voto}`}
+                            size={160}
+                            includeMargin
+                            level="M"
+                          />
+                          <p className="text-xs text-gray-500 font-mono break-all text-center max-w-xs">
+                            {`${origin}/votar/${el.token_voto}`}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Resultados ──────────────────────────────────────────────── */}
+          {subTab === 'resultados' && (
+            <div className="space-y-4">
+              {chapas.length === 0 ? (
+                <EmptyState icon={BarChart2} text="Nenhuma chapa registrada" />
+              ) : (
+                <>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+                      Apuração — {totalVotos} voto{totalVotos !== 1 ? 's' : ''} computado{totalVotos !== 1 ? 's' : ''}
+                    </p>
+                    {eleitores.length > 0 && (
+                      <span className="text-xs text-gray-500">
+                        Participação: {Math.round(totalVotos / eleitores.length * 100)}%
+                        ({eleitores.filter(e => e.votou).length}/{eleitores.length})
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Sort chapas by votes descending */}
+                  {[...chapas]
+                    .sort((a, b) => (resultados[b.id] ?? 0) - (resultados[a.id] ?? 0))
+                    .map((chapa, idx) => {
+                      const votes = resultados[chapa.id] ?? 0;
+                      const pct = totalVotos > 0 ? Math.round(votes / totalVotos * 100) : 0;
+                      const barW = maxVotos > 0 ? Math.round(votes / maxVotos * 100) : 0;
+                      const isLeading = idx === 0 && votes > 0;
+                      return (
+                        <div key={chapa.id} className="space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              {isLeading && <span className="text-xs">🏆</span>}
+                              <span className={`text-sm font-semibold ${isLeading ? 'text-orange-600 dark:text-orange-400' : 'text-gray-700 dark:text-gray-200'}`}>
+                                Chapa {String(chapa.numero_chapa).padStart(2, '0')} — {chapa.candidato_titular}
+                              </span>
+                            </div>
+                            <span className="text-sm font-bold text-gray-700 dark:text-gray-200">
+                              {votes} voto{votes !== 1 ? 's' : ''} <span className="text-xs font-normal text-gray-400">({pct}%)</span>
+                            </span>
+                          </div>
+                          <div className="h-3 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all duration-500 ${isLeading ? 'bg-orange-500' : 'bg-gray-400 dark:bg-gray-500'}`}
+                              style={{ width: `${barW}%` }}
+                            />
+                          </div>
+                          {chapa.candidato_suplente && (
+                            <p className="text-xs text-gray-400">Suplente: {chapa.candidato_suplente}</p>
+                          )}
+                        </div>
+                      );
+                    })}
+
+                  {/* Blank votes info */}
+                  {totalVotos === 0 && (
+                    <p className="text-sm text-gray-400 text-center py-4">Nenhum voto registrado ainda</p>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Modals ─────────────────────────────────────────────────────────── */}
+      {showForm && (
+        <Modal title={editing ? 'Editar Eleição' : 'Nova Eleição'} onClose={() => setShowForm(false)}>
+          <div className="grid grid-cols-2 gap-4">
+            <div><FLabel required>Ano</FLabel><FInput type="number" value={form.ano} onChange={e => setForm(p => ({ ...p, ano: e.target.value }))} /></div>
+            <div><FLabel>Data da eleição</FLabel><FInput type="date" value={form.data_eleicao} onChange={e => setForm(p => ({ ...p, data_eleicao: e.target.value }))} /></div>
+            <div><FLabel>Status</FLabel><FSelect value={form.status} onChange={e => setForm(p => ({ ...p, status: e.target.value as EleicaoForm['status'] }))}><option value="planejada">Planejada</option><option value="em_andamento">Em andamento</option><option value="concluida">Concluída</option></FSelect></div>
+            <div><FLabel>Mandato</FLabel><FSelect value={form.mandato_id} onChange={e => setForm(p => ({ ...p, mandato_id: e.target.value }))}><option value="">Nenhum</option>{mandatos.map(m => <option key={m.id} value={m.id}>{m.titulo}</option>)}</FSelect></div>
+            <div><FLabel>Total votantes</FLabel><FInput type="number" value={form.total_votantes} onChange={e => setForm(p => ({ ...p, total_votantes: e.target.value }))} /></div>
+            <div><FLabel>Total votos</FLabel><FInput type="number" value={form.total_votos} onChange={e => setForm(p => ({ ...p, total_votos: e.target.value }))} /></div>
+            <div><FLabel>URL do edital</FLabel><FInput value={form.edital_url} onChange={e => setForm(p => ({ ...p, edital_url: e.target.value }))} placeholder="https://..." /></div>
+            <div><FLabel>URL da ata</FLabel><FInput value={form.ata_url} onChange={e => setForm(p => ({ ...p, ata_url: e.target.value }))} placeholder="https://..." /></div>
+            <div className="col-span-2"><FLabel>Observações</FLabel><FTextarea rows={2} value={form.observacoes} onChange={e => setForm(p => ({ ...p, observacoes: e.target.value }))} /></div>
+          </div>
+          <ModalButtons onCancel={() => setShowForm(false)} onSave={save} saving={saving} />
+        </Modal>
+      )}
+
+      {showChapaForm && (
+        <Modal title="Nova Chapa" onClose={() => setShowChapaForm(false)}>
+          <div className="space-y-3">
+            <div>
+              <FLabel required>Candidato Titular</FLabel>
+              <FInput
+                placeholder="Nome completo do titular"
+                value={chapaForm.candidato_titular}
+                onChange={e => setChapaForm(p => ({ ...p, candidato_titular: e.target.value }))}
+                autoFocus
+              />
+            </div>
+            <div>
+              <FLabel>Candidato Suplente</FLabel>
+              <FInput
+                placeholder="Nome completo do suplente (opcional)"
+                value={chapaForm.candidato_suplente}
+                onChange={e => setChapaForm(p => ({ ...p, candidato_suplente: e.target.value }))}
+              />
+            </div>
+            <p className="text-xs text-gray-400">O número da chapa será atribuído automaticamente ({chapas.length + 1}).</p>
+          </div>
+          <ModalButtons onCancel={() => setShowChapaForm(false)} onSave={saveChapa} saving={saving} saveLabel="Registrar Chapa" />
+        </Modal>
+      )}
+
+      {showEleitorForm && (
+        <Modal title="Adicionar Eleitor" onClose={() => setShowEleitorForm(false)}>
+          <div>
+            <FLabel required>Nome do Eleitor</FLabel>
+            <FInput
+              placeholder="Nome completo"
+              value={eleitorForm.nome}
+              onChange={e => setEleitorForm({ nome: e.target.value })}
+              autoFocus
+            />
+            <p className="text-xs text-gray-400 mt-2">Um QR Code exclusivo será gerado automaticamente para este eleitor.</p>
+          </div>
+          <ModalButtons onCancel={() => setShowEleitorForm(false)} onSave={saveEleitor} saving={saving} saveLabel="Adicionar" />
         </Modal>
       )}
     </div>
@@ -1482,12 +1998,12 @@ function Modal({ title, children, onClose }: { title: string; children: React.Re
   );
 }
 
-function ModalButtons({ onCancel, onSave, saving }: { onCancel: () => void; onSave: () => void; saving: boolean }) {
+function ModalButtons({ onCancel, onSave, saving, saveLabel }: { onCancel: () => void; onSave: () => void; saving: boolean; saveLabel?: string }) {
   return (
     <div className="flex justify-end gap-2 pt-2 border-t border-gray-100 dark:border-gray-700">
       <button onClick={onCancel} disabled={saving} className="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">Cancelar</button>
       <button onClick={onSave} disabled={saving} className="px-4 py-2 rounded-lg text-sm font-semibold bg-orange-600 text-white hover:bg-orange-700 disabled:opacity-60 transition-colors">
-        {saving ? 'Salvando...' : 'Salvar'}
+        {saving ? 'Salvando...' : (saveLabel ?? 'Salvar')}
       </button>
     </div>
   );
