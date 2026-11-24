@@ -1186,8 +1186,6 @@ ${eleitores.map(el => `<div class="card">
             <div><FLabel>Data da eleição</FLabel><FInput type="date" value={form.data_eleicao} onChange={e => setForm(p => ({ ...p, data_eleicao: e.target.value }))} /></div>
             <div><FLabel>Status</FLabel><FSelect value={form.status} onChange={e => setForm(p => ({ ...p, status: e.target.value as EleicaoForm['status'] }))}><option value="planejada">Planejada</option><option value="em_andamento">Em andamento</option><option value="concluida">Concluída</option></FSelect></div>
             <div><FLabel>Mandato</FLabel><FSelect value={form.mandato_id} onChange={e => setForm(p => ({ ...p, mandato_id: e.target.value }))}><option value="">Nenhum</option>{mandatos.map(m => <option key={m.id} value={m.id}>{m.titulo}</option>)}</FSelect></div>
-            <div><FLabel>Total votantes</FLabel><FInput type="number" value={form.total_votantes} onChange={e => setForm(p => ({ ...p, total_votantes: e.target.value }))} /></div>
-            <div><FLabel>Total votos</FLabel><FInput type="number" value={form.total_votos} onChange={e => setForm(p => ({ ...p, total_votos: e.target.value }))} /></div>
             <div><FLabel>URL do edital</FLabel><FInput value={form.edital_url} onChange={e => setForm(p => ({ ...p, edital_url: e.target.value }))} placeholder="https://..." /></div>
             <div><FLabel>URL da ata</FLabel><FInput value={form.ata_url} onChange={e => setForm(p => ({ ...p, ata_url: e.target.value }))} placeholder="https://..." /></div>
             <div className="col-span-2"><FLabel>Observações</FLabel><FTextarea rows={2} value={form.observacoes} onChange={e => setForm(p => ({ ...p, observacoes: e.target.value }))} /></div>
@@ -1493,8 +1491,6 @@ ${eleitores.map(el => `<div class="card">
             <div><FLabel>Data da eleição</FLabel><FInput type="date" value={form.data_eleicao} onChange={e => setForm(p => ({ ...p, data_eleicao: e.target.value }))} /></div>
             <div><FLabel>Status</FLabel><FSelect value={form.status} onChange={e => setForm(p => ({ ...p, status: e.target.value as EleicaoForm['status'] }))}><option value="planejada">Planejada</option><option value="em_andamento">Em andamento</option><option value="concluida">Concluída</option></FSelect></div>
             <div><FLabel>Mandato</FLabel><FSelect value={form.mandato_id} onChange={e => setForm(p => ({ ...p, mandato_id: e.target.value }))}><option value="">Nenhum</option>{mandatos.map(m => <option key={m.id} value={m.id}>{m.titulo}</option>)}</FSelect></div>
-            <div><FLabel>Total votantes</FLabel><FInput type="number" value={form.total_votantes} onChange={e => setForm(p => ({ ...p, total_votantes: e.target.value }))} /></div>
-            <div><FLabel>Total votos</FLabel><FInput type="number" value={form.total_votos} onChange={e => setForm(p => ({ ...p, total_votos: e.target.value }))} /></div>
             <div><FLabel>URL do edital</FLabel><FInput value={form.edital_url} onChange={e => setForm(p => ({ ...p, edital_url: e.target.value }))} placeholder="https://..." /></div>
             <div><FLabel>URL da ata</FLabel><FInput value={form.ata_url} onChange={e => setForm(p => ({ ...p, ata_url: e.target.value }))} placeholder="https://..." /></div>
             <div className="col-span-2"><FLabel>Observações</FLabel><FTextarea rows={2} value={form.observacoes} onChange={e => setForm(p => ({ ...p, observacoes: e.target.value }))} /></div>
