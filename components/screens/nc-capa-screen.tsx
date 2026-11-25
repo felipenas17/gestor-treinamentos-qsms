@@ -1726,6 +1726,18 @@ export function NCCAPAScreen({ items, onSave, onDelete }: NCCAPAScreenProps) {
     );
   }
 
+  function deadlineBadge(deadline: string | undefined | null, status: NCStatus) {
+    if (!deadline || status === 'Encerrada') return null;
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const due   = new Date(deadline + 'T00:00:00');
+    const diff  = Math.ceil((due.getTime() - today.getTime()) / 86400000);
+    if (diff < 0)
+      return <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-100 text-red-700">Vencido</span>;
+    if (diff <= 7)
+      return <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-700">{diff === 0 ? 'Hoje' : `${diff}d`}</span>;
+    return <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-600">{fmtDate(deadline)}</span>;
+  }
+
   function rowNum(idx: number) {
     return `#${String(idx + 1).padStart(3, '0')}`;
   }
@@ -1870,6 +1882,7 @@ export function NCCAPAScreen({ items, onSave, onDelete }: NCCAPAScreenProps) {
                       <th className="text-left px-4 py-3 w-28">Cliente</th>
                       <th className="text-left px-4 py-3">Descrição</th>
                       <th className="text-left px-4 py-3 w-32">Responsável</th>
+                      <th className="text-left px-4 py-3 w-24">Prazo</th>
                       <th className="text-left px-4 py-3 w-28">Prazo D1</th>
                       <th className="text-left px-4 py-3 w-36">Status</th>
                       <th className="px-4 py-3 w-20"></th>
@@ -1888,6 +1901,9 @@ export function NCCAPAScreen({ items, onSave, onDelete }: NCCAPAScreenProps) {
                           {nc.code && <p className="text-[10px] text-slate-400 font-mono mt-0.5">{nc.code}</p>}
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-600 whitespace-nowrap">{nc.responsible || '—'}</td>
+                        <td className="px-4 py-3">
+                          {deadlineBadge(nc.deadline, nc.status) ?? <span className="text-slate-300 text-xs">—</span>}
+                        </td>
                         <td className="px-4 py-3">
                           {nc.statusD1 ? (
                             <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold ${
