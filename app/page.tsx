@@ -39,6 +39,7 @@ import { IndicadoresAmbientaisScreen } from '@/components/screens/indicadores-am
 import { ResiduosEteScreen } from '@/components/screens/residuos-ete-screen';
 import GestaoMudancasScreen from '@/components/screens/gestao-mudancas-screen';
 import MapeamentoProcessosScreen from '@/components/screens/mapeamento-processos-screen';
+import RiscosOportunidadesScreen from '@/components/screens/riscos-oportunidades-screen';
 // import { ImportDocumentModal } from '@/components/modals/import-document-modal'; // modal não ativo
 
 import {
@@ -1730,6 +1731,9 @@ export default function GestorTreinamentosApp() {
           )}
           {currentTab === 'mapeamento-processos' && (
             <MapeamentoProcessosScreen />
+          )}
+          {currentTab === 'riscos-oportunidades' && (
+            <RiscosOportunidadesScreen />
           )}
         </main>
       </div>
