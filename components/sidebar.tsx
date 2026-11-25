@@ -99,6 +99,7 @@ const MODULES: Module[] = [
       { id: 'procedimentos',     label: 'Procedimentos & POPs', sublabel: 'Revisões e Vigência',     icon: FileText       },
       { id: 'doc-controle',      label: 'Controle Documental',  sublabel: 'Licenças e Autorizações', icon: Shield         },
       { id: 'obrigacoes-legais', label: 'Obrigações Legais',    sublabel: 'Cumprimento e Prazos',    icon: ClipboardCheck },
+      { id: 'gestao-mudancas',  label: 'Gestão de Mudanças',  sublabel: 'PG-TR-SMS-013 · FAM/GIM', icon: RefreshCw      },
     ],
   },
   {
@@ -144,14 +145,6 @@ const MODULES: Module[] = [
         items: [
           { id: 'indicadores-ambientais', label: 'Indicadores Ambientais', sublabel: 'ISO 14001 · Monitoramento', icon: Leaf },
           { id: 'residuos-ete', label: 'Resíduos / ETE', sublabel: 'NBR 10004 · Efluentes', icon: Trash2 },
-        ],
-      },
-      {
-        id: 'governanca-qsms',
-        label: 'Governança QSMS',
-        icon: RefreshCw,
-        items: [
-          { id: 'gestao-mudancas', label: 'Gestão de Mudanças', sublabel: 'PG-TR-SMS-013 · FAM/GIM', icon: RefreshCw },
         ],
       },
     ],
