@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   CheckCircle2,
   ChevronDown,
@@ -63,6 +63,31 @@ export function AssessmentsScreen({
   const [empLinksCopied, setEmpLinksCopied] = useState<Record<string, string>>({}); // employeeId → token
   const [empLinkTokens, setEmpLinkTokens] = useState<Record<string, string>>({}); // employeeId → token
 
+  // Auto-expand card after assessment generation
+  const [justGeneratedFor, setJustGeneratedFor] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!justGeneratedFor) return;
+    const ass = assessments.find(
+      (a) => a.procedureCode === justGeneratedFor && a.status !== 'Encerrada'
+    );
+    if (ass) {
+      setExpandedId(ass.id);
+      setJustGeneratedFor(null);
+    }
+  }, [justGeneratedFor, assessments]);
+
+  // Ordenar procedimentos: Rascunho (precisa aprovação) → Ativa → Sem avaliação
+  const sortedProcedures = useMemo(() => {
+    const statusOrder = (code: string): number => {
+      const ass = assessments.find((a) => a.procedureCode === code && a.status !== 'Encerrada');
+      if (!ass) return 2;
+      if (ass.status === 'Rascunho') return 0;
+      return 1;
+    };
+    return [...procedures].sort((a, b) => statusOrder(a.code) - statusOrder(b.code));
+  }, [procedures, assessments]);
+
   // Agrupar registros da matriz por data de validade, ordenados pela urgência
   const expirationGroups = useMemo(() => {
     const map = new Map<string, TrainingRecord[]>();
@@ -123,6 +148,8 @@ export function AssessmentsScreen({
     setGeneratingFor(proc.code);
     try {
       await onGenerateAssessment(proc);
+      // Sinaliza para auto-expandir o card após estado de assessments atualizar
+      setJustGeneratedFor(proc.code);
     } finally {
       setGeneratingFor(null);
     }
@@ -305,7 +332,7 @@ export function AssessmentsScreen({
 
       {/* Procedure → Assessment cards */}
       <div className="space-y-3">
-        {procedures.map((proc) => {
+        {sortedProcedures.map((proc) => {
           const assessment = getAssessmentForProc(proc.code);
           const isGenerating = generatingFor === proc.code;
           const cardId = assessment?.id ?? `proc-${proc.id}`;
@@ -511,11 +538,14 @@ export function AssessmentsScreen({
                               }}
                               className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-50 transition-colors text-left"
                             >
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 flex-wrap">
                                 <Link2 className="w-3.5 h-3.5 text-blue-600" />
                                 <span className="text-[11px] font-semibold text-slate-700">Links por Colaborador</span>
                                 <span className="text-[10px] bg-blue-50 text-blue-600 border border-blue-200 rounded-full px-1.5 py-0.5 font-medium">
                                   link individual · nome pré-preenchido
+                                </span>
+                                <span className="text-[10px] bg-slate-50 text-slate-500 border border-slate-200 rounded-full px-1.5 py-0.5 font-medium">
+                                  {assessment.maxAttempts ?? 2} tentativa{(assessment.maxAttempts ?? 2) !== 1 ? 's' : ''} por link
                                 </span>
                               </div>
                               {showEmployeeLinks === assessment.id

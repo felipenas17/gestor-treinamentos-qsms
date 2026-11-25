@@ -49,15 +49,12 @@ export async function POST(req: NextRequest) {
     .maybeSingle();
 
   if (link) {
-    // Validações do link
+    // Validações estáticas do link (não dependem de concorrência)
     if (!link.is_active) {
       return NextResponse.json({ error: 'Link desativado' }, { status: 403 });
     }
     if (new Date(link.expires_at) < new Date()) {
       return NextResponse.json({ error: 'Link expirado' }, { status: 403 });
-    }
-    if (link.uses_count >= link.max_uses) {
-      return NextResponse.json({ error: 'Limite de usos atingido' }, { status: 403 });
     }
     assessmentId = link.assessment_id;
     linkId = link.id;
@@ -93,18 +90,33 @@ export async function POST(req: NextRequest) {
   const score = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0;
   const passed = score >= minScore;
 
-  // ── Incrementa uses_count atomicamente (evita race condition com +1 lido) ──
+  // ── Incrementa uses_count atomicamente com check-and-increment (evita race condition) ──
+  // O RPC faz FOR UPDATE + verifica limite antes de incrementar numa única transação
   if (linkId) {
-    const { error: usesErr } = await supabase.rpc('increment_assessment_uses', {
+    const { data: usesData, error: usesErr } = await supabase.rpc('increment_assessment_uses', {
       p_link_id: linkId,
     });
     if (usesErr) {
-      // Fallback não-atômico se a função ainda não existir no banco
+      // Fallback não-atômico se a função não existir no banco
       console.warn('[submit] rpc increment_assessment_uses falhou, usando fallback:', usesErr.message);
+      const { data: currentLink } = await supabase
+        .from('assessment_links')
+        .select('uses_count, max_uses')
+        .eq('id', linkId)
+        .single();
+      if (currentLink && currentLink.uses_count >= currentLink.max_uses) {
+        return NextResponse.json({ error: 'Limite de usos atingido' }, { status: 403 });
+      }
       await supabase
         .from('assessment_links')
-        .update({ uses_count: (link?.uses_count ?? 0) + 1 })
+        .update({ uses_count: (currentLink?.uses_count ?? 0) + 1 })
         .eq('id', linkId);
+    } else {
+      // RPC retorna limit_reached=true se o limite já foi atingido (antes do increment)
+      const result = Array.isArray(usesData) ? usesData[0] : usesData;
+      if (result?.limit_reached) {
+        return NextResponse.json({ error: 'Limite de usos atingido' }, { status: 403 });
+      }
     }
   }
 
