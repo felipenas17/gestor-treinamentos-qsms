@@ -38,6 +38,7 @@ import { CipaScreen } from '@/components/screens/cipa-screen';
 import { IndicadoresAmbientaisScreen } from '@/components/screens/indicadores-ambientais-screen';
 import { ResiduosEteScreen } from '@/components/screens/residuos-ete-screen';
 import GestaoMudancasScreen from '@/components/screens/gestao-mudancas-screen';
+import MapeamentoProcessosScreen from '@/components/screens/mapeamento-processos-screen';
 // import { ImportDocumentModal } from '@/components/modals/import-document-modal'; // modal não ativo
 
 import {
@@ -1726,6 +1727,9 @@ export default function GestorTreinamentosApp() {
           )}
           {currentTab === 'gestao-mudancas' && (
             <GestaoMudancasScreen />
+          )}
+          {currentTab === 'mapeamento-processos' && (
+            <MapeamentoProcessosScreen />
           )}
         </main>
       </div>
