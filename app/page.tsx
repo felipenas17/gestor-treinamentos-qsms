@@ -18,6 +18,7 @@ import { ProcedureExamModal } from '@/components/modals/procedure-exam-modal';
 import { RegisterTrainingModal } from '@/components/modals/register-training-modal';
 import { NotifyModal } from '@/components/modals/notify-modal';
 import { TrainingHistoryModal } from '@/components/modals/training-history-modal';
+import { EmployeeHistoryModal } from '@/components/modals/employee-history-modal';
 import { EmployeesScreen } from '@/components/screens/employees-screen';
 import { CertificatesScreen } from '@/components/screens/certificates-screen';
 import { DocControlScreen } from '@/components/screens/doc-control-screen';
@@ -142,6 +143,9 @@ export default function GestorTreinamentosApp() {
   const [toastType, setToastType] = useState<'success' | 'error'>('success');
   const [complianceDelta, setComplianceDelta] = useState<number | null>(null);
   const [historyRecord, setHistoryRecord] = useState<TrainingRecord | null>(null);
+  const [employeeHistoryTarget, setEmployeeHistoryTarget] = useState<{
+    id: string; name: string; role?: string; sector?: string;
+  } | null>(null);
 
   // ─── Merge normative certs into dashboard data ───────────────────────────
   const adjustedMetrics = useMemo(() => {
@@ -808,6 +812,13 @@ export default function GestorTreinamentosApp() {
   const handleViewHistory = useCallback((rec: TrainingRecord) => {
     setHistoryRecord(rec);
   }, []);
+
+  const handleViewEmployeeHistory = useCallback(
+    (id: string, name: string, role?: string, sector?: string) => {
+      setEmployeeHistoryTarget({ id, name, role, sector });
+    },
+    []
+  );
 
   const handleSaveTrainingRecord = useCallback(async () => {
     showToast('Certificação registrada com sucesso!');
@@ -1543,6 +1554,7 @@ export default function GestorTreinamentosApp() {
                 setIsRegisterTrainingOpen(true);
               }}
               onViewHistory={handleViewHistory}
+              onViewEmployeeHistory={handleViewEmployeeHistory}
             />
           )}
           {currentTab === 'conformidade' && (
@@ -1736,6 +1748,16 @@ export default function GestorTreinamentosApp() {
           employeeName={historyRecord.employeeName}
           procedureCode={historyRecord.procedureCode}
           procedureName={historyRecord.procedureName}
+        />
+      )}
+      {employeeHistoryTarget && (
+        <EmployeeHistoryModal
+          isOpen={employeeHistoryTarget !== null}
+          onClose={() => setEmployeeHistoryTarget(null)}
+          employeeId={employeeHistoryTarget.id}
+          employeeName={employeeHistoryTarget.name}
+          employeeRole={employeeHistoryTarget.role}
+          employeeSector={employeeHistoryTarget.sector}
         />
       )}
       {/* <ImportDocumentModal isOpen={isImportDocOpen} onClose={() => setIsImportDocOpen(false)} onProcedureImported={handleProcedureImported} /> */}

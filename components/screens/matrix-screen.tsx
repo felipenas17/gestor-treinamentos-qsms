@@ -29,6 +29,7 @@ interface MatrixScreenProps {
   onSendLink: (assessmentId: string, employeeId: string) => Promise<string | null>;
   onRegisterTraining: (rec: TrainingRecord) => void;
   onViewHistory?: (rec: TrainingRecord) => void;
+  onViewEmployeeHistory?: (employeeId: string, employeeName: string, role?: string, sector?: string) => void;
 }
 
 export function MatrixScreen({
@@ -39,6 +40,7 @@ export function MatrixScreen({
   onSendLink,
   onRegisterTraining,
   onViewHistory,
+  onViewEmployeeHistory,
 }: MatrixScreenProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSector, setSelectedSector] = useState<string>('Todos');
@@ -89,10 +91,10 @@ export function MatrixScreen({
 
   // ─── Grouped by employee ─────────────────────────────────────────────────────
   const groupedByEmployee = useMemo(() => {
-    const map = new Map<string, { name: string; role: string; sector: string; avatar: string; records: TrainingRecord[] }>();
+    const map = new Map<string, { id: string; name: string; role: string; sector: string; avatar: string; records: TrainingRecord[] }>();
     filtered.forEach((r) => {
       if (!map.has(r.employeeId)) {
-        map.set(r.employeeId, { name: r.employeeName, role: r.employeeRole, sector: r.sector, avatar: r.employeeAvatar, records: [] });
+        map.set(r.employeeId, { id: r.employeeId, name: r.employeeName, role: r.employeeRole, sector: r.sector, avatar: r.employeeAvatar, records: [] });
       }
       map.get(r.employeeId)!.records.push(r);
     });
@@ -612,6 +614,23 @@ export function MatrixScreen({
                     )}
                   </div>
                 </button>
+
+                {/* Histórico do colaborador (botão separado, não dentro do button acima) */}
+                {onViewEmployeeHistory && emp.id && (
+                  <div className="flex justify-end px-4 py-1.5 bg-slate-50/60 border-t border-slate-100">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onViewEmployeeHistory(emp.id!, emp.name, emp.role, emp.sector);
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1 text-[11px] font-semibold rounded-lg bg-violet-50 text-violet-600 border border-violet-200 hover:bg-violet-100 transition-colors"
+                    >
+                      <History className="w-3 h-3" />
+                      Histórico de avaliações
+                    </button>
+                  </div>
+                )}
+
                 {/* Expanded: training records */}
                 {isExpanded && (
                   <div className="border-t border-slate-100 divide-y divide-slate-50">
