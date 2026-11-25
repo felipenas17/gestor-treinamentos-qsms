@@ -458,13 +458,23 @@ export default function GestorTreinamentosApp() {
         criticality: p.criticality || 'Média',
         description: p.description,
         validityMonths: p.validity_months || 12,
-        fileUrl: p.file_url || undefined,
+        fileUrl: p.pdf_url || p.file_url || undefined,
         // Controle documental
         docType: p.doc_type || undefined,
-        docLastRevisionDate: p.doc_last_revision_date || null,
+        docLastRevisionDate: p.issue_date || p.doc_last_revision_date || null,
         docRevisionMonths: p.doc_revision_months || undefined,
-        docNextRevisionDate: p.doc_next_revision_date || null,
-        docRevisionStatus: p.doc_revision_status || undefined,
+        docNextRevisionDate: p.next_revision_date || p.doc_next_revision_date || null,
+        docRevisionStatus: (() => {
+          if (p.doc_revision_status) return p.doc_revision_status;
+          const nextRev = p.next_revision_date || p.doc_next_revision_date;
+          if (!nextRev) return undefined;
+          const today = new Date();
+          const revDate = new Date(nextRev + 'T00:00:00');
+          const diffDays = Math.floor((revDate.getTime() - today.getTime()) / 86400000);
+          if (diffDays < 0) return 'Vencido';
+          if (diffDays <= 60) return 'Para Revisão';
+          return 'Vigente';
+        })(),
         docResponsible: p.doc_responsible || null,
         programContent: Array.isArray(p.program_content) && p.program_content.length > 0 ? p.program_content : undefined,
       };
