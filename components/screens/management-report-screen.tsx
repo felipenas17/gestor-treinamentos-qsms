@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   BarChart3, Download, FileText, GraduationCap, Scale,
   ShieldCheck, AlertTriangle, CheckCircle2, XCircle, Clock,
-  Calendar, Building2, Loader2,
+  Calendar, Building2, Loader2, TrendingUp, TrendingDown, Minus,
 } from 'lucide-react';
 
 import jsPDF from 'jspdf';
@@ -16,6 +16,8 @@ import {
 import {
   DocControl, LegalObligation, TrainingRecord, NonConformity, GlobalComplianceScore,
 } from '@/types';
+import { fetchComplianceTrend } from '@/lib/supabase';
+import { TrendChart, TrendPoint } from '@/components/ui/trend-chart';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -102,6 +104,11 @@ export function ManagementReportScreen({
 }: ManagementReportScreenProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const reportRef = useRef<HTMLDivElement>(null);
+  const [trend, setTrend] = useState<TrendPoint[]>([]);
+
+  useEffect(() => {
+    fetchComplianceTrend(90).then(setTrend).catch(() => {});
+  }, [complianceScore.overall]);
 
   // ─── Document stats ─────────────────────────────────────────────────────────
   const docStats = useMemo(() => {
@@ -206,6 +213,73 @@ export function ManagementReportScreen({
     { name: 'Em Andamento', value: ncStats.emAndamento, fill: '#f59e0b' },
     { name: 'Concluída', value: ncStats.concluidas, fill: '#10b981' },
   ], [ncStats]);
+
+  // ─── Executive narrative ─────────────────────────────────────────────────────
+  const executiveNarrative = useMemo(() => {
+    const overall = Math.round(complianceScore.overall);
+
+    // Status label
+    const statusLabel =
+      overall >= 80 ? 'Satisfatório' :
+      overall >= 60 ? 'Em Atenção' :
+      'Crítico';
+
+    // Trend sentence
+    let trendSentence = '';
+    if (trend.length >= 2) {
+      const delta = trend[trend.length - 1].score - trend[0].score;
+      if (Math.abs(delta) >= 1) {
+        const dir = delta > 0 ? 'alta' : 'queda';
+        trendSentence = ` O índice apresenta tendência de ${dir} de ${Math.abs(delta).toFixed(1)}pp nos últimos 90 dias.`;
+      } else {
+        trendSentence = ' O índice permanece estável nos últimos 90 dias.';
+      }
+    }
+
+    // Worst module
+    const worstModule = complianceScore.modules.reduce(
+      (prev, curr) => curr.score < prev.score ? curr : prev,
+      complianceScore.modules[0]
+    );
+
+    // Critical items sentence
+    const critItems: string[] = [];
+    if (docStats.vencidos > 0) critItems.push(`${docStats.vencidos} documento(s) vencido(s)`);
+    if (oblStats.vencidas > 0) critItems.push(`${oblStats.vencidas} obrigação(ões) legal(is) vencida(s)`);
+    if (trainStats.vencidos > 0) critItems.push(`${trainStats.vencidos} certificação(ões) expirada(s)`);
+
+    let critSentence = '';
+    if (critItems.length > 0) {
+      critSentence = ` Requerem ação imediata: ${critItems.join(', ')}.`;
+    }
+
+    // NC sentence
+    let ncSentence = '';
+    if (ncStats.criticas > 0) {
+      ncSentence = ` Há ${ncStats.criticas} não conformidade(s) crítica(s) em aberto com elaboração de CAPA prioritária.`;
+    } else if (ncStats.abertas > 0) {
+      ncSentence = ` Há ${ncStats.abertas} NC(s) em aberto aguardando tratamento.`;
+    }
+
+    // Closing recommendation
+    const needsAttention = complianceScore.modules
+      .filter((m) => m.score < 80)
+      .map((m) => m.module.split(' ')[0]);
+    const closeSentence =
+      needsAttention.length > 0
+        ? ` Prioridade de melhoria: ${needsAttention.join(', ')}.`
+        : ' Todos os módulos atingiram o índice mínimo recomendado.';
+
+    return {
+      overall,
+      statusLabel,
+      trendSentence,
+      worstModule: worstModule ? `${worstModule.module} (${Math.round(worstModule.score)}%)` : '',
+      critSentence,
+      ncSentence,
+      closeSentence,
+    };
+  }, [complianceScore, trend, docStats, oblStats, trainStats, ncStats]);
 
   const today = new Date().toLocaleDateString('pt-BR', {
     day: '2-digit', month: 'long', year: 'numeric',
@@ -318,6 +392,70 @@ export function ManagementReportScreen({
               <p className="font-semibold">{today}</p>
             </div>
           </div>
+        </div>
+
+        {/* ── Análise Executiva ── */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-5">
+          <div className="flex items-start justify-between gap-4 mb-4">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <ShieldCheck className="w-4 h-4 text-blue-500" />
+                <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Análise Executiva</h3>
+                <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
+                  executiveNarrative.overall >= 80
+                    ? 'bg-emerald-100 text-emerald-700'
+                    : executiveNarrative.overall >= 60
+                    ? 'bg-amber-100 text-amber-700'
+                    : 'bg-red-100 text-red-700'
+                }`}>
+                  {executiveNarrative.statusLabel}
+                </span>
+              </div>
+              <p className="text-sm text-slate-600 leading-relaxed">
+                O SGI Tiger Rentank apresenta conformidade de{' '}
+                <strong className={
+                  executiveNarrative.overall >= 80 ? 'text-emerald-700' :
+                  executiveNarrative.overall >= 60 ? 'text-amber-700' : 'text-red-700'
+                }>
+                  {executiveNarrative.overall}%
+                </strong>{' '}
+                em {today}.{executiveNarrative.trendSentence}
+                {executiveNarrative.worstModule && (
+                  <> O módulo com menor índice é <strong className="text-slate-700">{executiveNarrative.worstModule}</strong>.</>
+                )}
+                {executiveNarrative.critSentence}
+                {executiveNarrative.ncSentence}
+                {executiveNarrative.closeSentence}
+              </p>
+            </div>
+            {/* Delta indicator */}
+            {trend.length >= 2 && (() => {
+              const delta = trend[trend.length - 1].score - trend[0].score;
+              const Icon = delta > 0.5 ? TrendingUp : delta < -0.5 ? TrendingDown : Minus;
+              const cls = delta > 0.5 ? 'text-emerald-600 bg-emerald-50 border-emerald-200'
+                        : delta < -0.5 ? 'text-red-600 bg-red-50 border-red-200'
+                        : 'text-slate-500 bg-slate-50 border-slate-200';
+              return (
+                <div className={`shrink-0 flex flex-col items-center px-4 py-3 rounded-xl border ${cls}`}>
+                  <Icon className="w-5 h-5 mb-1" />
+                  <span className="text-xs font-semibold">
+                    {delta > 0 ? '+' : ''}{delta.toFixed(1)}pp
+                  </span>
+                  <span className="text-[10px] opacity-70">90d</span>
+                </div>
+              );
+            })()}
+          </div>
+
+          {/* Mini trend chart */}
+          {trend.length >= 2 && (
+            <div className="border-t border-slate-100 pt-3">
+              <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-2">
+                Tendência de Conformidade — 90 dias
+              </p>
+              <TrendChart data={trend} heightClass="h-14" />
+            </div>
+          )}
         </div>
 
         {/* ── Score Global + Alertas ── */}
