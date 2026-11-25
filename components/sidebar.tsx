@@ -20,6 +20,8 @@ import {
   FileCheck2,
   Layers,
   HardHat,
+  Leaf,
+  Trash2,
 } from 'lucide-react';
 
 interface NavItem {
@@ -132,6 +134,15 @@ const MODULES: Module[] = [
         items: [
           { id: 'laaipr', label: 'LAAIPR', sublabel: 'Aspectos, Impactos e Riscos', icon: Layers },
           { id: 'cipa', label: 'CIPA', sublabel: 'Comissão Interna de Prevenção', icon: HardHat },
+        ],
+      },
+      {
+        id: 'gestao-ambiental',
+        label: 'Gestão Ambiental',
+        icon: Leaf,
+        items: [
+          { id: 'indicadores-ambientais', label: 'Indicadores Ambientais', sublabel: 'ISO 14001 · Monitoramento', icon: Leaf },
+          { id: 'residuos-ete', label: 'Resíduos / ETE', sublabel: 'NBR 10004 · Efluentes', icon: Trash2 },
         ],
       },
     ],

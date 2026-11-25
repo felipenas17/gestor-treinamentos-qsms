@@ -39,6 +39,9 @@ export function Header({
       // SMS / Gestão de Riscos
       case 'laaipr':             return 'LAAIPR — Aspectos, Impactos e Riscos';
       case 'cipa':               return 'CIPA — Comissão Interna de Prevenção';
+      // SMS / Gestão Ambiental
+      case 'indicadores-ambientais': return 'Indicadores Ambientais — ISO 14001';
+      case 'residuos-ete':       return 'Resíduos / ETE — NBR 10004 · CONAMA';
       default:                   return 'SGI — Sistema de Gestão Integrado';
     }
   };
@@ -69,6 +72,9 @@ export function Header({
       // SMS / Gestão de Riscos
       case 'laaipr':             return 'SMS / Gestão de Riscos / LAAIPR';
       case 'cipa':               return 'SMS / Gestão de Riscos / CIPA';
+      // SMS / Gestão Ambiental
+      case 'indicadores-ambientais': return 'SMS / Gestão Ambiental / Indicadores';
+      case 'residuos-ete':       return 'SMS / Gestão Ambiental / Resíduos · ETE';
       default:                   return 'Tiger Rentank / QSMS';
     }
   };
