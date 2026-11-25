@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   ClipboardCheck, ChevronDown, ChevronRight,
   CheckCircle2, AlertTriangle, XCircle,
@@ -229,15 +229,9 @@ interface AuditScreenProps {
 }
 
 export function AuditScreen(_props: AuditScreenProps) {
-  const [history, setHistory] = useState<AuditRecord[]>([]);
+  const [history, setHistory] = useState<AuditRecord[]>(() => loadHistory());
   const [view, setView] = useState<'list' | 'detail'>('list');
   const [currentId, setCurrentId] = useState<string | null>(null);
-
-  // Load history once
-  useEffect(() => {
-    const h = loadHistory();
-    setHistory(h);
-  }, []);
 
   // Current audit
   const current = history.find(r => r.id === currentId) ?? null;
