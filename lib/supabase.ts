@@ -523,6 +523,17 @@ export async function saveComplianceSnapshot(metrics: {
   }, { onConflict: 'snapshot_date' });
 }
 
+export async function fetchComplianceTrend(days = 90): Promise<{ date: string; score: number }[]> {
+  if (!supabase) return [];
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  const { data } = await supabase
+    .from('compliance_snapshots')
+    .select('snapshot_date, general_compliance')
+    .gte('snapshot_date', since)
+    .order('snapshot_date', { ascending: true });
+  return (data ?? []).map((r: any) => ({ date: r.snapshot_date as string, score: r.general_compliance as number }));
+}
+
 // ─── Assessment History (tentativas por colaborador) ──────────────────────────
 
 export interface AssessmentAttempt {

@@ -1,12 +1,59 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   ShieldCheck, FileText, Scale, GraduationCap, ClipboardList,
   TrendingUp, TrendingDown, Minus, Info, RefreshCw,
   AlertTriangle, Clock, ChevronDown, ChevronUp, XCircle,
 } from 'lucide-react';
 import { GlobalComplianceScore, ModuleScore, AlertItem, BreakdownItem } from '@/types';
+import { fetchComplianceTrend } from '@/lib/supabase';
+
+// ─── Mini trend chart ─────────────────────────────────────────────────────────
+
+function TrendChart({ data }: { data: { date: string; score: number }[] }) {
+  if (data.length < 2) return (
+    <div className="flex items-center justify-center h-20 text-xs text-slate-400">
+      Histórico insuficiente — acumula com o uso diário
+    </div>
+  );
+
+  const W = 500; const H = 80; const PAD = 8;
+  const scores = data.map(d => d.score);
+  const minS = Math.max(0, Math.min(...scores) - 5);
+  const maxS = Math.min(100, Math.max(...scores) + 5);
+  const toX = (i: number) => PAD + (i / (data.length - 1)) * (W - PAD * 2);
+  const toY = (s: number) => H - PAD - ((s - minS) / (maxS - minS || 1)) * (H - PAD * 2);
+
+  const pts = data.map((d, i) => `${toX(i)},${toY(d.score)}`).join(' ');
+  const area = `M ${toX(0)},${H} L ${pts.split(' ').map((p, i) => i === 0 ? `${toX(0)},${toY(data[0].score)}` : p).join(' L ')} L ${toX(data.length - 1)},${H} Z`;
+  const last = data[data.length - 1].score;
+  const first = data[0].score;
+  const delta = last - first;
+  const color = last >= 80 ? '#10b981' : last >= 60 ? '#f59e0b' : '#ef4444';
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1 text-xs text-slate-500">
+        <span>{data[0].date.slice(5)} → {data[data.length - 1].date.slice(5)}</span>
+        <span className={`font-semibold ${delta > 0 ? 'text-emerald-600' : delta < 0 ? 'text-red-500' : 'text-slate-400'}`}>
+          {delta > 0 ? `+${delta.toFixed(1)}` : delta.toFixed(1)}pp
+        </span>
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-16" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="cg" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity="0.25" />
+            <stop offset="100%" stopColor={color} stopOpacity="0.02" />
+          </linearGradient>
+        </defs>
+        <path d={area} fill="url(#cg)" />
+        <polyline points={pts} fill="none" stroke={color} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+        <circle cx={toX(data.length - 1)} cy={toY(last)} r="4" fill={color} />
+      </svg>
+    </div>
+  );
+}
 
 // ─── Gauge ────────────────────────────────────────────────────────────────────
 
@@ -215,6 +262,11 @@ interface ComplianceScoreScreenProps {
 export function ComplianceScoreScreen({ score, onRefresh }: ComplianceScoreScreenProps) {
   const { overall, modules, generatedAt, alerts = [] } = score;
   const [alertsExpanded, setAlertsExpanded] = useState(true);
+  const [trend, setTrend] = useState<{ date: string; score: number }[]>([]);
+
+  useEffect(() => {
+    fetchComplianceTrend(90).then(setTrend).catch(() => {});
+  }, [overall]);
 
   const activeModules = useMemo(
     () => modules.filter((m) => m.total > 0),
@@ -315,6 +367,13 @@ export function ComplianceScoreScreen({ score, onRefresh }: ComplianceScoreScree
                 Calculado em {generatedDate}
               </p>
             </div>
+            {/* Histórico 90 dias */}
+            {trend.length > 0 && (
+              <div className="w-full border-t border-slate-100 pt-3">
+                <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-2">Tendência — 90 dias</p>
+                <TrendChart data={trend} />
+              </div>
+            )}
           </div>
 
           {/* Summary side */}
