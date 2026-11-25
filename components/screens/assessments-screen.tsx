@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, startTransition } from 'react';
 import {
   CheckCircle2,
   ChevronDown,
@@ -72,8 +72,11 @@ export function AssessmentsScreen({
       (a) => a.procedureCode === justGeneratedFor && a.status !== 'Encerrada'
     );
     if (ass) {
-      setExpandedId(ass.id);
-      setJustGeneratedFor(null);
+      const id = ass.id;
+      startTransition(() => {
+        setExpandedId(id);
+        setJustGeneratedFor(null);
+      });
     }
   }, [justGeneratedFor, assessments]);
 
