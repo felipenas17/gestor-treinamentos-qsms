@@ -668,7 +668,7 @@ export function PtPetScreen({ onToast }: Props) {
             <FileCheck2 className="w-5 h-5 text-blue-400" />
             PT / PET — Permissões de Trabalho
           </h1>
-          <p className="text-sm text-slate-400 mt-0.5">FOR-TR-SMS-042 · Gestão e emissão de permissões</p>
+          <p className="text-sm text-slate-300 mt-0.5">FOR-TR-SMS-042 · Gestão e emissão de permissões</p>
         </div>
         <button
           onClick={openNew}

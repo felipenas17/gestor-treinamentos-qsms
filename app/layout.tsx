@@ -2,17 +2,17 @@ import type {Metadata} from 'next';
 import './globals.css'; // Global styles
 
 export const metadata: Metadata = {
-  title: 'Gestor de Treinamentos Internos - QSMS Offshore',
-  description: 'Plataforma de gestão de treinamentos, procedimentos POPs, matriz de conformidade e avaliações de eficácia para operações offshore.',
+  title: 'SGI — Sistema de Gestão Integrado | Tiger Rentank',
+  description: 'Portal SGI Tiger Rentank — Qualidade, Segurança e Meio Ambiente. ISO 9001 · ISO 45001 · ISO 14001.',
   openGraph: {
-    title: 'Gestor de Treinamentos Internos - QSMS Offshore',
-    description: 'Plataforma de gestão de treinamentos, procedimentos POPs, matriz de conformidade e avaliações de eficácia para operações offshore.',
+    title: 'SGI — Sistema de Gestão Integrado | Tiger Rentank',
+    description: 'Portal SGI Tiger Rentank — Qualidade, Segurança e Meio Ambiente. ISO 9001 · ISO 45001 · ISO 14001.',
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Gestor de Treinamentos Internos - QSMS Offshore',
-    description: 'Plataforma de gestão de treinamentos, procedimentos POPs, matriz de conformidade e avaliações de eficácia para operações offshore.',
+    title: 'SGI — Sistema de Gestão Integrado | Tiger Rentank',
+    description: 'Portal SGI Tiger Rentank — Qualidade, Segurança e Meio Ambiente. ISO 9001 · ISO 45001 · ISO 14001.',
   },
 };
 

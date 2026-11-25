@@ -1,6 +1,6 @@
 {
-  "name": "Gestor de Treinamentos Internos - QSMS Offshore",
-  "description": "Plataforma de gestão de treinamentos, procedimentos POPs, matriz de conformidade e avaliações de eficácia para operações offshore.",
+  "name": "SGI — Sistema de Gestão Integrado | Tiger Rentank",
+  "description": "Portal SGI Tiger Rentank — Qualidade, Segurança e Meio Ambiente. ISO 9001 · ISO 45001 · ISO 14001.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
