@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   ClipboardCheck, ChevronDown, ChevronRight,
   CheckCircle2, AlertTriangle, XCircle,
   Printer, Save, RotateCcw, FileText, Shield, Leaf,
-  Cpu, ThumbsUp, Info,
+  Cpu, ThumbsUp, Info, Plus, ArrowLeft, Calendar, User,
+  Clock, TrendingUp,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { runAuditDiagnostic, DiagnosticMap, DiagnosticResult } from '@/lib/audit-diagnostic';
@@ -36,34 +37,34 @@ interface AuditInfo {
   modalidade: 'Presencial' | 'Remota' | 'Híbrida';
 }
 
-// ─── Checklist Data (extraído do Checklist_QSMS_TigerRentank_v4.1.xlsx) ─────
+interface AuditRecord {
+  id: string;
+  name: string;        // Ex: "AI-01/2026"
+  createdAt: string;   // ISO date
+  info: AuditInfo;
+  states: Record<string, ItemState>;
+}
+
+// ─── Checklist Data ───────────────────────────────────────────────────────────
 
 const QUALIDADE: ChecklistItem[] = [
-  // 1. Contexto da Organização
   { id:'Q1', section:'1. Contexto da Organização (Seção 4)', question:'A organização determina questões internas e externas pertinentes ao seu propósito que afetam o SGQ?', norma_ref:'ISO 9001:2015 – 4.1', requisito:'A norma exige que a organização identifique e monitore as questões internas (cultura, valores, recursos) e externas (ambiente legal, tecnológico, competitivo) relevantes ao seu contexto e aos seus objetivos estratégicos.', evidencias:['Análise de contexto documentada (SWOT, PESTEL)','Registro de revisão periódica das questões internas e externas','Ata de reunião de análise crítica abordando o contexto'] },
   { id:'Q2', section:'1. Contexto da Organização (Seção 4)', question:'O escopo do SGQ está definido, documentado e considera questões do contexto e requisitos das partes interessadas?', norma_ref:'ISO 9001:2015 – 4.3', requisito:'O escopo do SGQ deve ser determinado, documentado e disponível, informando os produtos e serviços cobertos e justificando quaisquer requisitos da norma que não se apliquem.', evidencias:['Documento de escopo do SGQ (manual ou documento específico)','Certificado ISO 9001 com escopo descrito','Exclusões justificadas quando aplicável'] },
   { id:'Q3', section:'1. Contexto da Organização (Seção 4)', question:'A organização possui mapeamento de processos com entradas, saídas, interações e responsáveis definidos?', norma_ref:'ISO 9001:2015 – 4.4', requisito:'A organização deve estabelecer, implementar, manter e melhorar o SGQ incluindo os processos necessários e suas interações, determinando entradas e saídas esperadas, sequência, critérios e responsabilidades.', evidencias:['Mapa de processos / fluxogramas documentados','Folhas de processo com entradas, saídas e responsáveis','Indicadores de processo definidos e monitorados'] },
-  // 2. Liderança
   { id:'Q4', section:'2. Liderança e Comprometimento (Seção 5)', question:'Responsabilidades e autoridades para funções relevantes ao SGQ estão atribuídas, comunicadas e compreendidas?', norma_ref:'ISO 9001:2015 – 5.3', requisito:'A alta direção deve assegurar que as responsabilidades e autoridades para funções relevantes são atribuídas, comunicadas e entendidas na organização, incluindo a designação de responsável pelo SGQ.', evidencias:['Organograma atualizado','Descrições de cargo com responsabilidades do SGQ','Designação formal do representante da qualidade'] },
-  // 3. Planejamento
   { id:'Q5', section:'3. Planejamento (Seção 6)', question:'Mudanças no SGQ são planejadas e executadas de forma controlada (Gestão de Mudanças)?', norma_ref:'ISO 9001:2015 – 6.3', requisito:'Quando a organização determina a necessidade de mudanças no SGQ, as mudanças devem ser realizadas de maneira planejada, considerando o propósito, a integridade do SGQ, a disponibilidade de recursos e a alocação de responsabilidades.', evidencias:['Procedimento de Gestão de Mudanças documentado','Registros de solicitações de mudança aprovadas (GM/FAM)','Evidência de avaliação de impacto antes da implementação'] },
-  // 4. Apoio / Suporte
   { id:'Q6', section:'4. Apoio / Suporte (Seção 7)', question:'Os recursos necessários (pessoas, infraestrutura, ambiente) estão determinados e disponibilizados?', norma_ref:'ISO 9001:2015 – 7.1', requisito:'A organização deve determinar e prover os recursos necessários para estabelecer, implementar, manter e melhorar continuamente o SGQ, incluindo recursos humanos, infraestrutura e ambiente para operação dos processos.', evidencias:['Plano de manutenção de infraestrutura','Registros de manutenção preventiva e corretiva de equipamentos','Condições adequadas observadas in loco (iluminação, limpeza, organização)'] },
   { id:'Q7', section:'4. Apoio / Suporte (Seção 7)', question:'Instrumentos de monitoramento e medição são calibrados e certificados? Registros estão válidos?', norma_ref:'ISO 9001:2015 – 7.1.5', requisito:'A organização deve determinar o monitoramento e a medição a ser realizado e os recursos necessários para assegurar resultados válidos e confiáveis. Equipamentos de medição devem ser calibrados em intervalos especificados.', evidencias:['Lista/inventário de equipamentos de medição com status de calibração','Certificados de calibração vigentes (rastreáveis ao INMETRO/RBC)','Procedimento de controle de instrumentos documentado'] },
   { id:'Q8', section:'4. Apoio / Suporte (Seção 7)', question:'A informação documentada (procedimentos, registros) é controlada, atualizada e acessível?', norma_ref:'ISO 9001:2015 – 7.5', requisito:'A organização deve controlar a informação documentada necessária para o SGQ, assegurando que está disponível, adequada para uso, protegida e retida pelo tempo necessário.', evidencias:['Procedimento de controle de documentos e registros','Lista mestre de documentos com revisões e aprovações','Evidência de controle de acesso e distribuição de documentos'] },
   { id:'Q9', section:'4. Apoio / Suporte (Seção 7)', question:'Os canais de comunicação interna e externa estão estabelecidos e funcionando?', norma_ref:'ISO 9001:2015 – 7.4', requisito:'A organização deve determinar as comunicações internas e externas pertinentes ao SGQ, incluindo o quê, quando, com quem, como e quem comunica.', evidencias:['Plano ou matriz de comunicação documentado','Exemplos de comunicações internas (murais, e-mails, reuniões, DDS)','Registros de comunicações externas com clientes e fornecedores'] },
-  // 5. Operação
   { id:'Q10', section:'5. Operação (Seção 8)', question:'O planejamento e controle operacional estão definidos para os processos de realização do produto/serviço?', norma_ref:'ISO 9001:2015 – 8.1', requisito:'A organização deve planejar, implementar, controlar, manter e reter informação documentada para ter confiança de que os processos foram realizados conforme planejado e para demonstrar a conformidade de produtos e serviços.', evidencias:['Instruções de trabalho / procedimentos operacionais por processo','Critérios de aceitação de produtos e serviços definidos','Registros de controle operacional'] },
   { id:'Q11', section:'5. Operação (Seção 8)', question:'Os requisitos de clientes são determinados, revisados e comunicados antes do fornecimento do produto/serviço?', norma_ref:'ISO 9001:2015 – 8.2', requisito:'A organização deve assegurar que tem a capacidade de atender os requisitos de produtos e serviços a serem oferecidos aos clientes, realizando análise crítica antes de se comprometer com o fornecimento.', evidencias:['Contratos/pedidos com requisitos do cliente documentados','Registros de análise crítica de contratos','Evidência de comunicação de requisitos alterados'] },
   { id:'Q12', section:'5. Operação (Seção 8)', question:'Fornecedores externos são controlados? Há critérios de qualificação e avaliação periódica?', norma_ref:'ISO 9001:2015 – 8.4', requisito:'A organização deve assegurar que os processos, produtos e serviços fornecidos externamente não afetam de forma adversa sua capacidade de atender os requisitos dos clientes, avaliando fornecedores criticamente.', evidencias:['Lista de fornecedores qualificados/aprovados','Procedimento de qualificação e avaliação de fornecedores críticos','Registros de avaliação periódica de desempenho de fornecedores'] },
   { id:'Q13', section:'5. Operação (Seção 8)', question:'Produtos não conformes são identificados, segregados e tratados para evitar uso não intencional?', norma_ref:'ISO 9001:2015 – 8.7', requisito:'A organização deve assegurar que as saídas que não estejam conformes com seus requisitos sejam identificadas e controladas para prevenir seu uso ou entrega não intencionais.', evidencias:['Procedimento de controle de produto não conforme','Área de segregação de material NC identificada (etiquetas, local físico)','Registros de disposição de produtos NCs (retrabalho, descarte, concessão)'] },
-  // 6. Avaliação de Desempenho
   { id:'Q14', section:'6. Avaliação de Desempenho (Seção 9)', question:'A satisfação dos clientes é monitorada com metodologia e indicadores definidos?', norma_ref:'ISO 9001:2015 – 9.1.2', requisito:'A organização deve monitorar a percepção dos clientes do grau em que seus requisitos foram atendidos, determinando os métodos para obter, monitorar e analisar criticamente essa informação.', evidencias:['Pesquisa de satisfação de clientes com resultados documentados','Indicador de satisfação com meta definida e histórico de resultados','Análise de reclamações e elogios de clientes'] },
   { id:'Q15', section:'6. Avaliação de Desempenho (Seção 9)', question:'A alta direção realiza Análise Crítica do SGQ periodicamente com registros (atas)?', norma_ref:'ISO 9001:2015 – 9.3', requisito:'A alta direção deve analisar criticamente o SGQ da organização, em intervalos planejados, para assegurar sua contínua conveniência, adequação, eficácia e alinhamento com a direção estratégica.', evidencias:['Atas de reunião de Análise Crítica (mínimo anual)','Evidência de análise das entradas obrigatórias (indicadores, auditorias, reclamações, riscos)','Registro de saídas da análise crítica com decisões e ações'] },
-  // 7. Melhoria Contínua
   { id:'Q16', section:'7. Melhoria Contínua (Seção 10)', question:'São tomadas ações corretivas eficazes para reclamações de clientes com rastreamento até a causa raiz?', norma_ref:'ISO 9001:2015 – 10.2', requisito:'A organização deve reagir à não conformidade, tomar ação para controlá-la e corrigi-la, investigar a causa raiz e implementar ações para que não se repita ou ocorra em outro local.', evidencias:['Registro de reclamações de clientes com data de abertura e fechamento','Respostas formais aos clientes com ações tomadas','Evidência de análise de causa raiz (5 Porquês, Ishikawa)'] },
   { id:'Q17', section:'7. Melhoria Contínua (Seção 10)', question:'A organização busca proativamente a melhoria contínua do SGQ?', norma_ref:'ISO 9001:2015 – 10.3', requisito:'A organização deve continuamente melhorar a conveniência, a adequação e a eficácia do SGQ, considerando os resultados da análise e avaliação e as saídas da análise crítica pela direção.', evidencias:['Projetos de melhoria contínua em andamento ou concluídos (Kaizen, 5S, PDCA)','Evidência de melhoria nos indicadores de qualidade ao longo do tempo','Ações proativas de melhoria não decorrentes apenas de NCs'] },
-  // 8. Requisitos Específicos Tiger Rentank
   { id:'Q18', section:'8. Requisitos Específicos – Tiger Rentank', question:'O fornecedor possui critérios para prevenção de trabalho infantil e trabalho análogo à escravidão?', norma_ref:'NBR 16001 / ODS 8 / Legislação Trabalhista', requisito:'A organização deve ter política de responsabilidade social e controles de recrutamento que impeçam o uso de trabalho infantil (menores de 18 anos em atividades noturnas, perigosas ou insalubres) ou análogo à escravidão.', evidencias:['Política de Responsabilidade Social ou código de conduta com cláusula específica','Procedimento de recrutamento com checagem de documentos','Declaração do fornecedor sobre não utilização de trabalho irregular'] },
   { id:'Q19', section:'8. Requisitos Específicos – Tiger Rentank', question:'O fornecedor controla subcontratados que atuam em seu nome para a Tiger Rentank?', norma_ref:'ISO 9001:2015 – 8.4 / Contrato Tiger Rentank', requisito:'A organização deve assegurar que os processos, produtos e serviços de fornecedores externos não afetam negativamente sua entrega ao cliente Tiger Rentank, aplicando os mesmos requisitos QSMS à cadeia de subcontratação.', evidencias:['Lista de subcontratados com qualificação documentada','Cláusulas contratuais com subcontratados sobre requisitos QSMS','Evidência de avaliação e monitoramento dos subcontratados'] },
   { id:'Q20', section:'8. Requisitos Específicos – Tiger Rentank', question:'O fornecedor cumpre com todo o licenciamento legal aplicável ao escopo de atividades?', norma_ref:'Legislação Brasileira', requisito:'A organização deve manter atualizados todos os alvarás, licenças e registros legais exigidos para o exercício de suas atividades, em conformidade com a legislação federal, estadual e municipal aplicável.', evidencias:['Alvará de funcionamento vigente','Licenças técnicas aplicáveis (CREA, ABNT, INMETRO, órgão ambiental)','Certidões de regularidade fiscal e trabalhista (CND, FGTS, Trabalhista)'] },
@@ -102,13 +103,74 @@ const AMBIENTAL: ChecklistItem[] = [
   { id:'A9', section:'4. Gestão de Produtos Químicos e Emergências', question:'O armazenamento de produtos químicos e inflamáveis atende aos requisitos de segurança e ambiente?', norma_ref:'NR-20 / NR-26 / ABNT NBR 17505', requisito:'O armazenamento de líquidos inflamáveis e combustíveis deve atender aos requisitos da NR-20 e ABNT NBR 17505, com contenção secundária, sinalização, ventilação adequada e proteção contra fontes de ignição.', evidencias:['Inspeção visual do local de armazenamento de químicos','Contenção secundária dimensionada (110% do maior volume armazenado)','Sinalização e identificação de riscos no local de armazenamento'] },
 ];
 
-// ─── Score helpers ─────────────────────────────────────────────────────────────
+// ─── Storage ──────────────────────────────────────────────────────────────────
 
-const STORAGE_KEY = 'audit_screen_state_v2';
+const HISTORY_KEY = 'audit_history_v1';
+const OLD_KEY = 'audit_screen_state_v2'; // para migração
 
-type TabId = 'qualidade' | 'seguranca' | 'ambiental' | 'plano';
+function loadHistory(): AuditRecord[] {
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY);
+    if (raw) return JSON.parse(raw) as AuditRecord[];
 
-function calcScore(items: ChecklistItem[], states: Record<string, ItemState>) {
+    // Migração: se havia dados antigos, cria o primeiro registro a partir deles
+    const oldRaw = localStorage.getItem(OLD_KEY);
+    if (oldRaw) {
+      const oldStates = JSON.parse(oldRaw) as Record<string, ItemState>;
+      const hasData = Object.values(oldStates).some(s => s.avaliacao);
+      if (hasData) {
+        const migrated: AuditRecord = {
+          id: 'migrated-' + Date.now(),
+          name: 'AI-01/' + new Date().getFullYear(),
+          createdAt: new Date().toISOString().slice(0, 10),
+          info: {
+            auditor: 'Luiz Felipe Nascimento',
+            data: new Date().toISOString().slice(0, 10),
+            tipo: 'Periódica',
+            modalidade: 'Presencial',
+          },
+          states: oldStates,
+        };
+        const history = [migrated];
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+        localStorage.removeItem(OLD_KEY);
+        return history;
+      }
+    }
+  } catch {}
+  return [];
+}
+
+function saveHistory(records: AuditRecord[]) {
+  try { localStorage.setItem(HISTORY_KEY, JSON.stringify(records)); } catch {}
+}
+
+function generateName(records: AuditRecord[]): string {
+  const year = new Date().getFullYear();
+  const countYear = records.filter(r => r.name.endsWith(`/${year}`)).length;
+  return `AI-${String(countYear + 1).padStart(2, '0')}/${year}`;
+}
+
+function newRecord(records: AuditRecord[]): AuditRecord {
+  return {
+    id: 'audit-' + Date.now(),
+    name: generateName(records),
+    createdAt: new Date().toISOString().slice(0, 10),
+    info: {
+      auditor: 'Luiz Felipe Nascimento',
+      data: new Date().toISOString().slice(0, 10),
+      tipo: 'Periódica',
+      modalidade: 'Presencial',
+    },
+    states: {},
+  };
+}
+
+// ─── Score helpers ────────────────────────────────────────────────────────────
+
+const ALL_ITEMS = [...QUALIDADE, ...SEGURANCA, ...AMBIENTAL];
+
+function calcScore(items: ChecklistItem[], states: Record<string, ItemState>): number | null {
   const evaluated = items.filter(it => {
     const av = states[it.id]?.avaliacao;
     return !!av && av !== 'NA';
@@ -116,15 +178,49 @@ function calcScore(items: ChecklistItem[], states: Record<string, ItemState>) {
   if (!evaluated.length) return null;
   const ok = evaluated.filter(it => states[it.id]?.avaliacao === 'OK').length;
   const om = evaluated.filter(it => states[it.id]?.avaliacao === 'OM').length;
-  // OK=1.0, OM=0.5, NC=0
-  const score = ((ok + om * 0.5) / evaluated.length) * 100;
-  return Math.round(score);
+  return Math.round(((ok + om * 0.5) / evaluated.length) * 100);
+}
+
+function scoreColor(s: number | null) {
+  if (s === null) return 'text-slate-400';
+  if (s >= 80) return 'text-emerald-600';
+  if (s >= 60) return 'text-amber-600';
+  return 'text-red-600';
+}
+
+function scoreBg(s: number | null) {
+  if (s === null) return 'bg-slate-50 border-slate-200';
+  if (s >= 80) return 'bg-emerald-50 border-emerald-200';
+  if (s >= 60) return 'bg-amber-50 border-amber-200';
+  return 'bg-red-50 border-red-200';
+}
+
+function getStatus(states: Record<string, ItemState>): {
+  label: string;
+  color: string;
+  bg: string;
+  border: string;
+} {
+  const hasAny = Object.values(states).some(s => s.avaliacao);
+  if (!hasAny) return { label: 'Não Iniciada', color: 'text-slate-500', bg: 'bg-slate-100', border: 'border-slate-300' };
+
+  const globalScore = calcScore(ALL_ITEMS, states);
+  const totalEvaluated = ALL_ITEMS.filter(it => {
+    const av = states[it.id]?.avaliacao;
+    return !!av;
+  }).length;
+  const isComplete = totalEvaluated >= ALL_ITEMS.length;
+
+  if (!isComplete) return { label: 'Em Andamento', color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-300' };
+  if (globalScore === null) return { label: 'Em Andamento', color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-300' };
+  if (globalScore >= 80) return { label: 'Aprovado', color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-400' };
+  if (globalScore >= 60) return { label: 'Parcialmente Conforme', color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-400' };
+  return { label: 'Reprovado', color: 'text-red-700', bg: 'bg-red-50', border: 'border-red-400' };
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
 interface AuditScreenProps {
-  // We don't use system data for this checklist
   procedures?: unknown[];
   records?: unknown[];
   documents?: unknown[];
@@ -133,27 +229,246 @@ interface AuditScreenProps {
 }
 
 export function AuditScreen(_props: AuditScreenProps) {
+  const [history, setHistory] = useState<AuditRecord[]>([]);
+  const [view, setView] = useState<'list' | 'detail'>('list');
+  const [currentId, setCurrentId] = useState<string | null>(null);
+
+  // Load history once
+  useEffect(() => {
+    const h = loadHistory();
+    setHistory(h);
+  }, []);
+
+  // Current audit
+  const current = history.find(r => r.id === currentId) ?? null;
+
+  // Helpers to update current audit
+  const updateCurrent = useCallback((updater: (r: AuditRecord) => AuditRecord) => {
+    if (!currentId) return;
+    setHistory(prev => {
+      const updated = prev.map(r => r.id === currentId ? updater(r) : r);
+      saveHistory(updated);
+      return updated;
+    });
+  }, [currentId]);
+
+  function openAudit(id: string) {
+    setCurrentId(id);
+    setView('detail');
+  }
+
+  function handleNewAudit() {
+    const rec = newRecord(history);
+    const updated = [rec, ...history];
+    setHistory(updated);
+    saveHistory(updated);
+    setCurrentId(rec.id);
+    setView('detail');
+  }
+
+  function handleBack() {
+    setView('list');
+    setCurrentId(null);
+  }
+
+  function handleDeleteAudit(id: string) {
+    if (!window.confirm('Excluir esta auditoria permanentemente?')) return;
+    const updated = history.filter(r => r.id !== id);
+    setHistory(updated);
+    saveHistory(updated);
+  }
+
+  // ─── List View ──────────────────────────────────────────────────────────────
+
+  if (view === 'list') {
+    return (
+      <div className="flex-1 flex flex-col min-h-0">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-3 border-b border-slate-100 bg-white gap-4 flex-wrap">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
+              <ClipboardCheck className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-slate-900">Auditorias Internas QSMS</h2>
+              <p className="text-[11px] text-slate-400">ISO 9001 · ISO 45001 · ISO 14001 — Tiger Rentank</p>
+            </div>
+          </div>
+          <button
+            onClick={handleNewAudit}
+            className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+          >
+            <Plus className="w-4 h-4" />
+            Nova Auditoria
+          </button>
+        </div>
+
+        {/* List */}
+        <div className="flex-1 overflow-y-auto px-6 py-4">
+          {history.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-24 text-center gap-4">
+              <div className="w-16 h-16 rounded-2xl bg-blue-50 flex items-center justify-center">
+                <ClipboardCheck className="w-8 h-8 text-blue-400" />
+              </div>
+              <p className="text-sm font-semibold text-slate-600">Nenhuma auditoria registrada</p>
+              <p className="text-xs text-slate-400">Clique em <strong>Nova Auditoria</strong> para iniciar o primeiro ciclo.</p>
+              <button
+                onClick={handleNewAudit}
+                className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition mt-2"
+              >
+                <Plus className="w-4 h-4" />
+                Nova Auditoria
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {history.map(rec => {
+                const globalScore = calcScore(ALL_ITEMS, rec.states);
+                const qScore = calcScore(QUALIDADE, rec.states);
+                const sScore = calcScore(SEGURANCA, rec.states);
+                const aScore = calcScore(AMBIENTAL, rec.states);
+                const status = getStatus(rec.states);
+                const totalEvaluated = ALL_ITEMS.filter(it => rec.states[it.id]?.avaliacao).length;
+                const ncCount = ALL_ITEMS.filter(it => rec.states[it.id]?.avaliacao === 'NC').length;
+
+                return (
+                  <div
+                    key={rec.id}
+                    className="bg-white border border-slate-200 rounded-xl p-4 hover:border-blue-200 hover:shadow-sm transition-all"
+                  >
+                    <div className="flex items-start gap-4">
+                      {/* Left: identity */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-mono font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-lg">
+                            {rec.name}
+                          </span>
+                          <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${status.bg} ${status.color} ${status.border}`}>
+                            {status.label}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-4 mt-2 flex-wrap">
+                          <span className="flex items-center gap-1 text-[11px] text-slate-500">
+                            <User className="w-3 h-3" /> {rec.info.auditor}
+                          </span>
+                          <span className="flex items-center gap-1 text-[11px] text-slate-500">
+                            <Calendar className="w-3 h-3" />
+                            {rec.info.data
+                              ? new Date(rec.info.data + 'T12:00:00').toLocaleDateString('pt-BR')
+                              : '—'}
+                          </span>
+                          <span className="flex items-center gap-1 text-[11px] text-slate-500">
+                            <Clock className="w-3 h-3" /> {rec.info.tipo} · {rec.info.modalidade}
+                          </span>
+                          <span className="text-[11px] text-slate-400">
+                            {totalEvaluated}/{ALL_ITEMS.length} itens avaliados
+                            {ncCount > 0 && <span className="ml-1 text-red-500 font-bold">· {ncCount} NC</span>}
+                          </span>
+                        </div>
+
+                        {/* Score mini-row */}
+                        <div className="flex items-center gap-2 mt-2.5 flex-wrap">
+                          <span className="flex items-center gap-1 text-[11px]">
+                            <TrendingUp className="w-3 h-3 text-slate-400" />
+                            <span className="text-slate-500 font-medium">Global:</span>
+                            <span className={`font-extrabold ${scoreColor(globalScore)}`}>
+                              {globalScore !== null ? `${globalScore}%` : '—'}
+                            </span>
+                          </span>
+                          <span className="text-slate-200">|</span>
+                          <span className="text-[11px] text-slate-400">
+                            Q: <span className={`font-bold ${scoreColor(qScore)}`}>{qScore !== null ? `${qScore}%` : '—'}</span>
+                          </span>
+                          <span className="text-[11px] text-slate-400">
+                            S: <span className={`font-bold ${scoreColor(sScore)}`}>{sScore !== null ? `${sScore}%` : '—'}</span>
+                          </span>
+                          <span className="text-[11px] text-slate-400">
+                            A: <span className={`font-bold ${scoreColor(aScore)}`}>{aScore !== null ? `${aScore}%` : '—'}</span>
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Right: actions */}
+                      <div className="flex flex-col gap-1.5 shrink-0">
+                        <button
+                          onClick={() => openAudit(rec.id)}
+                          className="px-3 py-1.5 text-xs font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                        >
+                          Abrir
+                        </button>
+                        <button
+                          onClick={() => handleDeleteAudit(rec.id)}
+                          className="px-3 py-1.5 text-xs font-semibold text-red-500 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition"
+                        >
+                          Excluir
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ─── Detail View ────────────────────────────────────────────────────────────
+
+  if (!current) return null;
+
+  return (
+    <DetailView
+      record={current}
+      onChange={updater => updateCurrent(updater)}
+      onBack={handleBack}
+    />
+  );
+}
+
+// ─── Detail sub-component ─────────────────────────────────────────────────────
+
+type TabId = 'qualidade' | 'seguranca' | 'ambiental' | 'plano';
+
+interface DetailViewProps {
+  record: AuditRecord;
+  onChange: (updater: (r: AuditRecord) => AuditRecord) => void;
+  onBack: () => void;
+}
+
+function DetailView({ record, onChange, onBack }: DetailViewProps) {
   const [tab, setTab] = useState<TabId>('qualidade');
-  const [info, setInfo] = useState<AuditInfo>({
-    auditor: 'Luiz Felipe Nascimento',
-    data: new Date().toISOString().slice(0, 10),
-    tipo: 'Periódica',
-    modalidade: 'Presencial',
-  });
-  const [states, setStates] = useState<Record<string, ItemState>>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      return saved ? JSON.parse(saved) : {};
-    } catch { return {}; }
-  });
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
   const [saved, setSaved] = useState(false);
 
-  // ── Diagnóstico automático ──────────────────────────────────────────────────
   const [diagnostic, setDiagnostic] = useState<DiagnosticMap | null>(null);
   const [diagLoading, setDiagLoading] = useState(false);
   const [diagError, setDiagError] = useState<string | null>(null);
   const [diagExpanded, setDiagExpanded] = useState<Record<string, boolean>>({});
+
+  const info = record.info;
+  const states = record.states;
+
+  function setInfo(updater: (prev: AuditInfo) => AuditInfo) {
+    onChange(r => ({ ...r, info: updater(r.info) }));
+  }
+
+  function getState(id: string): ItemState {
+    return states[id] ?? { avaliacao: '', evidencia_observada: '', parecer: '' };
+  }
+
+  function setState(id: string, patch: Partial<ItemState>) {
+    onChange(r => ({
+      ...r,
+      states: {
+        ...r.states,
+        [id]: { ...getState(id), ...(r.states[id] ?? {}), ...patch },
+      },
+    }));
+    setSaved(false);
+  }
 
   async function handleRunDiagnostic() {
     setDiagLoading(true);
@@ -170,11 +485,8 @@ export function AuditScreen(_props: AuditScreenProps) {
     }
   }
 
-  /** Monta texto estruturado de evidência para preencher automaticamente o campo */
   function buildEvidText(res: DiagnosticResult): string {
-    if (res.evidencias.length === 0) {
-      return 'Nenhum registro encontrado no sistema para este requisito.';
-    }
+    if (res.evidencias.length === 0) return 'Nenhum registro encontrado no sistema para este requisito.';
     const lista = res.evidencias.map((e, i) => `${i + 1}. ${e}`).join('\n');
     const conclusao = res.sugestao === 'OK'
       ? `✔ ${res.total} registro(s) atendendo ao requisito.`
@@ -190,18 +502,19 @@ export function AuditScreen(_props: AuditScreenProps) {
     if (hasData) {
       if (!window.confirm('Aplicar sugestões automáticas a todos os itens ainda não avaliados?')) return;
     }
-    const patch: Record<string, ItemState> = { ...states };
-    Object.entries(diagnostic).forEach(([id, res]) => {
-      const current = patch[id];
-      if (!current?.avaliacao) {
-        patch[id] = {
-          avaliacao: res.sugestao,
-          evidencia_observada: buildEvidText(res),
-          parecer: '',
-        };
-      }
+    onChange(r => {
+      const patch = { ...r.states };
+      Object.entries(diagnostic).forEach(([id, res]) => {
+        if (!patch[id]?.avaliacao) {
+          patch[id] = {
+            avaliacao: res.sugestao,
+            evidencia_observada: buildEvidText(res),
+            parecer: '',
+          };
+        }
+      });
+      return { ...r, states: patch };
     });
-    setStates(patch);
     setSaved(false);
   }
 
@@ -215,45 +528,26 @@ export function AuditScreen(_props: AuditScreenProps) {
     });
   }
 
-  // Persist to localStorage
-  useEffect(() => {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(states)); } catch {}
-  }, [states]);
-
-  function getState(id: string): ItemState {
-    return states[id] ?? { avaliacao: '', evidencia_observada: '', parecer: '' };
-  }
-
-  function setState(id: string, patch: Partial<ItemState>) {
-    setStates(prev => ({ ...prev, [id]: { ...getState(id), ...patch } }));
-    setSaved(false);
-  }
-
   function handleSave() {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(states)); } catch {}
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   }
 
   function handleReset() {
-    if (!window.confirm('Limpar todos os dados da auditoria?')) return;
-    setStates({});
-    try { localStorage.removeItem(STORAGE_KEY); } catch {}
+    if (!window.confirm('Limpar todas as respostas desta auditoria?')) return;
+    onChange(r => ({ ...r, states: {} }));
   }
 
-  // Scores
   const qScore = calcScore(QUALIDADE, states);
   const sScore = calcScore(SEGURANCA, states);
   const aScore = calcScore(AMBIENTAL, states);
-  const allItems = [...QUALIDADE, ...SEGURANCA, ...AMBIENTAL];
-  const globalScore = calcScore(allItems, states);
+  const globalScore = calcScore(ALL_ITEMS, states);
+  const status = getStatus(states);
 
-  // NC/OM lists for Plano de Ação
-  const ncItems = allItems.filter(it => states[it.id]?.avaliacao === 'NC');
-  const omItems = allItems.filter(it => states[it.id]?.avaliacao === 'OM');
+  const ncItems = ALL_ITEMS.filter(it => states[it.id]?.avaliacao === 'NC');
+  const omItems = ALL_ITEMS.filter(it => states[it.id]?.avaliacao === 'OM');
 
   function renderItems(items: ChecklistItem[]) {
-    // Group by section
     const sections: Record<string, ChecklistItem[]> = {};
     items.forEach(it => {
       if (!sections[it.section]) sections[it.section] = [];
@@ -271,14 +565,11 @@ export function AuditScreen(_props: AuditScreenProps) {
             const expanded = expandedItems[item.id] ?? false;
             const av = st.avaliacao;
             const avColor = av === 'OK' ? 'bg-emerald-50 border-emerald-200' : av === 'OM' ? 'bg-amber-50 border-amber-200' : av === 'NC' ? 'bg-red-50 border-red-200' : av === 'NA' ? 'bg-slate-50 border-slate-200' : 'bg-white border-slate-200';
-
-            // Diagnóstico automático para este item
             const diag = diagnostic?.[item.id];
             const diagEv = diagExpanded[item.id] ?? false;
 
             return (
               <div key={item.id} className={`rounded-xl border ${avColor} overflow-hidden transition-colors`}>
-                {/* Question header */}
                 <div className="px-4 py-3">
                   <div className="flex items-start gap-3">
                     <span className="text-[10px] font-mono font-bold text-slate-400 mt-0.5 shrink-0 w-6">{item.id}</span>
@@ -297,7 +588,6 @@ export function AuditScreen(_props: AuditScreenProps) {
                     <span className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded font-mono">{item.norma_ref}</span>
                   </div>
 
-                  {/* Avaliação buttons */}
                   <div className="flex items-center gap-1.5 mt-2.5 ml-9 flex-wrap">
                     {(['OK', 'OM', 'NC', 'NA'] as Avaliacao[]).map(opt => {
                       const active = av === opt;
@@ -322,22 +612,15 @@ export function AuditScreen(_props: AuditScreenProps) {
                     {av && <span className="ml-1 text-[11px] text-slate-400">{av === 'OK' ? 'Conforme' : av === 'OM' ? 'Oportunidade de Melhoria' : av === 'NC' ? 'Não Conformidade' : 'Não Avaliado'}</span>}
                   </div>
 
-                  {/* ── Badge de diagnóstico automático ──────────────────── */}
                   {diag && (
                     <div className="ml-9 mt-2.5">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        {/* Badge sugestão */}
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${
-                          diag.sugestao === 'OK'
-                            ? 'bg-emerald-100 text-emerald-700 border-emerald-300'
-                            : diag.sugestao === 'OM'
-                            ? 'bg-amber-100 text-amber-700 border-amber-300'
-                            : 'bg-red-100 text-red-700 border-red-300'
+                          diag.sugestao === 'OK' ? 'bg-emerald-100 text-emerald-700 border-emerald-300' : diag.sugestao === 'OM' ? 'bg-amber-100 text-amber-700 border-amber-300' : 'bg-red-100 text-red-700 border-red-300'
                         }`}>
                           <Cpu className="w-2.5 h-2.5" />
                           Sistema: {diag.sugestao} · {diag.total} reg.
                         </span>
-                        {/* Botão Aceitar */}
                         {!av && (
                           <button
                             type="button"
@@ -347,7 +630,6 @@ export function AuditScreen(_props: AuditScreenProps) {
                             <ThumbsUp className="w-2.5 h-2.5" /> Aceitar
                           </button>
                         )}
-                        {/* Toggle evidências encontradas */}
                         {diag.evidencias.length > 0 && (
                           <button
                             type="button"
@@ -358,7 +640,6 @@ export function AuditScreen(_props: AuditScreenProps) {
                           </button>
                         )}
                       </div>
-                      {/* Lista de evidências do sistema */}
                       {diagEv && diag.evidencias.length > 0 && (
                         <div className="mt-1.5 bg-purple-50 border border-purple-200 rounded-lg px-3 py-2">
                           <p className="text-[10px] font-bold uppercase tracking-widest text-purple-500 mb-1">Registros encontrados no sistema</p>
@@ -378,15 +659,12 @@ export function AuditScreen(_props: AuditScreenProps) {
                   )}
                 </div>
 
-                {/* Expanded detail */}
                 {expanded && (
                   <div className="border-t border-slate-200 px-4 py-3 space-y-3 bg-white/70">
-                    {/* Requisito */}
                     <div>
                       <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Requisito da Norma</p>
                       <p className="text-xs text-slate-600 leading-relaxed">{item.requisito}</p>
                     </div>
-                    {/* Evidências esperadas */}
                     <div>
                       <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Evidências Esperadas</p>
                       <ul className="space-y-0.5">
@@ -397,7 +675,6 @@ export function AuditScreen(_props: AuditScreenProps) {
                         ))}
                       </ul>
                     </div>
-                    {/* Evidência Observada */}
                     <div>
                       <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1 block">Evidência Observada</label>
                       <textarea
@@ -408,7 +685,6 @@ export function AuditScreen(_props: AuditScreenProps) {
                         className="w-full px-2.5 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none bg-white"
                       />
                     </div>
-                    {/* Parecer */}
                     <div>
                       <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1 block">Parecer do Auditor</label>
                       <textarea
@@ -429,50 +705,45 @@ export function AuditScreen(_props: AuditScreenProps) {
     ));
   }
 
-  function scoreColor(s: number | null) {
-    if (s === null) return 'text-slate-400';
-    if (s >= 80) return 'text-emerald-600';
-    if (s >= 60) return 'text-amber-600';
-    return 'text-red-600';
-  }
-  function scoreBg(s: number | null) {
-    if (s === null) return 'bg-slate-50 border-slate-200';
-    if (s >= 80) return 'bg-emerald-50 border-emerald-200';
-    if (s >= 60) return 'bg-amber-50 border-amber-200';
-    return 'bg-red-50 border-red-200';
-  }
-
   return (
     <div className="flex-1 flex flex-col min-h-0">
 
-      {/* ── Top bar ── */}
+      {/* Top bar */}
       <div className="flex items-center justify-between px-6 py-3 border-b border-slate-100 bg-white gap-4 flex-wrap print:hidden">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
-            <ClipboardCheck className="w-4 h-4 text-white" />
-          </div>
-          <div>
-            <h2 className="text-sm font-bold text-slate-900">Auditoria Interna QSMS</h2>
-            <p className="text-[11px] text-slate-400">ISO 9001 · ISO 45001 · ISO 14001 — Tiger Rentank</p>
+          <button
+            onClick={onBack}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-lg transition"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" /> Auditorias
+          </button>
+          <div className="w-px h-5 bg-slate-200" />
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center">
+              <ClipboardCheck className="w-3.5 h-3.5 text-white" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-bold text-slate-900">{record.name}</span>
+                <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${status.bg} ${status.color} ${status.border}`}>
+                  {status.label}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400">ISO 9001 · ISO 45001 · ISO 14001 — Tiger Rentank</p>
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Botão principal: Diagnóstico Automático */}
           <button
             onClick={handleRunDiagnostic}
             disabled={diagLoading}
             className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition ${
-              diagLoading
-                ? 'bg-purple-100 text-purple-400 cursor-wait'
-                : diagnostic
-                ? 'bg-purple-600 text-white hover:bg-purple-700'
-                : 'bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100'
+              diagLoading ? 'bg-purple-100 text-purple-400 cursor-wait' : diagnostic ? 'bg-purple-600 text-white hover:bg-purple-700' : 'bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100'
             }`}
           >
             <Cpu className="w-3.5 h-3.5" />
             {diagLoading ? 'Analisando…' : diagnostic ? 'Re-analisar' : 'Diagnóstico Automático'}
           </button>
-          {/* Aplicar sugestões quando diagnóstico pronto */}
           {diagnostic && (
             <button
               onClick={handleApplyAll}
@@ -492,22 +763,20 @@ export function AuditScreen(_props: AuditScreenProps) {
             <Printer className="w-3.5 h-3.5" /> Imprimir
           </button>
         </div>
-        {/* Banner de erro de diagnóstico */}
         {diagError && (
           <div className="w-full mt-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 flex items-center gap-2">
             <XCircle className="w-3.5 h-3.5 shrink-0" /> {diagError}
           </div>
         )}
-        {/* Banner de sucesso */}
         {diagnostic && !diagError && (
           <div className="w-full mt-2 text-xs text-purple-700 bg-purple-50 border border-purple-200 rounded-lg px-3 py-2 flex items-center gap-2">
             <Info className="w-3.5 h-3.5 shrink-0" />
-            Diagnóstico concluído — {Object.keys(diagnostic).length} itens analisados. Badges roxos indicam a sugestão do sistema. Clique em <strong>Aceitar</strong> por item ou use <strong>Aplicar Sugestões</strong> para preencher todos os não avaliados.
+            Diagnóstico concluído — {Object.keys(diagnostic).length} itens analisados. Badges roxos indicam a sugestão do sistema.
           </div>
         )}
       </div>
 
-      {/* ── Info da auditoria ── */}
+      {/* Info da auditoria */}
       <div className="px-6 py-3 bg-white border-b border-slate-100">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div>
@@ -533,7 +802,7 @@ export function AuditScreen(_props: AuditScreenProps) {
         </div>
       </div>
 
-      {/* ── Score cards ── */}
+      {/* Score cards */}
       <div className="px-6 py-3 bg-white border-b border-slate-100">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className={`rounded-xl border px-4 py-2.5 ${scoreBg(globalScore)}`}>
@@ -555,13 +824,13 @@ export function AuditScreen(_props: AuditScreenProps) {
         </div>
       </div>
 
-      {/* ── Tabs ── */}
+      {/* Tabs */}
       <div className="flex gap-1 px-6 py-2 bg-white border-b border-slate-100 print:hidden">
         {[
           { id: 'qualidade' as TabId, label: 'ISO 9001', count: QUALIDADE.length, icon: <FileText className="w-3.5 h-3.5" /> },
           { id: 'seguranca' as TabId, label: 'ISO 45001', count: SEGURANCA.length, icon: <Shield className="w-3.5 h-3.5" /> },
           { id: 'ambiental' as TabId, label: 'ISO 14001', count: AMBIENTAL.length, icon: <Leaf className="w-3.5 h-3.5" /> },
-          { id: 'plano' as TabId, label: `Plano de Ação`, count: ncItems.length + omItems.length, icon: <AlertTriangle className="w-3.5 h-3.5" /> },
+          { id: 'plano' as TabId, label: 'Plano de Ação', count: ncItems.length + omItems.length, icon: <AlertTriangle className="w-3.5 h-3.5" /> },
         ].map(t => (
           <button
             key={t.id}
@@ -578,7 +847,7 @@ export function AuditScreen(_props: AuditScreenProps) {
         ))}
       </div>
 
-      {/* ── Content ── */}
+      {/* Content */}
       <div className="flex-1 overflow-y-auto px-6 py-4">
         {tab === 'qualidade' && renderItems(QUALIDADE)}
         {tab === 'seguranca' && renderItems(SEGURANCA)}
@@ -586,7 +855,7 @@ export function AuditScreen(_props: AuditScreenProps) {
 
         {tab === 'plano' && (
           <div className="space-y-4">
-            <p className="text-xs text-slate-500">Itens classificados como <strong>NC</strong> (Não Conformidade) e <strong>OM</strong> (Oportunidade de Melhoria) — requer plano de ação com causa raiz, responsável e prazo.</p>
+            <p className="text-xs text-slate-500">Itens classificados como <strong>NC</strong> e <strong>OM</strong> — requer plano de ação com causa raiz, responsável e prazo.</p>
 
             {ncItems.length === 0 && omItems.length === 0 && (
               <div className="flex flex-col items-center justify-center py-16 text-center gap-3">
