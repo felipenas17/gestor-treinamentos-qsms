@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useRef } from 'react';
 import {
   GitBranch,
   Plus,
@@ -309,10 +309,7 @@ function FlowchartSVG({ swimlanes, etapas }: { swimlanes: Swimlane[]; etapas: Et
 // ─── Main screen ─────────────────────────────────────────────────────────────
 export default function MapeamentoProcessosScreen() {
   // ── Data state ──────────────────────────────────────────────────────────
-  const [processos, setProcessos] = useState<Processo[]>(() => {
-    void loadProcessos();
-    return [];
-  });
+  const [processos, setProcessos] = useState<Processo[]>([]);
   const [swimlaneMap, setSwimlaneMap] = useState<Record<string, Swimlane[]>>({});
   const [etapaMap, setEtapaMap] = useState<Record<string, Etapa[]>>({});
 
@@ -357,6 +354,10 @@ export default function MapeamentoProcessosScreen() {
       setLoading(false);
     }
   }
+
+  // Trigger initial load: lazy initializer runs synchronously on first render;
+  // by the time the async body of loadProcessos executes (microtask), all setters exist.
+  useState(() => { void loadProcessos(); return null; });
 
   async function loadDetail(processoId: string) {
     if (!supabase) return;
