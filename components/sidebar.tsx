@@ -22,6 +22,7 @@ import {
   HardHat,
   Leaf,
   Trash2,
+  RefreshCw,
 } from 'lucide-react';
 
 interface NavItem {
@@ -143,6 +144,14 @@ const MODULES: Module[] = [
         items: [
           { id: 'indicadores-ambientais', label: 'Indicadores Ambientais', sublabel: 'ISO 14001 · Monitoramento', icon: Leaf },
           { id: 'residuos-ete', label: 'Resíduos / ETE', sublabel: 'NBR 10004 · Efluentes', icon: Trash2 },
+        ],
+      },
+      {
+        id: 'governanca-qsms',
+        label: 'Governança QSMS',
+        icon: RefreshCw,
+        items: [
+          { id: 'gestao-mudancas', label: 'Gestão de Mudanças', sublabel: 'PG-TR-SMS-013 · FAM/GIM', icon: RefreshCw },
         ],
       },
     ],

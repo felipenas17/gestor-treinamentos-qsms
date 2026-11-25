@@ -37,6 +37,7 @@ import { LaaiprScreen } from '@/components/screens/laaipr-screen';
 import { CipaScreen } from '@/components/screens/cipa-screen';
 import { IndicadoresAmbientaisScreen } from '@/components/screens/indicadores-ambientais-screen';
 import { ResiduosEteScreen } from '@/components/screens/residuos-ete-screen';
+import GestaoMudancasScreen from '@/components/screens/gestao-mudancas-screen';
 // import { ImportDocumentModal } from '@/components/modals/import-document-modal'; // modal não ativo
 
 import {
@@ -1722,6 +1723,9 @@ export default function GestorTreinamentosApp() {
           )}
           {currentTab === 'residuos-ete' && (
             <ResiduosEteScreen onToast={showToast} />
+          )}
+          {currentTab === 'gestao-mudancas' && (
+            <GestaoMudancasScreen />
           )}
         </main>
       </div>
