@@ -25,6 +25,7 @@ import {
   RefreshCw,
   GitBranch,
   ShieldAlert,
+  Target,
 } from 'lucide-react';
 
 interface NavItem {
@@ -104,6 +105,7 @@ const MODULES: Module[] = [
       { id: 'gestao-mudancas',      label: 'Gestão de Mudanças',      sublabel: 'PG-TR-SMS-013 · FAM/GIM',         icon: RefreshCw  },
       { id: 'mapeamento-processos',    label: 'Mapeamento de Processos',    sublabel: 'Fluxos e Processos Operacionais',    icon: GitBranch   },
       { id: 'riscos-oportunidades',    label: 'Riscos e Oportunidades',     sublabel: 'Matriz SWOT & Análise de Riscos',    icon: ShieldAlert  },
+      { id: 'objetivos-metas',         label: 'Objetivos e Metas',          sublabel: 'Planejamento e Monitoramento do SGI', icon: Target       },
     ],
   },
   {
