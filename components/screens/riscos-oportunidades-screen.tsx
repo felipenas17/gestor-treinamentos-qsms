@@ -17,6 +17,9 @@ import {
   RefreshCw,
   History,
   FileText,
+  ThumbsUp,
+  ThumbsDown,
+  ClipboardCheck,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
@@ -55,6 +58,16 @@ interface PlanoItem {
   recurso: string | null;
   custo: string | null;
   status: 'Pendente' | 'Em andamento' | 'Concluído' | 'Cancelado';
+}
+
+interface RiscoEficacia {
+  id: string;
+  plano_id: string;
+  eficaz: boolean;
+  observacao: string | null;
+  data_avaliacao: string;
+  avaliado_por: string | null;
+  created_at: string;
 }
 
 interface RiscoRevisao {
@@ -154,7 +167,7 @@ const textareaCls = 'w-full bg-slate-800/80 border border-slate-700/60 rounded-l
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-type ActiveTab = 'swot' | 'analise' | 'planos' | 'revisoes';
+type ActiveTab = 'swot' | 'analise' | 'planos' | 'eficacia' | 'revisoes';
 type AnaliseForm = Partial<AnaliseItem> & { risco_antes: number; risco_depois: number };
 
 export default function RiscosOportunidadesScreen() {
@@ -166,6 +179,7 @@ export default function RiscosOportunidadesScreen() {
   const [swotItems,    setSwotItems]    = useState<SwotItem[]>([]);
   const [analiseItems, setAnaliseItems] = useState<AnaliseItem[]>([]);
   const [planoItems,   setPlanoItems]   = useState<PlanoItem[]>([]);
+  const [eficacias,    setEficacias]    = useState<RiscoEficacia[]>([]);
   const [revisoes,     setRevisoes]     = useState<RiscoRevisao[]>([]);
 
   // Modals
@@ -181,6 +195,12 @@ export default function RiscosOportunidadesScreen() {
   const [revisaoModal, setRevisaoModal] = useState<{ open: boolean; item: Partial<RiscoRevisao>; isNew: boolean }>(
     { open: false, item: { ...defaultRevisao, data: new Date().toISOString().split('T')[0] }, isNew: true }
   );
+  const [eficaciaModal, setEficaciaModal] = useState<{
+    open: boolean;
+    plano: PlanoItem | null;
+    existing: RiscoEficacia | null;
+  }>({ open: false, plano: null, existing: null });
+  const [eficaciaForm, setEficaciaForm] = useState<{ eficaz: boolean; observacao: string }>({ eficaz: true, observacao: '' });
 
   // ── Load ─────────────────────────────────────────────────────────────────────
 
@@ -189,19 +209,22 @@ export default function RiscosOportunidadesScreen() {
     setLoading(true);
     setError(null);
     try {
-      const [s, a, p, r] = await Promise.all([
+      const [s, a, p, e, r] = await Promise.all([
         supabase.from('riscos_swot').select('*').order('quadrante').order('ordem'),
         supabase.from('riscos_analise').select('*').order('requisito').order('created_at'),
         supabase.from('riscos_planos').select('*').order('origem').order('item_num'),
+        supabase.from('riscos_eficacia').select('*'),
         supabase.from('riscos_revisoes').select('*').order('numero', { ascending: false }),
       ]);
       if (s.error) throw s.error;
       if (a.error) throw a.error;
       if (p.error) throw p.error;
+      if (e.error) throw e.error;
       if (r.error) throw r.error;
       setSwotItems(s.data as SwotItem[]);
       setAnaliseItems(a.data as AnaliseItem[]);
       setPlanoItems(p.data as PlanoItem[]);
+      setEficacias(e.data as RiscoEficacia[]);
       setRevisoes(r.data as RiscoRevisao[]);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erro ao carregar dados');
@@ -381,6 +404,67 @@ export default function RiscosOportunidadesScreen() {
     }
   }
 
+  // ── Eficácia CRUD ─────────────────────────────────────────────────────────────
+
+  function openEficaciaModal(plano: PlanoItem) {
+    const existing = eficacias.find(e => e.plano_id === plano.id) ?? null;
+    setEficaciaForm({
+      eficaz: existing ? existing.eficaz : true,
+      observacao: existing?.observacao ?? '',
+    });
+    setEficaciaModal({ open: true, plano, existing });
+  }
+
+  async function saveEficacia() {
+    if (!supabase || !eficaciaModal.plano) return;
+    setLoading(true);
+    try {
+      const payload = {
+        plano_id: eficaciaModal.plano.id,
+        eficaz: eficaciaForm.eficaz,
+        observacao: eficaciaForm.observacao.trim() || null,
+        data_avaliacao: new Date().toISOString().split('T')[0],
+      };
+      if (eficaciaModal.existing) {
+        const { error: err } = await supabase.from('riscos_eficacia').update(payload).eq('id', eficaciaModal.existing.id);
+        if (err) throw err;
+      } else {
+        const { error: err } = await supabase.from('riscos_eficacia').insert(payload);
+        if (err) throw err;
+      }
+      const origemLabel = eficaciaModal.plano.origem === 'forca_oportunidade' ? 'FO' : 'FA';
+      const result = eficaciaForm.eficaz ? 'Eficaz' : 'Não eficaz';
+      await createAutoRevision(
+        `Avaliação de Eficácia — Plano ${origemLabel} #${eficaciaModal.plano.item_num}: ${result}`,
+        'riscos_eficacia'
+      );
+      setEficaciaModal({ open: false, plano: null, existing: null });
+      await loadAll();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Erro ao salvar eficácia');
+      setLoading(false);
+    }
+  }
+
+  async function deleteEficacia(id: string, plano: PlanoItem) {
+    if (!supabase) return;
+    if (!window.confirm('Remover avaliação de eficácia?')) return;
+    setLoading(true);
+    try {
+      const { error: err } = await supabase.from('riscos_eficacia').delete().eq('id', id);
+      if (err) throw err;
+      const origemLabel = plano.origem === 'forca_oportunidade' ? 'FO' : 'FA';
+      await createAutoRevision(
+        `Exclusão de Avaliação de Eficácia — Plano ${origemLabel} #${plano.item_num}`,
+        'riscos_eficacia'
+      );
+      await loadAll();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Erro ao remover');
+      setLoading(false);
+    }
+  }
+
   // ── Revisão CRUD ──────────────────────────────────────────────────────────────
 
   async function saveRevisao() {
@@ -481,7 +565,8 @@ export default function RiscosOportunidadesScreen() {
         {([
           { key: 'swot'    as const, label: 'Matriz SWOT'            },
           { key: 'analise' as const, label: 'Riscos & Oportunidades' },
-          { key: 'planos'  as const, label: 'Planos de Ação'         },
+          { key: 'planos'   as const, label: 'Planos de Ação'          },
+          { key: 'eficacia' as const, label: 'Eficácia'              },
           { key: 'revisoes' as const, label: 'Revisões'              },
         ]).map(tab => (
           <button
@@ -495,6 +580,19 @@ export default function RiscosOportunidadesScreen() {
           >
             {tab.key === 'revisoes' && <History className="w-3.5 h-3.5" />}
             {tab.label}
+            {tab.key === 'eficacia' && (() => {
+              const concluidos = planoItems.filter(p => p.status === 'Concluído').length;
+              const avaliados  = eficacias.length;
+              if (concluidos === 0) return null;
+              const all = avaliados >= concluidos;
+              return (
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${
+                  activeTab === 'eficacia'
+                    ? (all ? 'bg-green-800 text-green-200' : 'bg-rose-800 text-rose-200')
+                    : (all ? 'bg-green-900 text-green-400' : 'bg-slate-700 text-slate-400')
+                }`}>{avaliados}/{concluidos}</span>
+              );
+            })()}
             {tab.key === 'revisoes' && revisoes.length > 0 && (
               <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${
                 activeTab === 'revisoes' ? 'bg-rose-800 text-rose-200' : 'bg-slate-700 text-slate-400'
@@ -788,6 +886,138 @@ export default function RiscosOportunidadesScreen() {
           })}
         </div>
       )}
+
+      {/* ══════════════════════════════════════════════════════════════════════════
+          Tab: Eficácia
+      ══════════════════════════════════════════════════════════════════════════ */}
+      {!loading && activeTab === 'eficacia' && (() => {
+        const concluidos = planoItems.filter(p => p.status === 'Concluído');
+        const naoAvaliados = concluidos.filter(p => !eficacias.find(e => e.plano_id === p.id));
+        const eficazCount  = eficacias.filter(e => e.eficaz).length;
+        const naoEficazCount = eficacias.filter(e => !e.eficaz).length;
+
+        return (
+          <div>
+            {/* KPI row */}
+            {concluidos.length > 0 && (
+              <div className="grid grid-cols-3 gap-3 mb-5">
+                <div className="bg-slate-900/60 border border-slate-800/60 rounded-xl p-4 text-center">
+                  <p className="text-2xl font-bold text-slate-200">{concluidos.length}</p>
+                  <p className="text-xs text-slate-500 mt-0.5">Planos concluídos</p>
+                </div>
+                <div className="bg-green-900/20 border border-green-800/40 rounded-xl p-4 text-center">
+                  <p className="text-2xl font-bold text-green-400">{eficazCount}</p>
+                  <p className="text-xs text-slate-500 mt-0.5">Eficaz</p>
+                </div>
+                <div className="bg-rose-900/20 border border-rose-800/40 rounded-xl p-4 text-center">
+                  <p className="text-2xl font-bold text-rose-400">{naoEficazCount}</p>
+                  <p className="text-xs text-slate-500 mt-0.5">Não eficaz</p>
+                </div>
+              </div>
+            )}
+
+            {/* Pending evaluation banner */}
+            {naoAvaliados.length > 0 && (
+              <div className="mb-4 flex items-center gap-2 px-4 py-3 bg-yellow-900/20 border border-yellow-700/40 rounded-xl text-xs text-yellow-300">
+                <ClipboardCheck className="w-4 h-4 shrink-0" />
+                <span><strong>{naoAvaliados.length}</strong> plano{naoAvaliados.length > 1 ? 's' : ''} concluído{naoAvaliados.length > 1 ? 's' : ''} aguardando avaliação de eficácia.</span>
+              </div>
+            )}
+
+            {concluidos.length === 0 ? (
+              <div className="bg-slate-900/60 border border-slate-800/60 rounded-xl py-14 text-center">
+                <ClipboardCheck className="w-8 h-8 text-slate-600 mx-auto mb-3" />
+                <p className="text-sm text-slate-500">Nenhum plano de ação concluído ainda.</p>
+                <p className="text-xs text-slate-600 mt-1">A avaliação de eficácia estará disponível quando planos forem marcados como "Concluído".</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {([
+                  { key: 'forca_oportunidade' as const, label: 'Força + Oportunidade (FO)' },
+                  { key: 'fraqueza_ameaca'    as const, label: 'Fraqueza + Ameaça (FA)'    },
+                ]).map(sec => {
+                  const items = concluidos.filter(p => p.origem === sec.key);
+                  if (items.length === 0) return null;
+                  const origemLabel = sec.key === 'forca_oportunidade' ? 'FO' : 'FA';
+
+                  return (
+                    <div key={sec.key} className="bg-slate-900/60 border border-slate-800/60 rounded-xl overflow-hidden">
+                      <div className="px-4 py-2.5 border-b border-slate-800/40">
+                        <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide">{sec.label}</h3>
+                      </div>
+                      <div className="divide-y divide-slate-800/40">
+                        {items.map(plano => {
+                          const aval = eficacias.find(e => e.plano_id === plano.id);
+                          return (
+                            <div key={plano.id} className="px-4 py-3 flex items-start gap-4 group hover:bg-slate-800/20 transition-colors">
+                              {/* Número */}
+                              <span className="text-xs text-slate-500 font-mono mt-0.5 w-6 shrink-0">{origemLabel}{plano.item_num}</span>
+
+                              {/* Descrição */}
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm text-slate-300 leading-snug">{plano.descricao}</p>
+                                {aval && aval.observacao && (
+                                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                                    <span className="text-slate-600">↳</span> {aval.observacao}
+                                  </p>
+                                )}
+                                {aval && (
+                                  <p className="text-[11px] text-slate-600 mt-0.5">Avaliado em {fmtDate(aval.data_avaliacao)}</p>
+                                )}
+                              </div>
+
+                              {/* Badge eficácia */}
+                              <div className="shrink-0 flex items-center gap-2">
+                                {aval ? (
+                                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border ${
+                                    aval.eficaz
+                                      ? 'bg-green-900/40 text-green-300 border-green-700/40'
+                                      : 'bg-rose-900/40 text-rose-300 border-rose-700/40'
+                                  }`}>
+                                    {aval.eficaz
+                                      ? <><ThumbsUp className="w-3 h-3" /> Eficaz</>
+                                      : <><ThumbsDown className="w-3 h-3" /> Não eficaz</>
+                                    }
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs text-yellow-400 bg-yellow-900/20 border border-yellow-700/30">
+                                    <Clock className="w-3 h-3" />
+                                    Pendente
+                                  </span>
+                                )}
+
+                                {/* Actions */}
+                                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <button
+                                    onClick={() => openEficaciaModal(plano)}
+                                    className="p-1.5 hover:bg-slate-700 rounded-lg"
+                                    title={aval ? 'Editar avaliação' : 'Avaliar eficácia'}
+                                  >
+                                    <Edit2 className="w-3.5 h-3.5 text-slate-400" />
+                                  </button>
+                                  {aval && (
+                                    <button
+                                      onClick={() => deleteEficacia(aval.id, plano)}
+                                      className="p-1.5 hover:bg-rose-900/40 rounded-lg"
+                                      title="Remover avaliação"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* ══════════════════════════════════════════════════════════════════════════
           Tab: Revisões
@@ -1269,6 +1499,96 @@ export default function RiscosOportunidadesScreen() {
                 className="px-4 py-2 rounded-lg text-sm font-medium bg-rose-600 hover:bg-rose-500 disabled:opacity-40 text-white transition-colors"
               >
                 Salvar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════════════
+          Modal: Avaliação de Eficácia
+      ══════════════════════════════════════════════════════════════════════════ */}
+      {eficaciaModal.open && eficaciaModal.plano && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-slate-900 border border-slate-700/60 rounded-2xl w-full max-w-md shadow-2xl">
+            <div className="flex items-center justify-between p-5 border-b border-slate-800">
+              <h2 className="text-base font-semibold text-white flex items-center gap-2">
+                <ClipboardCheck className="w-4 h-4 text-teal-400" />
+                {eficaciaModal.existing ? 'Editar Avaliação de Eficácia' : 'Avaliar Eficácia'}
+              </h2>
+              <button
+                onClick={() => setEficaciaModal({ open: false, plano: null, existing: null })}
+                className="p-1.5 hover:bg-slate-800 rounded-lg"
+              >
+                <X className="w-4 h-4 text-slate-400" />
+              </button>
+            </div>
+
+            {/* Plano info */}
+            <div className="mx-5 mt-4 px-3 py-2.5 bg-slate-800/60 border border-slate-700/40 rounded-xl">
+              <p className="text-[11px] text-slate-500 uppercase tracking-wide font-semibold mb-0.5">
+                {eficaciaModal.plano.origem === 'forca_oportunidade' ? 'Força + Oportunidade' : 'Fraqueza + Ameaça'} · #{eficaciaModal.plano.item_num}
+              </p>
+              <p className="text-sm text-slate-300 leading-snug">{eficaciaModal.plano.descricao}</p>
+            </div>
+
+            <div className="p-5 space-y-4">
+              {/* Eficaz toggle */}
+              <div>
+                <label className={labelCls}>O plano foi eficaz? *</label>
+                <div className="flex gap-3 mt-1">
+                  <button
+                    onClick={() => setEficaciaForm(f => ({ ...f, eficaz: true }))}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border text-sm font-semibold transition-colors ${
+                      eficaciaForm.eficaz
+                        ? 'bg-green-900/60 border-green-600 text-green-300'
+                        : 'bg-slate-800/60 border-slate-700 text-slate-500 hover:border-slate-500'
+                    }`}
+                  >
+                    <ThumbsUp className="w-4 h-4" /> Sim, foi eficaz
+                  </button>
+                  <button
+                    onClick={() => setEficaciaForm(f => ({ ...f, eficaz: false }))}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border text-sm font-semibold transition-colors ${
+                      !eficaciaForm.eficaz
+                        ? 'bg-rose-900/60 border-rose-600 text-rose-300'
+                        : 'bg-slate-800/60 border-slate-700 text-slate-500 hover:border-slate-500'
+                    }`}
+                  >
+                    <ThumbsDown className="w-4 h-4" /> Não foi eficaz
+                  </button>
+                </div>
+              </div>
+
+              {/* Observação */}
+              <div>
+                <label className={labelCls}>Observação da Eficácia</label>
+                <textarea
+                  className={textareaCls}
+                  rows={3}
+                  placeholder={eficaciaForm.eficaz
+                    ? 'ex: Foi atendido pois as ações de controle reduziram o risco, foram implementados novos procedimentos...'
+                    : 'ex: Não foi eficaz pois o problema persiste, as ações não foram suficientes para...'
+                  }
+                  value={eficaciaForm.observacao}
+                  onChange={e => setEficaciaForm(f => ({ ...f, observacao: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-2 justify-end p-5 pt-0">
+              <button
+                onClick={() => setEficaciaModal({ open: false, plano: null, existing: null })}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={saveEficacia}
+                disabled={loading}
+                className="px-4 py-2 rounded-lg text-sm font-medium bg-teal-700 hover:bg-teal-600 disabled:opacity-40 text-white transition-colors"
+              >
+                {eficaciaModal.existing ? 'Atualizar Avaliação' : 'Registrar Avaliação'}
               </button>
             </div>
           </div>
