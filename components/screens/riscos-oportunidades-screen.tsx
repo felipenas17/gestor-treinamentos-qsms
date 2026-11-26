@@ -15,6 +15,8 @@ import {
   Clock,
   XCircle,
   RefreshCw,
+  History,
+  FileText,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
@@ -53,6 +55,17 @@ interface PlanoItem {
   recurso: string | null;
   custo: string | null;
   status: 'Pendente' | 'Em andamento' | 'Concluído' | 'Cancelado';
+}
+
+interface RiscoRevisao {
+  id: string;
+  numero: number;
+  descricao: string;
+  participantes: string | null;
+  data: string;
+  tabela_afetada: string | null;
+  created_by: string | null;
+  created_at: string;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -128,6 +141,10 @@ const defaultPlano = {
   responsavel: '', prazo: '', recurso: '', custo: '', status: 'Pendente' as const,
 };
 
+const defaultRevisao = {
+  descricao: '', participantes: '',
+};
+
 // ─── Shared input styles ──────────────────────────────────────────────────────
 
 const inputCls    = 'w-full bg-slate-800/80 border border-slate-700/60 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-rose-500/60 focus:ring-1 focus:ring-rose-500/30 transition-colors';
@@ -137,7 +154,7 @@ const textareaCls = 'w-full bg-slate-800/80 border border-slate-700/60 rounded-l
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-type ActiveTab = 'swot' | 'analise' | 'planos';
+type ActiveTab = 'swot' | 'analise' | 'planos' | 'revisoes';
 type AnaliseForm = Partial<AnaliseItem> & { risco_antes: number; risco_depois: number };
 
 export default function RiscosOportunidadesScreen() {
@@ -149,6 +166,7 @@ export default function RiscosOportunidadesScreen() {
   const [swotItems,    setSwotItems]    = useState<SwotItem[]>([]);
   const [analiseItems, setAnaliseItems] = useState<AnaliseItem[]>([]);
   const [planoItems,   setPlanoItems]   = useState<PlanoItem[]>([]);
+  const [revisoes,     setRevisoes]     = useState<RiscoRevisao[]>([]);
 
   // Modals
   const [swotModal, setSwotModal] = useState<{ open: boolean; item: Partial<SwotItem>; isNew: boolean }>(
@@ -160,6 +178,9 @@ export default function RiscosOportunidadesScreen() {
   const [planoModal, setPlanoModal] = useState<{ open: boolean; item: Partial<PlanoItem>; isNew: boolean }>(
     { open: false, item: { ...defaultPlano }, isNew: true }
   );
+  const [revisaoModal, setRevisaoModal] = useState<{ open: boolean; item: Partial<RiscoRevisao>; isNew: boolean }>(
+    { open: false, item: { ...defaultRevisao, data: new Date().toISOString().split('T')[0] }, isNew: true }
+  );
 
   // ── Load ─────────────────────────────────────────────────────────────────────
 
@@ -168,17 +189,20 @@ export default function RiscosOportunidadesScreen() {
     setLoading(true);
     setError(null);
     try {
-      const [s, a, p] = await Promise.all([
+      const [s, a, p, r] = await Promise.all([
         supabase.from('riscos_swot').select('*').order('quadrante').order('ordem'),
         supabase.from('riscos_analise').select('*').order('requisito').order('created_at'),
         supabase.from('riscos_planos').select('*').order('origem').order('item_num'),
+        supabase.from('riscos_revisoes').select('*').order('numero', { ascending: false }),
       ]);
       if (s.error) throw s.error;
       if (a.error) throw a.error;
       if (p.error) throw p.error;
+      if (r.error) throw r.error;
       setSwotItems(s.data as SwotItem[]);
       setAnaliseItems(a.data as AnaliseItem[]);
       setPlanoItems(p.data as PlanoItem[]);
+      setRevisoes(r.data as RiscoRevisao[]);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erro ao carregar dados');
     } finally {
@@ -188,6 +212,29 @@ export default function RiscosOportunidadesScreen() {
 
   // Lazy initializer runs synchronously on first render — AFTER function declaration
   useState(() => { void loadAll(); return null; });
+
+  // ── Auto-Revision ──────────────────────────────────────────────────────────
+
+  async function createAutoRevision(descricao: string, tabelaAfetada: string) {
+    if (!supabase) return;
+    try {
+      const { data } = await supabase
+        .from('riscos_revisoes')
+        .select('numero')
+        .order('numero', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const nextNum = ((data?.numero ?? -1) as number) + 1;
+      await supabase.from('riscos_revisoes').insert({
+        numero: nextNum,
+        descricao,
+        data: new Date().toISOString().split('T')[0],
+        tabela_afetada: tabelaAfetada,
+      });
+    } catch {
+      // non-critical
+    }
+  }
 
   // ── SWOT CRUD ─────────────────────────────────────────────────────────────────
 
@@ -201,9 +248,12 @@ export default function RiscosOportunidadesScreen() {
         const maxOrdem = swotItems.filter(i => i.quadrante === item.quadrante).length;
         const { error: err } = await supabase.from('riscos_swot').insert({ ...item, ordem: maxOrdem });
         if (err) throw err;
+        const qLabel = QUADRANTS.find(q => q.key === item.quadrante)?.label ?? item.quadrante;
+        await createAutoRevision(`Inclusão de item na Matriz SWOT — ${qLabel}: ${(item.descricao ?? '').substring(0, 80)}`, 'riscos_swot');
       } else {
         const { error: err } = await supabase.from('riscos_swot').update({ descricao: item.descricao, ordem: item.ordem }).eq('id', item.id!);
         if (err) throw err;
+        await createAutoRevision(`Atualização de item na Matriz SWOT: ${(item.descricao ?? '').substring(0, 80)}`, 'riscos_swot');
       }
       setSwotModal({ open: false, item: {}, isNew: true });
       await loadAll();
@@ -213,13 +263,14 @@ export default function RiscosOportunidadesScreen() {
     }
   }
 
-  async function deleteSwot(id: string) {
+  async function deleteSwot(id: string, descricao: string) {
     if (!supabase) return;
     if (!window.confirm('Remover este item da Matriz SWOT?')) return;
     setLoading(true);
     try {
       const { error: err } = await supabase.from('riscos_swot').delete().eq('id', id);
       if (err) throw err;
+      await createAutoRevision(`Exclusão de item na Matriz SWOT: ${descricao.substring(0, 80)}`, 'riscos_swot');
       await loadAll();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erro ao remover');
@@ -249,9 +300,11 @@ export default function RiscosOportunidadesScreen() {
       if (analiseModal.isNew) {
         const { error: err } = await supabase.from('riscos_analise').insert(payload);
         if (err) throw err;
+        await createAutoRevision(`Inclusão de ${payload.tipo} na Análise de Riscos — ${payload.requisito}: ${payload.descricao.substring(0, 60)}`, 'riscos_analise');
       } else {
         const { error: err } = await supabase.from('riscos_analise').update(payload).eq('id', item.id!);
         if (err) throw err;
+        await createAutoRevision(`Atualização de ${payload.tipo} na Análise de Riscos: ${payload.descricao.substring(0, 80)}`, 'riscos_analise');
       }
       setAnaliseModal({ open: false, item: { ...defaultAnalise, risco_antes: 0, risco_depois: 0 }, isNew: true });
       await loadAll();
@@ -261,13 +314,14 @@ export default function RiscosOportunidadesScreen() {
     }
   }
 
-  async function deleteAnalise(id: string) {
+  async function deleteAnalise(id: string, descricao: string) {
     if (!supabase) return;
     if (!window.confirm('Remover esta análise de risco/oportunidade?')) return;
     setLoading(true);
     try {
       const { error: err } = await supabase.from('riscos_analise').delete().eq('id', id);
       if (err) throw err;
+      await createAutoRevision(`Exclusão de item da Análise de Riscos: ${descricao.substring(0, 80)}`, 'riscos_analise');
       await loadAll();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erro ao remover');
@@ -294,12 +348,15 @@ export default function RiscosOportunidadesScreen() {
     };
     setLoading(true);
     try {
+      const origemLabel = payload.origem === 'forca_oportunidade' ? 'FO' : 'FA';
       if (planoModal.isNew) {
         const { error: err } = await supabase.from('riscos_planos').insert(payload);
         if (err) throw err;
+        await createAutoRevision(`Inclusão de Plano de Ação ${origemLabel} #${payload.item_num}: ${payload.descricao.substring(0, 60)}`, 'riscos_planos');
       } else {
         const { error: err } = await supabase.from('riscos_planos').update(payload).eq('id', item.id!);
         if (err) throw err;
+        await createAutoRevision(`Atualização de Plano de Ação ${origemLabel} #${payload.item_num}: ${payload.descricao.substring(0, 60)}`, 'riscos_planos');
       }
       setPlanoModal({ open: false, item: { ...defaultPlano }, isNew: true });
       await loadAll();
@@ -309,12 +366,57 @@ export default function RiscosOportunidadesScreen() {
     }
   }
 
-  async function deletePlano(id: string) {
+  async function deletePlano(id: string, origemLabel: string, itemNum: number, descricao: string) {
     if (!supabase) return;
     if (!window.confirm('Remover este plano de ação?')) return;
     setLoading(true);
     try {
       const { error: err } = await supabase.from('riscos_planos').delete().eq('id', id);
+      if (err) throw err;
+      await createAutoRevision(`Exclusão de Plano de Ação ${origemLabel} #${itemNum}: ${descricao.substring(0, 60)}`, 'riscos_planos');
+      await loadAll();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Erro ao remover');
+      setLoading(false);
+    }
+  }
+
+  // ── Revisão CRUD ──────────────────────────────────────────────────────────────
+
+  async function saveRevisao() {
+    if (!supabase) return;
+    const item = revisaoModal.item;
+    if (!item.descricao?.trim() || !item.data) return;
+    setLoading(true);
+    try {
+      const { data: maxData } = await supabase
+        .from('riscos_revisoes')
+        .select('numero')
+        .order('numero', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const nextNum = ((maxData?.numero ?? -1) as number) + 1;
+      const { error: err } = await supabase.from('riscos_revisoes').insert({
+        numero: nextNum,
+        descricao: item.descricao,
+        participantes: item.participantes?.trim() || null,
+        data: item.data,
+      });
+      if (err) throw err;
+      setRevisaoModal({ open: false, item: { ...defaultRevisao, data: new Date().toISOString().split('T')[0] }, isNew: true });
+      await loadAll();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Erro ao salvar revisão');
+      setLoading(false);
+    }
+  }
+
+  async function deleteRevisao(id: string) {
+    if (!supabase) return;
+    if (!window.confirm('Remover esta entrada do histórico de revisões?')) return;
+    setLoading(true);
+    try {
+      const { error: err } = await supabase.from('riscos_revisoes').delete().eq('id', id);
       if (err) throw err;
       await loadAll();
     } catch (e) {
@@ -330,6 +432,8 @@ export default function RiscosOportunidadesScreen() {
   const altosRiscos        = analiseItems.filter(a => a.risco_antes >= 10).length;
   const riscosReduzidos    = analiseItems.filter(a => a.risco_antes > 0 && a.risco_antes > a.risco_depois).length;
 
+  const ultimaRevisao = revisoes.length > 0 ? revisoes[0] : null;
+
   // ── Render ────────────────────────────────────────────────────────────────────
 
   return (
@@ -337,14 +441,22 @@ export default function RiscosOportunidadesScreen() {
 
       {/* Header */}
       <div className="mb-6">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-rose-600 to-red-700 flex items-center justify-center shadow-lg shadow-rose-900/30 shrink-0">
-            <ShieldAlert className="w-5 h-5 text-white" />
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-rose-600 to-red-700 flex items-center justify-center shadow-lg shadow-rose-900/30 shrink-0">
+              <ShieldAlert className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-white">Riscos e Oportunidades</h1>
+              <p className="text-xs text-slate-400">Matriz SWOT · Análise de Riscos · Planos de Ação · Revisões</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl font-bold text-white">Riscos e Oportunidades</h1>
-            <p className="text-xs text-slate-400">Matriz SWOT · Análise de Riscos · Planos de Ação</p>
-          </div>
+          {ultimaRevisao && (
+            <div className="text-right hidden md:block">
+              <p className="text-[11px] text-slate-500">Última revisão</p>
+              <p className="text-xs font-medium text-slate-300">Rev. {ultimaRevisao.numero} — {fmtDate(ultimaRevisao.data)}</p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -365,22 +477,29 @@ export default function RiscosOportunidadesScreen() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-5 bg-slate-900/60 rounded-xl p-1 w-fit">
+      <div className="flex gap-1 mb-5 bg-slate-900/60 rounded-xl p-1 w-fit flex-wrap">
         {([
           { key: 'swot'    as const, label: 'Matriz SWOT'            },
           { key: 'analise' as const, label: 'Riscos & Oportunidades' },
           { key: 'planos'  as const, label: 'Planos de Ação'         },
+          { key: 'revisoes' as const, label: 'Revisões'              },
         ]).map(tab => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 ${
               activeTab === tab.key
                 ? 'bg-rose-600 text-white shadow-lg shadow-rose-900/30'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
             }`}
           >
+            {tab.key === 'revisoes' && <History className="w-3.5 h-3.5" />}
             {tab.label}
+            {tab.key === 'revisoes' && revisoes.length > 0 && (
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${
+                activeTab === 'revisoes' ? 'bg-rose-800 text-rose-200' : 'bg-slate-700 text-slate-400'
+              }`}>{revisoes.length}</span>
+            )}
           </button>
         ))}
       </div>
@@ -452,7 +571,7 @@ export default function RiscosOportunidadesScreen() {
                           <Edit2 className="w-3 h-3 text-slate-400" />
                         </button>
                         <button
-                          onClick={() => deleteSwot(item.id)}
+                          onClick={() => deleteSwot(item.id, item.descricao)}
                           className="p-1 hover:bg-rose-900/40 rounded"
                           title="Remover"
                         >
@@ -555,7 +674,7 @@ export default function RiscosOportunidadesScreen() {
                               <Edit2 className="w-3.5 h-3.5 text-slate-400" />
                             </button>
                             <button
-                              onClick={() => deleteAnalise(item.id)}
+                              onClick={() => deleteAnalise(item.id, item.descricao)}
                               className="p-1.5 hover:bg-rose-900/40 rounded-lg"
                               title="Remover"
                             >
@@ -594,6 +713,7 @@ export default function RiscosOportunidadesScreen() {
             { key: 'fraqueza_ameaca'    as const, label: 'Fraqueza + Ameaça (FA)',    bg: 'bg-amber-950/40',   border: 'border-amber-800/40',   textCl: 'text-amber-300'   },
           ]).map(sec => {
             const items = planoItems.filter(p => p.origem === sec.key);
+            const origemLabel = sec.key === 'forca_oportunidade' ? 'FO' : 'FA';
             return (
               <div key={sec.key} className={`mb-5 ${sec.bg} ${sec.border} border rounded-xl overflow-hidden`}>
                 <div className="px-4 py-3 border-b border-slate-800/40 flex items-center justify-between">
@@ -649,7 +769,7 @@ export default function RiscosOportunidadesScreen() {
                                   <Edit2 className="w-3 h-3 text-slate-400" />
                                 </button>
                                 <button
-                                  onClick={() => deletePlano(item.id)}
+                                  onClick={() => deletePlano(item.id, origemLabel, item.item_num, item.descricao)}
                                   className="p-1 hover:bg-rose-900/40 rounded"
                                   title="Remover"
                                 >
@@ -666,6 +786,91 @@ export default function RiscosOportunidadesScreen() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════════════
+          Tab: Revisões
+      ══════════════════════════════════════════════════════════════════════════ */}
+      {!loading && activeTab === 'revisoes' && (
+        <div>
+          {/* Header row */}
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <History className="w-4 h-4 text-slate-400" />
+              <p className="text-sm text-slate-400">
+                Histórico de revisões do documento — gerado automaticamente a cada alteração.
+              </p>
+            </div>
+            <button
+              onClick={() => setRevisaoModal({ open: true, item: { ...defaultRevisao, data: new Date().toISOString().split('T')[0] }, isNew: true })}
+              className="flex items-center gap-2 px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-sm font-medium transition-colors shadow-lg shadow-rose-900/30 shrink-0"
+            >
+              <Plus className="w-4 h-4" />
+              Nova Revisão
+            </button>
+          </div>
+
+          {/* Revision table */}
+          <div className="bg-slate-900/60 border border-slate-800/60 rounded-xl overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-800/60 bg-slate-900/80">
+                    <th className="text-center px-4 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide w-16">Rev.</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Descrição da Alteração</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Participantes / Responsável</th>
+                    <th className="text-center px-4 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide whitespace-nowrap">Data</th>
+                    <th className="text-center px-3 py-3 w-16"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/40">
+                  {revisoes.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="py-10 text-center text-sm text-slate-500">
+                        Nenhuma revisão registrada ainda
+                      </td>
+                    </tr>
+                  )}
+                  {revisoes.map(rev => (
+                    <tr key={rev.id} className="hover:bg-slate-800/30 transition-colors group">
+                      <td className="px-4 py-3 text-center">
+                        <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-rose-900/40 border border-rose-700/40 text-rose-300 text-sm font-bold">
+                          {rev.numero}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 align-top max-w-xs">
+                        <div className="flex items-start gap-2">
+                          <FileText className="w-3.5 h-3.5 text-slate-500 mt-0.5 shrink-0" />
+                          <p className="text-sm text-slate-300 leading-relaxed">{rev.descricao}</p>
+                        </div>
+                        {rev.tabela_afetada && rev.tabela_afetada !== 'auto' && (
+                          <p className="text-[11px] text-slate-600 mt-0.5 ml-5">↳ {rev.tabela_afetada}</p>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 align-top">
+                        <p className="text-xs text-slate-400">{rev.participantes || '—'}</p>
+                      </td>
+                      <td className="px-4 py-3 text-center align-top">
+                        <span className="text-xs text-slate-400 font-mono whitespace-nowrap">{fmtDate(rev.data)}</span>
+                      </td>
+                      <td className="px-3 py-3 align-top">
+                        <div className="flex justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => deleteRevisao(rev.id)}
+                            className="p-1.5 hover:bg-rose-900/40 rounded-lg"
+                            title="Remover"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       )}
 
@@ -1064,6 +1269,73 @@ export default function RiscosOportunidadesScreen() {
                 className="px-4 py-2 rounded-lg text-sm font-medium bg-rose-600 hover:bg-rose-500 disabled:opacity-40 text-white transition-colors"
               >
                 Salvar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════════════
+          Modal: Nova Revisão
+      ══════════════════════════════════════════════════════════════════════════ */}
+      {revisaoModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-slate-900 border border-slate-700/60 rounded-2xl w-full max-w-md shadow-2xl">
+            <div className="flex items-center justify-between p-5 border-b border-slate-800">
+              <h2 className="text-base font-semibold text-white flex items-center gap-2">
+                <History className="w-4 h-4 text-rose-400" />
+                Nova Revisão Manual
+              </h2>
+              <button
+                onClick={() => setRevisaoModal({ open: false, item: { ...defaultRevisao, data: new Date().toISOString().split('T')[0] }, isNew: true })}
+                className="p-1.5 hover:bg-slate-800 rounded-lg"
+              >
+                <X className="w-4 h-4 text-slate-400" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className={labelCls}>Descrição da Alteração *</label>
+                <textarea
+                  className={textareaCls}
+                  rows={3}
+                  placeholder="ex: Revisão para inclusão de novos itens de risco identificados na auditoria..."
+                  value={revisaoModal.item.descricao ?? ''}
+                  onChange={e => setRevisaoModal(m => ({ ...m, item: { ...m.item, descricao: e.target.value } }))}
+                />
+              </div>
+              <div>
+                <label className={labelCls}>Participantes / Responsável</label>
+                <input
+                  className={inputCls}
+                  placeholder="Nome, Cargo... (separados por vírgula)"
+                  value={revisaoModal.item.participantes ?? ''}
+                  onChange={e => setRevisaoModal(m => ({ ...m, item: { ...m.item, participantes: e.target.value } }))}
+                />
+              </div>
+              <div>
+                <label className={labelCls}>Data *</label>
+                <input
+                  type="date"
+                  className={inputCls}
+                  value={revisaoModal.item.data ?? ''}
+                  onChange={e => setRevisaoModal(m => ({ ...m, item: { ...m.item, data: e.target.value } }))}
+                />
+              </div>
+            </div>
+            <div className="flex gap-2 justify-end p-5 pt-0">
+              <button
+                onClick={() => setRevisaoModal({ open: false, item: { ...defaultRevisao, data: new Date().toISOString().split('T')[0] }, isNew: true })}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={saveRevisao}
+                disabled={!revisaoModal.item.descricao?.trim() || !revisaoModal.item.data || loading}
+                className="px-4 py-2 rounded-lg text-sm font-medium bg-rose-600 hover:bg-rose-500 disabled:opacity-40 text-white transition-colors"
+              >
+                Registrar Revisão
               </button>
             </div>
           </div>
