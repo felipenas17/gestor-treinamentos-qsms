@@ -928,7 +928,7 @@ export default function RiscosOportunidadesScreen() {
               <div className="bg-slate-900/60 border border-slate-800/60 rounded-xl py-14 text-center">
                 <ClipboardCheck className="w-8 h-8 text-slate-600 mx-auto mb-3" />
                 <p className="text-sm text-slate-500">Nenhum plano de ação concluído ainda.</p>
-                <p className="text-xs text-slate-600 mt-1">A avaliação de eficácia estará disponível quando planos forem marcados como "Concluído".</p>
+                <p className="text-xs text-slate-600 mt-1">A avaliação de eficácia estará disponível quando planos forem marcados como &quot;Concluído&quot;.</p>
               </div>
             ) : (
               <div className="space-y-3">
