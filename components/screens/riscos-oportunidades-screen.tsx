@@ -432,12 +432,6 @@ export default function RiscosOportunidadesScreen() {
         const { error: err } = await supabase.from('riscos_eficacia').insert(payload);
         if (err) throw err;
       }
-      const origemLabel = eficaciaModal.plano.origem === 'forca_oportunidade' ? 'FO' : 'FA';
-      const result = eficaciaForm.eficaz ? 'Eficaz' : 'Não eficaz';
-      await createAutoRevision(
-        `Avaliação de Eficácia — Plano ${origemLabel} #${eficaciaModal.plano.item_num}: ${result}`,
-        'riscos_eficacia'
-      );
       setEficaciaModal({ open: false, plano: null, existing: null });
       await loadAll();
     } catch (e) {
@@ -453,11 +447,6 @@ export default function RiscosOportunidadesScreen() {
     try {
       const { error: err } = await supabase.from('riscos_eficacia').delete().eq('id', id);
       if (err) throw err;
-      const origemLabel = plano.origem === 'forca_oportunidade' ? 'FO' : 'FA';
-      await createAutoRevision(
-        `Exclusão de Avaliação de Eficácia — Plano ${origemLabel} #${plano.item_num}`,
-        'riscos_eficacia'
-      );
       await loadAll();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erro ao remover');
