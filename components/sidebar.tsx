@@ -26,6 +26,7 @@ import {
   GitBranch,
   ShieldAlert,
   Target,
+  Handshake,
 } from 'lucide-react';
 
 interface NavItem {
@@ -106,6 +107,7 @@ const MODULES: Module[] = [
       { id: 'mapeamento-processos',    label: 'Mapeamento de Processos',    sublabel: 'Fluxos e Processos Operacionais',    icon: GitBranch   },
       { id: 'riscos-oportunidades',    label: 'Riscos e Oportunidades',     sublabel: 'Matriz SWOT & Análise de Riscos',    icon: ShieldAlert  },
       { id: 'objetivos-metas',         label: 'Objetivos e Metas',          sublabel: 'Planejamento e Monitoramento do SGI', icon: Target       },
+      { id: 'partes-interessadas',     label: 'Partes Interessadas',        sublabel: 'Necessidades, Requisitos e Riscos',   icon: Handshake    },
     ],
   },
   {
