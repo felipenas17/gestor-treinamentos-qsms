@@ -27,6 +27,7 @@ import {
   ShieldAlert,
   Target,
   Handshake,
+  Scale,
 } from 'lucide-react';
 
 interface NavItem {
@@ -103,6 +104,7 @@ const MODULES: Module[] = [
       { id: 'procedimentos',     label: 'Procedimentos & POPs', sublabel: 'Revisões e Vigência',     icon: FileText       },
       { id: 'doc-controle',      label: 'Controle Documental',  sublabel: 'Licenças e Autorizações', icon: Shield         },
       { id: 'obrigacoes-legais', label: 'Obrigações Legais',    sublabel: 'Cumprimento e Prazos',    icon: ClipboardCheck },
+      { id: 'requisitos-legais-grl', label: 'Requisitos Legais (GRL)', sublabel: 'Relatórios Anuais de Revisão', icon: Scale },
       { id: 'gestao-mudancas',      label: 'Gestão de Mudanças',      sublabel: 'PG-TR-SMS-013 · FAM/GIM',         icon: RefreshCw  },
       { id: 'mapeamento-processos',    label: 'Mapeamento de Processos',    sublabel: 'Fluxos e Processos Operacionais',    icon: GitBranch   },
       { id: 'riscos-oportunidades',    label: 'Riscos e Oportunidades',     sublabel: 'Matriz SWOT & Análise de Riscos',    icon: ShieldAlert  },

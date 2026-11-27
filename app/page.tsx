@@ -42,6 +42,7 @@ import MapeamentoProcessosScreen from '@/components/screens/mapeamento-processos
 import RiscosOportunidadesScreen from '@/components/screens/riscos-oportunidades-screen';
 import ObjetivosMetas from '@/components/screens/objetivos-metas-screen';
 import PartesInteressadas from '@/components/screens/partes-interessadas-screen';
+import GrlRelatorios from '@/components/screens/grl-relatorios-screen';
 // import { ImportDocumentModal } from '@/components/modals/import-document-modal'; // modal não ativo
 
 import {
@@ -1742,6 +1743,9 @@ export default function GestorTreinamentosApp() {
           )}
           {currentTab === 'partes-interessadas' && (
             <PartesInteressadas />
+          )}
+          {currentTab === 'requisitos-legais-grl' && (
+            <GrlRelatorios />
           )}
         </main>
       </div>
